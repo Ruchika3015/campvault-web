@@ -78,27 +78,48 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (email, password) => {
-    const data = await api.login({ email, password });
-    const newToken = data.token;
-    const newUser = data.user;
-    if (!newToken) throw { status: 500, message: 'Authentication failed. No token received.' };
-    localStorage.setItem('cj_token', newToken);
-    setToken(newToken);
-    setUser(newUser);
-    setIsDemoMode(false);
-    return newUser;
-  }, []);
+  const data = await api.login({ email, password });
+
+  const newToken = data.token;
+  const newUser = data.user;
+
+  if (!newToken) {
+    throw {
+      status: 500,
+      message: 'Authentication failed. No token received.'
+    };
+  }
+
+  // Remove any old demo session
+  localStorage.removeItem(DEMO_TOKEN_KEY);
+  localStorage.removeItem(DEMO_USER_KEY);
+
+  localStorage.setItem('cj_token', newToken);
+
+  setToken(newToken);
+  setUser(newUser);
+  setIsDemoMode(false);
+
+  return newUser;
+}, []);
 
   const register = useCallback(async (payload) => {
-    const data = await api.register(payload);
-    if (data.token) {
-      localStorage.setItem('cj_token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-      setIsDemoMode(false);
-    }
-    return data;
-  }, []);
+  const data = await api.register(payload);
+
+  if (data.token) {
+    // Remove any old demo session
+    localStorage.removeItem(DEMO_TOKEN_KEY);
+    localStorage.removeItem(DEMO_USER_KEY);
+
+    localStorage.setItem('cj_token', data.token);
+
+    setToken(data.token);
+    setUser(data.user);
+    setIsDemoMode(false);
+  }
+
+  return data;
+}, []);
 
   const demoLogin = useCallback(() => {
     const demoToken = 'demo-session-' + Date.now();

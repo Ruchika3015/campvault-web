@@ -2,11 +2,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { LED, Rivet } from '@/components/primitives/Details';
 import { mockDashboardNotifications } from '@/data/jugaadMockData';
+import { api } from '@/services/api';
 import {
   Home, Search, Plus, ClipboardList, Inbox, Send, MessageSquare,
   LogOut, Menu, X, Bell, User, Settings,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'HOME', icon: Home, path: '/dashboard' },
@@ -20,14 +21,54 @@ const NAV_ITEMS = [
 ];
 
 export function WorkshopNav() {
-  const { user, logout, isDemoMode } = useAuth();
+  const { user, logout, isDemoMode, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false);
+  const [notifications, setNotifications] = useState(isDemoMode ? mockDashboardNotifications : []);
 
-  const unreadNotifs = mockDashboardNotifications.filter((n) => n.unread).length;
+  const fetchNotifications = useCallback(async () => {
+    if (isDemoMode) {
+      setNotifications(mockDashboardNotifications);
+      return;
+    }
+    if (!isAuthenticated) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const data = await api.getNotifications();
+      const list = data?.notifications || data?.data || (Array.isArray(data) ? data : []);
+      setNotifications(Array.isArray(list) ? list : []);
+    } catch {
+      // silently handle errors on background polling/fetch
+    }
+  }, [isDemoMode, isAuthenticated]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const unreadNotifs = notifications.filter((n) => n.unread || n.is_read === false || n.read === false).length;
+
+  const handleMarkAllRead = async () => {
+    if (isDemoMode) {
+      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+      setNotifOpen(false);
+      return;
+    }
+    try {
+      await Promise.allSettled(
+        notifications.filter((n) => n.unread || n.is_read === false || n.read === false).map((n) => api.markNotificationRead(n.id))
+      );
+      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false, is_read: true, read: true })));
+    } catch {
+      // ignore
+    }
+    setNotifOpen(false);
+  };
 
   const getActiveId = () => {
     const path = location.pathname;
@@ -57,7 +98,7 @@ export function WorkshopNav() {
   };
 
   const getNotifLink = (n) => {
-    if (n.conversationId) return `/dashboard/messages/${n.conversationId}`;
+    if (n.conversationId || n.conversation_id) return `/dashboard/messages/${n.conversationId || n.conversation_id}`;
     if (n.jugaadId && n.jugaadId.startsWith('JG-1')) return `/dashboard/my-jugaads`;
     if (n.jugaadId && n.jugaadId.startsWith('JG-2')) return `/dashboard/my-requests`;
     return '/dashboard';
@@ -183,27 +224,33 @@ export function WorkshopNav() {
                 <Bell size={13} className="text-amber" />
                 <span className="font-technical text-[9px] text-ink-0">NOTIFICATIONS</span>
               </div>
-              <button className="font-technical text-[7px] text-mint hover:text-mint-soft transition-colors" onClick={() => setNotifOpen(false)}>
+              <button className="font-technical text-[7px] text-mint hover:text-mint-soft transition-colors" onClick={handleMarkAllRead}>
                 MARK ALL READ
               </button>
             </div>
             <div className="space-y-2.5 max-h-64 overflow-y-auto">
-              {mockDashboardNotifications.map((n) => (
-                <Link
-                  key={n.id}
-                  to={getNotifLink(n)}
-                  onClick={() => setNotifOpen(false)}
-                  className="flex items-start gap-2.5 surface-metal rounded-lg p-2.5 hover:border-amber/30 transition-colors"
-                  style={{ border: '1px solid transparent' }}
-                >
-                  <span className="text-sm leading-none mt-0.5">{n.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono text-[10px] text-ink-1 leading-snug">{n.text}</p>
-                    <p className="font-mono text-[8px] text-ink-3 mt-0.5">{timeAgoShort(n.timestamp)}</p>
-                  </div>
-                  {n.unread && <span className="w-2 h-2 rounded-full bg-coral shrink-0 mt-1" />}
-                </Link>
-              ))}
+              {notifications.length === 0 ? (
+                <div className="py-8 text-center font-mono text-[10px] text-ink-3">
+                  No notifications yet.
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <Link
+                    key={n.id}
+                    to={getNotifLink(n)}
+                    onClick={() => setNotifOpen(false)}
+                    className="flex items-start gap-2.5 surface-metal rounded-lg p-2.5 hover:border-amber/30 transition-colors"
+                    style={{ border: '1px solid transparent' }}
+                  >
+                    <span className="text-sm leading-none mt-0.5">{n.emoji || '🔔'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono text-[10px] text-ink-1 leading-snug">{n.text || n.message || n.title}</p>
+                      <p className="font-mono text-[8px] text-ink-3 mt-0.5">{timeAgoShort(n.timestamp || n.created_at || n.createdAt)}</p>
+                    </div>
+                    {(n.unread || n.is_read === false || n.read === false) && <span className="w-2 h-2 rounded-full bg-coral shrink-0 mt-1" />}
+                  </Link>
+                ))
+              )}
             </div>
             <button onClick={() => setNotifOpen(false)} className="absolute -top-2 -right-2 grid place-items-center w-7 h-7 rounded-full surface-metal text-ink-2 hover:text-ink-0 text-xs" aria-label="Close">✕</button>
           </div>

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { LED } from '@/components/primitives/Details';
 import { mockDiscoveryFeed, CATEGORY_COLORS, timeAgo, daysUntil } from '@/data/jugaadMockData';
+import { api } from '@/services/api';
 import { Search, Heart, X, HandCoins, Clock, Star, Undo2, CheckCircle2 } from 'lucide-react';
 import { BargainModal } from '@/components/workshop/pages/BargainModal';
 import { ProposalModal } from '@/components/workshop/pages/ProposalModal';
@@ -8,8 +9,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useProposals } from '@/context/ProposalContext';
 
 export function FindJugaadPage() {
-  const { user } = useAuth();
-  const { sendProposal, getProposalForJugaad } = useProposals();
+  const { user, isDemoMode, isAuthenticated } = useAuth();
+  const { sendProposal, getProposalForJugaad, refreshData } = useProposals();
+  const [feedItems, setFeedItems] = useState(isDemoMode ? mockDiscoveryFeed : []);
+  const [loading, setLoading] = useState(!isDemoMode);
   const [hidden, setHidden] = useState([]);
   const [bargain, setBargain] = useState(null);
   const [proposalItem, setProposalItem] = useState(null);
@@ -17,25 +20,57 @@ export function FindJugaadPage() {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('ALL');
 
+  const fetchFeed = useCallback(async () => {
+    if (isDemoMode) {
+      setFeedItems(mockDiscoveryFeed);
+      setLoading(false);
+      return;
+    }
+    if (!isAuthenticated) return;
+
+    setLoading(true);
+    try {
+      const data = await api.getDiscoveryFeed();
+      const list = data?.jugaads || data?.data || (Array.isArray(data) ? data : []);
+      setFeedItems(Array.isArray(list) ? list : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [isDemoMode, isAuthenticated]);
+
+  useEffect(() => {
+    fetchFeed();
+  }, [fetchFeed]);
+
   const helper = user
     ? { id: user.id, name: user.name, initials: user.name?.slice(0, 2).toUpperCase() || 'U' }
     : { id: 'guest', name: 'Guest', initials: 'GU' };
 
-  const visible = mockDiscoveryFeed.filter(
+  const visible = feedItems.filter(
     (x) =>
       !hidden.includes(x.id) &&
-      (!query || x.title.toLowerCase().includes(query.toLowerCase()) || x.skillRequired.toLowerCase().includes(query.toLowerCase())) &&
+      (!query || (x.title && x.title.toLowerCase().includes(query.toLowerCase())) || (x.skillRequired && x.skillRequired.toLowerCase().includes(query.toLowerCase()))) &&
       (category === 'ALL' || x.category === category)
   );
 
-  const hide = (id) => {
+  const hide = async (id) => {
     setHidden((v) => [...v, id]);
     setUndo(id);
+    if (!isDemoMode) {
+      try {
+        await api.markNotInterested(id);
+      } catch {
+        // ignore
+      }
+    }
     setTimeout(() => setUndo((v) => (v === id ? null : v)), 5000);
   };
 
-  const handleSendProposal = (payload) => {
-    sendProposal({ ...payload, helper });
+  const handleSendProposal = async (payload) => {
+    await sendProposal({ ...payload, helper });
+    await fetchFeed();
   };
 
   const sections = [
@@ -148,9 +183,13 @@ export function FindJugaadPage() {
 }
 
 function OpportunityCard({ item, existingProposal, onInterest, onHide, onBargain }) {
-  const color = CATEGORY_COLORS[item.category];
+  const color = CATEGORY_COLORS[item.category] || 'amber';
   const proposalSent = !!existingProposal;
   const proposalStatus = existingProposal?.status;
+  const posterName = item.poster?.name || item.creator?.name || 'Student';
+  const posterInitials = item.poster?.initials || posterName.slice(0, 2).toUpperCase();
+  const posterRating = item.poster?.rating ?? '4.8';
+  const categoryChar = item.category ? item.category[0] : 'J';
 
   return (
     <article
@@ -163,7 +202,7 @@ function OpportunityCard({ item, existingProposal, onInterest, onHide, onBargain
             className="grid place-items-center w-11 h-11 rounded-xl shrink-0"
             style={{ background: `color-mix(in srgb, var(--${color}) 14%, transparent)`, color: `var(--${color})` }}
           >
-            <span className="font-display text-lg">{item.category[0]}</span>
+            <span className="font-display text-lg">{categoryChar}</span>
           </span>
           <div>
             <h2 className="font-display text-lg text-ink-0 leading-tight">{item.title}</h2>
@@ -174,7 +213,7 @@ function OpportunityCard({ item, existingProposal, onInterest, onHide, onBargain
               >
                 {item.category}
               </span>
-              <span className="font-mono text-[8px] text-ink-3">{item.skillRequired}</span>
+              <span className="font-mono text-[8px] text-ink-3">{item.skillRequired || 'General'}</span>
             </div>
           </div>
         </div>
@@ -191,9 +230,9 @@ function OpportunityCard({ item, existingProposal, onInterest, onHide, onBargain
         </span>
         <span className="flex items-center gap-1">
           <Star size={11} className="text-amber fill-amber" />
-          {item.poster.rating}
+          {posterRating}
         </span>
-        <span>{timeAgo(item.postedAt)}</span>
+        <span>{timeAgo(item.postedAt || item.created_at || item.createdAt)}</span>
       </div>
 
       {proposalSent && (
@@ -210,9 +249,9 @@ function OpportunityCard({ item, existingProposal, onInterest, onHide, onBargain
 
       <div className="mt-4 pt-3 border-t border-metal-1/40 flex items-center gap-2">
         <span className="grid place-items-center w-6 h-6 rounded-full bg-amber text-bg-0 font-display text-[8px]">
-          {item.poster.initials}
+          {posterInitials}
         </span>
-        <span className="font-mono text-[9px] text-ink-1 flex-1">{item.poster.name}</span>
+        <span className="font-mono text-[9px] text-ink-1 flex-1">{posterName}</span>
         <button
           onClick={onHide}
           aria-label="Not interested"

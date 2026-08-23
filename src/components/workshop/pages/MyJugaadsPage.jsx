@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { LED } from '@/components/primitives/Details';
 import { mockMyPostedJugaads, JUGAAD_STATUS, REQUEST_STATUS, timeAgo } from '@/data/jugaadMockData';
+import { api } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 import { ClipboardList, ArrowLeft, ChevronRight, UserCheck, HandCoins, Check, X, MessageSquare, Clock, Tag } from 'lucide-react';
 import { useProposals } from '@/context/ProposalContext';
 import { CounterOfferModal } from '@/components/workshop/pages/CounterOfferModal';
@@ -16,30 +18,79 @@ const PROPOSAL_STATUS = {
 };
 
 export function MyJugaadsPage() {
+  const { isDemoMode, isAuthenticated } = useAuth();
   const { proposals, acceptProposal, rejectProposal, counterProposal } = useProposals();
+  const [jugaadsList, setJugaadsList] = useState(isDemoMode ? mockMyPostedJugaads : []);
+  const [loading, setLoading] = useState(!isDemoMode);
   const [selected, setSelected] = useState(null);
   const [status, setStatus] = useState({});
   const [counterTarget, setCounterTarget] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
-  const items = mockMyPostedJugaads.map((x) => ({ ...x, status: status[x.id] || x.status }));
+
+  const fetchMyJugaads = useCallback(async () => {
+    if (isDemoMode) {
+      setJugaadsList(mockMyPostedJugaads);
+      setLoading(false);
+      return;
+    }
+    if (!isAuthenticated) return;
+
+    setLoading(true);
+    try {
+      const data = await api.getMyJugaads();
+      const list = data?.jugaads || data?.data || (Array.isArray(data) ? data : []);
+      setJugaadsList(Array.isArray(list) ? list : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [isDemoMode, isAuthenticated]);
+
+  useEffect(() => {
+    fetchMyJugaads();
+  }, [fetchMyJugaads]);
+
+  const handleUpdateStatus = async (itemId, newStatus) => {
+    setStatus((v) => ({ ...v, [itemId]: newStatus }));
+    if (!isDemoMode) {
+      try {
+        await api.updateJugaadStatus(itemId, newStatus);
+        await fetchMyJugaads();
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const items = jugaadsList.map((x) => ({
+    ...x,
+    status: status[x.id] || x.status || 'open',
+    interestedStudents: x.interestedStudents || x.requests || [],
+  }));
 
   if (selected) {
     const item = items.find((x) => x.id === selected) || items[0];
-    const itemProposals = proposals.filter((p) => p.jugaadId === item.id);
+    if (!item) return null;
+    const itemProposals = proposals.filter((p) => p.jugaadId === item.id || p.jugaad_id === item.id);
     return (
       <Detail
         item={item}
         proposals={itemProposals}
         onBack={() => setSelected(null)}
-        onStatus={(s) => setStatus((v) => ({ ...v, [item.id]: s }))}
+        onStatus={(s) => handleUpdateStatus(item.id, s)}
         onAcceptProposal={(p) => setConfirmAction({ variant: 'accept', proposal: p })}
         onRejectProposal={(p) => setConfirmAction({ variant: 'reject', proposal: p })}
         onCounterProposal={(p) => setCounterTarget(p)}
         confirmAction={confirmAction}
         setConfirmAction={setConfirmAction}
-        onConfirmAction={() => {
-          if (confirmAction.variant === 'accept') acceptProposal(confirmAction.proposal.id);
-          else if (confirmAction.variant === 'reject') rejectProposal(confirmAction.proposal.id);
+        onConfirmAction={async () => {
+          if (confirmAction.variant === 'accept') {
+            await acceptProposal(confirmAction.proposal.id);
+          } else if (confirmAction.variant === 'reject') {
+            await rejectProposal(confirmAction.proposal.id);
+          }
+          await fetchMyJugaads();
           setConfirmAction(null);
         }}
       />
@@ -56,51 +107,70 @@ export function MyJugaadsPage() {
           POST NEW
         </Link>
       </div>
-      <div className="grid lg:grid-cols-2 gap-3">
-        {items.map((item) => {
-          const itemProposals = proposals.filter((p) => p.jugaadId === item.id);
-          return (
-            <button
-              key={item.id}
-              onClick={() => setSelected(item.id)}
-              className="surface-metal-brushed rounded-2xl p-5 text-left hover:border-amber/40 transition-colors"
-              style={{ border: '1px solid var(--metal-1)' }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-display text-lg">{item.title}</p>
-                  <p className="font-mono text-[9px] text-ink-3 mt-1">{item.id} · {item.skillRequired}</p>
-                </div>
-                <span
-                  className="font-technical text-[7px] px-2 py-1 rounded"
-                  style={{ color: `var(--${JUGAAD_STATUS[item.status].color})`, background: `color-mix(in srgb, var(--${JUGAAD_STATUS[item.status].color}) 12%, transparent)` }}
-                >
-                  {JUGAAD_STATUS[item.status].label}
-                </span>
-              </div>
-              <p className="font-mono text-[10px] text-ink-2 mt-4 line-clamp-2">{item.description}</p>
-              <div className="flex items-center gap-3 mt-4">
-                <span className="font-display text-lg text-amber">₹{item.amount}</span>
-                <span className="font-mono text-[9px] text-ink-3">
-                  {item.interestedStudents.length + itemProposals.length} requests
-                </span>
-                {itemProposals.length > 0 && (
-                  <span className="font-technical text-[7px] text-amber px-1.5 py-0.5 rounded bg-amber/10">
-                    {itemProposals.length} PROPOSALS
+
+      {items.length === 0 ? (
+        <div className="surface-metal-brushed rounded-2xl p-12 text-center" style={{ border: '1px solid var(--metal-1)' }}>
+          <ClipboardList size={36} className="mx-auto text-ink-3 mb-3" />
+          <p className="font-display text-xl text-ink-0">NO POSTED JUGAADS</p>
+          <p className="font-mono text-xs text-ink-2 mt-2 max-w-sm mx-auto">
+            You haven't posted any tasks yet. Drop a task into the exchange to get help from campus students.
+          </p>
+          <Link to="/dashboard/post-jugaad" className="machine-control machine-control--primary inline-flex mt-6" style={{ padding: '10px 16px' }}>
+            <span className="ctrl-led" />
+            POST YOUR FIRST JUGAAD
+          </Link>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-2 gap-3">
+          {items.map((item) => {
+            const itemProposals = proposals.filter((p) => p.jugaadId === item.id || p.jugaad_id === item.id);
+            const statusConfig = JUGAAD_STATUS[item.status] || JUGAAD_STATUS.open;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setSelected(item.id)}
+                className="surface-metal-brushed rounded-2xl p-5 text-left hover:border-amber/40 transition-colors"
+                style={{ border: '1px solid var(--metal-1)' }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-display text-lg">{item.title}</p>
+                    <p className="font-mono text-[9px] text-ink-3 mt-1">{item.id} · {item.skillRequired || item.category}</p>
+                  </div>
+                  <span
+                    className="font-technical text-[7px] px-2 py-1 rounded"
+                    style={{ color: `var(--${statusConfig.color})`, background: `color-mix(in srgb, var(--${statusConfig.color}) 12%, transparent)` }}
+                  >
+                    {statusConfig.label}
                   </span>
-                )}
-                <ChevronRight size={14} className="ml-auto text-ink-3" />
-              </div>
-            </button>
-          );
-        })}
-      </div>
+                </div>
+                <p className="font-mono text-[10px] text-ink-2 mt-4 line-clamp-2">{item.description}</p>
+                <div className="flex items-center gap-3 mt-4">
+                  <span className="font-display text-lg text-amber">₹{item.amount}</span>
+                  <span className="font-mono text-[9px] text-ink-3">
+                    {(item.interestedStudents?.length || 0) + itemProposals.length} requests
+                  </span>
+                  {itemProposals.length > 0 && (
+                    <span className="font-technical text-[7px] text-amber px-1.5 py-0.5 rounded bg-amber/10">
+                      {itemProposals.length} PROPOSALS
+                    </span>
+                  )}
+                  <ChevronRight size={14} className="ml-auto text-ink-3" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {counterTarget && (
         <CounterOfferModal
           proposal={counterTarget}
           onClose={() => setCounterTarget(null)}
-          onSubmit={(price, msg) => counterProposal(counterTarget.id, price, msg)}
+          onSubmit={async (price, msg) => {
+            await counterProposal(counterTarget.id, price, msg);
+            await fetchMyJugaads();
+          }}
         />
       )}
     </div>
@@ -195,23 +265,27 @@ function Detail({ item, proposals, onBack, onStatus, onAcceptProposal, onRejectP
           <div className="surface-metal-brushed rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <p className="font-technical text-[9px]">INTERESTED STUDENTS</p>
-              <span className="font-mono text-[8px] text-ink-3">{item.interestedStudents.length} requests</span>
+              <span className="font-mono text-[8px] text-ink-3">{(item.interestedStudents?.length || 0)} requests</span>
             </div>
             <div className="space-y-3">
-              {item.interestedStudents.map((student) => (
-                <StudentRequest
-                  key={student.id}
-                  student={student}
-                  assigned={item.acceptedStudent?.id === student.id}
-                  locked={!!item.acceptedStudent && item.acceptedStudent.id !== student.id}
-                />
-              ))}
+              {(item.interestedStudents?.length || 0) === 0 ? (
+                <p className="font-mono text-[9px] text-ink-3 py-2">No direct student requests yet.</p>
+              ) : (
+                item.interestedStudents.map((student) => (
+                  <StudentRequest
+                    key={student.id}
+                    student={student}
+                    assigned={item.acceptedStudent?.id === student.id}
+                    locked={!!item.acceptedStudent && item.acceptedStudent.id !== student.id}
+                  />
+                ))
+              )}
             </div>
             {item.acceptedStudent && (
               <div className="mt-4 surface-panel rounded-xl p-3 flex items-center gap-2 text-mint">
                 <UserCheck size={15} />
                 <span className="font-mono text-[10px]">Assigned to {item.acceptedStudent.name} · ₹{item.acceptedStudent.agreedAmount}</span>
-                <Link to="/dashboard/messages/conv1" className="ml-auto font-technical text-[8px] text-mint">MESSAGE</Link>
+                <Link to={item.acceptedStudent.conversationId ? `/dashboard/messages/${item.acceptedStudent.conversationId}` : `/dashboard/messages`} className="ml-auto font-technical text-[8px] text-mint">MESSAGE</Link>
               </div>
             )}
           </div>

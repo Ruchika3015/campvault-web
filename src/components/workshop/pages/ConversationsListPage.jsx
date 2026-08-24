@@ -1,203 +1,304 @@
-import { Link } from 'react-router-dom';
-import { LED } from '@/components/primitives/Details';
-import { useProposals } from '@/context/ProposalContext';
-import { MessageSquare, ArrowRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { api } from '@/services/api';
+
+function getInitials(name) {
+  const value = String(name || '').trim();
+
+  if (!value) {
+    return 'U';
+  }
+
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+}
+
+function extractConversations(response) {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response?.conversations)) {
+    return response.conversations;
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  if (Array.isArray(response?.data?.conversations)) {
+    return response.data.conversations;
+  }
+
+  return [];
+}
+
+function formatLastMessage(conversation) {
+  if (conversation?.last_message) {
+    return conversation.last_message;
+  }
+
+  return 'No messages yet — say hello!';
+}
+
+function formatMoney(value) {
+  if (value === null || value === undefined || value === '') {
+    return '₹0';
+  }
+
+  return `₹${value}`;
+}
 
 export function ConversationsListPage() {
-  const { conversations = [] } = useProposals();
+  const navigate = useNavigate();
 
-  // Only keep valid conversation objects.
-  const list = Array.isArray(conversations)
-    ? conversations.filter(Boolean)
-    : [];
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const getInitials = (user) => {
-    if (!user) {
-      return 'U';
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await api.getConversations();
+
+      const list = extractConversations(response);
+
+      console.log('CONVERSATIONS FROM BACKEND:', response);
+      console.log('NORMALIZED CONVERSATIONS:', list);
+
+      setConversations(list);
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+
+      setError(
+        err?.message ||
+          'Unable to load conversations. Please try again.'
+      );
+
+      setConversations([]);
+    } finally {
+      setLoading(false);
     }
-
-    // Use backend-provided initials when available.
-    if (
-      typeof user.initials === 'string' &&
-      user.initials.trim()
-    ) {
-      return user.initials.trim().slice(0, 2).toUpperCase();
-    }
-
-    // Otherwise generate initials from name.
-    const name =
-      user.name ||
-      user.fullName ||
-      user.username ||
-      '';
-
-    if (typeof name === 'string' && name.trim()) {
-      const parts = name
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean);
-
-      return parts
-        .slice(0, 2)
-        .map((part) => part.charAt(0))
-        .join('')
-        .toUpperCase() || 'U';
-    }
-
-    return 'U';
   };
 
-  const getUserName = (user) => {
-    if (!user) {
-      return 'User';
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  const visibleConversations = useMemo(() => {
+    return conversations.filter((conversation) => {
+      return Boolean(
+        conversation?.id ||
+          conversation?.conversation_id
+      );
+    });
+  }, [conversations]);
+
+  const openConversation = (conversation) => {
+    const conversationId =
+      conversation?.id ??
+      conversation?.conversation_id;
+
+    if (!conversationId) {
+      console.error(
+        'Conversation has no conversation ID:',
+        conversation
+      );
+      return;
     }
 
+    navigate(`/dashboard/messages/${conversationId}`);
+  };
+
+  if (loading) {
     return (
-      user.name ||
-      user.fullName ||
-      user.username ||
-      'User'
+      <div className="min-h-screen bg-[#0b0908] px-6 py-16 text-[#f4efe7]">
+        <div className="mx-auto max-w-[1180px]">
+          <div className="mb-3 font-technical text-[10px] uppercase tracking-[0.28em] text-[#7fe0c0]">
+            06 — ACCEPTED COLLABORATIONS
+          </div>
+
+          <h1 className="text-5xl font-black uppercase tracking-[-0.04em] md:text-6xl">
+            Messages.
+          </h1>
+
+          <p className="mt-5 max-w-2xl text-base leading-7 text-[#aaa39a]">
+            Loading your accepted collaborations...
+          </p>
+        </div>
+      </div>
     );
-  };
-
-  const getLastMessage = (conversation) => {
-    const messages = Array.isArray(conversation?.messages)
-      ? conversation.messages
-      : [];
-
-    if (messages.length === 0) {
-      return 'No messages yet — say hello!';
-    }
-
-    const lastMessage = messages[messages.length - 1];
-
-    if (!lastMessage) {
-      return 'No messages yet — say hello!';
-    }
-
-    return (
-      lastMessage.text ||
-      lastMessage.message ||
-      lastMessage.content ||
-      'No messages yet — say hello!'
-    );
-  };
+  }
 
   return (
-    <div>
-      <section className="pt-12 pb-7">
-        <div className="flex items-center gap-3 mb-4">
-          <LED
-            color="mint"
-            pulse
-            size={7}
-          />
+    <div className="min-h-screen bg-[#0b0908] px-6 py-16 text-[#f4efe7]">
+      <div className="mx-auto max-w-[1180px]">
 
-          <span className="font-technical text-[9px] text-ink-2">
-            06 — ACCEPTED COLLABORATIONS
-          </span>
+        {/* HEADER */}
+        <div className="mb-3 font-technical text-[10px] uppercase tracking-[0.28em] text-[#7fe0c0]">
+          06 — ACCEPTED COLLABORATIONS
         </div>
 
-        <h1 className="font-display text-4xl sm:text-5xl">
-          MESSAGES.
+        <h1 className="text-5xl font-black uppercase tracking-[-0.04em] md:text-6xl">
+          Messages.
         </h1>
 
-        <p className="mt-4 max-w-xl text-sm text-ink-2">
+        <p className="mt-5 max-w-2xl text-base leading-7 text-[#aaa39a]">
           Conversations unlock only when a poster accepts your
           request. Every thread belongs to one Jugaad.
         </p>
-      </section>
 
-      {list.length === 0 ? (
-        <div className="py-16 text-center">
-          <MessageSquare
-            size={32}
-            className="mx-auto text-ink-3 mb-3"
-          />
+        {/* ERROR */}
+        {error && (
+          <div className="mt-8 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
+            {error}
+          </div>
+        )}
 
-          <p className="font-mono text-sm text-ink-2">
-            No conversations yet. Accept a proposal to start
-            messaging.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {list.map((conversation, index) => {
-            if (!conversation) {
-              return null;
-            }
+        {/* EMPTY */}
+        {!error && visibleConversations.length === 0 && (
+          <div className="mt-10 rounded-3xl border border-white/10 bg-white/[0.04] p-8">
+            <p className="text-lg font-semibold">
+              No accepted collaborations yet.
+            </p>
+
+            <p className="mt-2 text-sm text-[#aaa39a]">
+              Once a proposal is accepted, the other person will
+              appear here.
+            </p>
+          </div>
+        )}
+
+        {/* CONVERSATIONS */}
+        <div className="mt-9 space-y-4">
+          {visibleConversations.map((conversation) => {
+            /*
+             * IMPORTANT:
+             *
+             * The backend already gives us the OTHER PERSON.
+             *
+             * Example:
+             *
+             * other_user_id: "2"
+             * other_user_name: "Ishita Agarwal"
+             * other_user_email: "ishita05agarwal@gmail.com"
+             *
+             * Therefore we must NOT use:
+             *
+             * conversation.user
+             * conversation.poster
+             * conversation.proposer
+             *
+             * unless the backend actually sends those fields.
+             */
 
             const conversationId =
-              conversation.id ||
-              conversation._id ||
-              `conversation-${index}`;
+              conversation?.id ??
+              conversation?.conversation_id;
 
-            const otherUser =
-              conversation.otherUser ||
-              conversation.user ||
-              conversation.poster ||
-              conversation.helper ||
-              {};
+            const personName =
+              conversation?.other_user_name ||
+              'User';
 
-            const userName = getUserName(otherUser);
-            const initials = getInitials(otherUser);
+            const personEmail =
+              conversation?.other_user_email ||
+              '';
+
+            const personId =
+              conversation?.other_user_id ??
+              '';
 
             const jugaadTitle =
-              conversation.jugaadTitle ||
-              conversation.jugaad?.title ||
-              conversation.title ||
+              conversation?.jugaad_title ||
               'Jugaad';
 
-            const agreedAmount =
-              conversation.agreedAmount ??
-              conversation.agreed_price ??
-              conversation.proposedAmount ??
-              conversation.proposed_price ??
-              conversation.amount ??
-              0;
+            const jugaadId =
+              conversation?.jugaad_id ??
+              '';
+
+            const proposalId =
+              conversation?.proposal_id ??
+              '';
 
             const lastMessage =
-              getLastMessage(conversation);
+              formatLastMessage(conversation);
+
+            const initials = getInitials(personName);
 
             return (
-              <Link
+              <button
                 key={conversationId}
-                to={`/dashboard/messages/${conversationId}`}
-                className="surface-metal-brushed rounded-2xl p-5 flex items-center gap-4 hover:border-mint/40 transition-colors"
-                style={{
-                  border: '1px solid var(--metal-1)',
-                }}
+                type="button"
+                onClick={() =>
+                  openConversation(conversation)
+                }
+                className="group flex w-full items-center gap-5 rounded-[22px] border border-white/10 bg-white/[0.06] px-5 py-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/20 hover:bg-white/[0.09] md:px-6"
               >
-                {/* USER AVATAR */}
-                <span className="grid place-items-center w-12 h-12 rounded-full bg-mint text-bg-0 font-display text-sm shrink-0">
+                {/* AVATAR */}
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#62d5b1] text-lg font-black text-[#07110d]">
                   {initials}
-                </span>
+                </div>
 
-                {/* CONVERSATION INFO */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-display text-lg">
-                    {userName}
-                  </p>
+                {/* CONTENT */}
+                <div className="min-w-0 flex-1">
 
-                  <p className="font-mono text-[9px] text-ink-3 mt-1">
-                    {jugaadTitle} · ₹{agreedAmount}
-                  </p>
+                  {/* PERSON */}
+                  <div className="truncate text-xl font-bold text-[#f4efe7]">
+                    {personName}
+                  </div>
 
-                  <p className="font-mono text-[10px] text-ink-2 mt-3 truncate">
+                  {/* JUGAAD */}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#aaa39a]">
+                    <span>
+                      {jugaadTitle}
+                    </span>
+
+                    <span>•</span>
+
+                    <span>
+                      {formatMoney(
+                        conversation?.amount ??
+                          conversation?.budget ??
+                          conversation?.price
+                      )}
+                    </span>
+                  </div>
+
+                  {/* MESSAGE */}
+                  <div className="mt-3 truncate text-sm text-[#aaa39a]">
                     {lastMessage}
-                  </p>
+                  </div>
+
+                  {/* DEBUG-FRIENDLY META, visually subtle */}
+                  {(personId ||
+                    jugaadId ||
+                    proposalId ||
+                    personEmail) && (
+                    <div className="mt-2 hidden text-[10px] text-white/30">
+                      user: {personId} · jugaad: {jugaadId} ·
+                      proposal: {proposalId} · {personEmail}
+                    </div>
+                  )}
                 </div>
 
                 {/* ARROW */}
-                <ArrowRight
-                  size={17}
-                  className="text-ink-3 shrink-0"
-                />
-              </Link>
+                <div className="shrink-0 text-2xl text-[#aaa39a] transition group-hover:translate-x-1 group-hover:text-white">
+                  →
+                </div>
+              </button>
             );
           })}
         </div>
-      )}
+      </div>
     </div>
   );
 }
+
+export default ConversationsListPage;

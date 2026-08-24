@@ -16,10 +16,12 @@ import { ConfirmActionModal } from '@/components/workshop/pages/ConfirmActionMod
 
 const STATUS_CFG = {
   ...REQUEST_STATUS,
+
   waiting: {
     color: 'amber',
     label: 'PENDING',
   },
+
   withdrawn: {
     color: 'ink',
     label: 'WITHDRAWN',
@@ -72,13 +74,46 @@ function getPoster(request) {
 }
 
 function safeTimeAgo(value) {
-  if (!value) return 'recently';
+  if (!value) {
+    return 'recently';
+  }
 
   try {
     return timeAgo(value);
   } catch {
     return 'recently';
   }
+}
+
+/*
+ * The backend uses PostgreSQL bigint for conversation IDs.
+ *
+ * Therefore values such as:
+ *   "conv1"
+ *   "conv-1"
+ *   "abc"
+ *
+ * are NOT valid conversation IDs.
+ *
+ * Only allow numeric IDs here.
+ */
+function getValidConversationId(request) {
+  const rawId =
+    request?.conversationId ??
+    request?.conversation_id ??
+    request?.conversation?.id;
+
+  if (rawId === null || rawId === undefined) {
+    return null;
+  }
+
+  const value = String(rawId).trim();
+
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  return value;
 }
 
 export function MyRequestsPage() {
@@ -96,15 +131,19 @@ export function MyRequestsPage() {
   const handleWithdraw = (request) => {
     setConfirmAction({
       variant: 'withdraw',
+
       proposal: {
         id: request?.proposalId,
+
         helper: {
           name: 'You',
         },
+
         jugaadTitle:
           request?.jugaadTitle ||
           request?.jugaad?.title ||
           'Jugaad',
+
         proposedPrice:
           request?.proposedAmount ??
           request?.amount ??
@@ -115,7 +154,9 @@ export function MyRequestsPage() {
   };
 
   const handleConfirmAction = async () => {
-    if (!confirmAction) return;
+    if (!confirmAction) {
+      return;
+    }
 
     try {
       if (
@@ -125,7 +166,10 @@ export function MyRequestsPage() {
         await withdrawProposal(confirmAction.proposal.id);
       }
     } catch (error) {
-      console.error('Failed to perform proposal action:', error);
+      console.error(
+        'Failed to perform proposal action:',
+        error
+      );
     } finally {
       setConfirmAction(null);
     }
@@ -135,7 +179,11 @@ export function MyRequestsPage() {
     <div>
       <section className="pt-12 pb-7">
         <div className="flex items-center gap-3 mb-4">
-          <LED color="mint" pulse size={7} />
+          <LED
+            color="mint"
+            pulse
+            size={7}
+          />
 
           <span className="font-technical text-[9px] text-ink-2">
             05 — YOUR OUTGOING SIGNALS
@@ -145,12 +193,14 @@ export function MyRequestsPage() {
         <h1 className="font-display text-4xl sm:text-5xl">
           MY
           <br />
-          <span className="text-mint">REQUESTS.</span>
+          <span className="text-mint">
+            REQUESTS.
+          </span>
         </h1>
 
         <p className="mt-4 max-w-xl text-sm text-ink-2">
-          Track every Jugaad where you raised your hand, made an offer, or
-          started a collaboration.
+          Track every Jugaad where you raised your hand,
+          made an offer, or started a collaboration.
         </p>
       </section>
 
@@ -223,8 +273,12 @@ function RequestRow({
     'completed',
   ].includes(status);
 
-  const isNegotiating = status === 'negotiating';
-  const isWithdrawn = status === 'withdrawn';
+  const isNegotiating =
+    status === 'negotiating';
+
+  const isWithdrawn =
+    status === 'withdrawn';
+
   const isPending =
     status === 'waiting' ||
     status === 'pending';
@@ -263,11 +317,13 @@ function RequestRow({
   const requestType =
     request?.requestType ||
     request?.request_type ||
-    (request?.proposedAmount != null ||
-    request?.proposed_amount != null ||
-    request?.proposed_price != null
-      ? 'proposal'
-      : 'interest');
+    (
+      request?.proposedAmount != null ||
+      request?.proposed_amount != null ||
+      request?.proposed_price != null
+        ? 'proposal'
+        : 'interest'
+    );
 
   const explanation =
     request?.explanation ||
@@ -299,10 +355,24 @@ function RequestRow({
       ? request.negotiation_history
       : [];
 
+  /*
+   * IMPORTANT:
+   *
+   * Do NOT use:
+   *
+   *   conversationId || 'conv1'
+   *
+   * because the backend expects a bigint.
+   *
+   * getValidConversationId() returns:
+   *
+   *   "1"   -> valid
+   *   "2"   -> valid
+   *   "conv1" -> null
+   *   "conv-1" -> null
+   */
   const conversationId =
-    request?.conversationId ||
-    request?.conversation_id ||
-    request?.conversation?.id;
+    getValidConversationId(request);
 
   return (
     <article
@@ -312,7 +382,7 @@ function RequestRow({
       }}
     >
       <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-        {/* SAFE POSTER AVATAR */}
+        {/* POSTER AVATAR */}
         <span className="grid place-items-center w-10 h-10 rounded-full bg-amber text-bg-0 font-display text-[9px] shrink-0">
           {poster.initials}
         </span>
@@ -350,9 +420,13 @@ function RequestRow({
               <Tag size={10} />
 
               {skills.map((skill, index) => (
-                <span key={`${skill}-${index}`}>
+                <span
+                  key={`${skill}-${index}`}
+                >
                   {skill}
-                  {index < skills.length - 1 ? ' · ' : ''}
+                  {index < skills.length - 1
+                    ? ' · '
+                    : ''}
                 </span>
               ))}
             </p>
@@ -382,46 +456,61 @@ function RequestRow({
       </div>
 
       {/* NEGOTIATION HISTORY */}
-      {isNegotiating && negotiationHistory.length > 0 && (
-        <div className="mt-4 surface-wood rounded-xl p-3">
-          <p className="font-technical text-[8px] text-paper/80 mb-2">
-            NEGOTIATION HISTORY
-          </p>
+      {isNegotiating &&
+        negotiationHistory.length > 0 && (
+          <div className="mt-4 surface-wood rounded-xl p-3">
+            <p className="font-technical text-[8px] text-paper/80 mb-2">
+              NEGOTIATION HISTORY
+            </p>
 
-          {negotiationHistory.map((offer, index) => (
-            <div
-              key={offer?.id || index}
-              className="flex items-center gap-2 py-1"
-            >
-              <span className="font-mono text-[9px] text-paper flex-1">
-                {offer?.from === 'me'
-                  ? 'You'
-                  : 'Poster'}
+            {negotiationHistory.map(
+              (offer, index) => (
+                <div
+                  key={offer?.id || index}
+                  className="flex items-center gap-2 py-1"
+                >
+                  <span className="font-mono text-[9px] text-paper flex-1">
+                    {offer?.from === 'me'
+                      ? 'You'
+                      : 'Poster'}
 
-                {offer?.message
-                  ? ` — ${offer.message}`
-                  : ''}
-              </span>
+                    {offer?.message
+                      ? ` — ${offer.message}`
+                      : ''}
+                  </span>
 
-              <span className="font-display text-sm text-amber">
-                ₹{Number(offer?.amount || 0).toFixed(2)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+                  <span className="font-display text-sm text-amber">
+                    ₹
+                    {Number(
+                      offer?.amount || 0
+                    ).toFixed(2)}
+                  </span>
+                </div>
+              )
+            )}
+          </div>
+        )}
 
       {/* ACTIONS */}
       <div className="mt-4 pt-3 border-t border-metal-1/40 flex flex-wrap gap-2">
         {/* MESSAGE AFTER ACCEPTANCE */}
-        {isAccepted && (
+
+        {isAccepted && conversationId && (
           <Link
-            to={`/dashboard/messages/${conversationId || 'conv1'}`}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px]"
+            to={`/dashboard/messages/${conversationId}`}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
           >
             <MessageSquare size={12} />
             MESSAGE
           </Link>
+        )}
+
+        {/* If accepted but backend has not supplied
+            a real conversation ID, don't create a fake one. */}
+        {isAccepted && !conversationId && (
+          <span className="font-mono text-[9px] text-ink-3">
+            Conversation unavailable.
+          </span>
         )}
 
         {/* NEGOTIATION ACTIONS */}

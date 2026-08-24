@@ -21,41 +21,30 @@ export function ProposalModal({
   onClose,
   onSend,
 }) {
-  const [explanation, setExplanation] =
-    useState('');
+  const [explanation, setExplanation] = useState('');
 
-  const [proposedPrice, setProposedPrice] =
-    useState(
-      item?.amount
-        ? String(item.amount)
-        : ''
-    );
+  const [proposedPrice, setProposedPrice] = useState(
+    item?.amount ? String(item.amount) : ''
+  );
 
-  const [completionTime, setCompletionTime] =
-    useState('');
+  const [completionTime, setCompletionTime] = useState('');
 
-  const [selectedSkills, setSelectedSkills] =
-    useState([]);
+  const [selectedSkills, setSelectedSkills] = useState([]);
 
-  const [customSkill, setCustomSkill] =
-    useState('');
+  const [customSkill, setCustomSkill] = useState('');
 
-  const [error, setError] =
-    useState('');
+  const [error, setError] = useState('');
 
-  const [sent, setSent] =
-    useState(false);
+  const [sent, setSent] = useState(false);
 
-  const [sending, setSending] =
-    useState(false);
+  const [sending, setSending] = useState(false);
 
   if (!item) {
     return null;
   }
 
   const color =
-    CATEGORY_COLORS?.[item.category] ||
-    'amber';
+    CATEGORY_COLORS?.[item.category] || 'amber';
 
   const posterName =
     item?.poster?.name ??
@@ -77,16 +66,13 @@ export function ProposalModal({
   const toggleSkill = (skillName) => {
     setSelectedSkills((previous) =>
       previous.includes(skillName)
-        ? previous.filter(
-            (skill) => skill !== skillName
-          )
+        ? previous.filter((skill) => skill !== skillName)
         : [...previous, skillName]
     );
   };
 
   const addCustomSkill = () => {
-    const trimmed =
-      customSkill.trim();
+    const trimmed = customSkill.trim();
 
     if (
       trimmed &&
@@ -117,6 +103,7 @@ export function ProposalModal({
 
     if (
       !proposedPrice ||
+      Number.isNaN(Number(proposedPrice)) ||
       Number(proposedPrice) <= 0
     ) {
       setError(
@@ -136,35 +123,45 @@ export function ProposalModal({
     setSending(true);
 
     try {
-      await onSend({
+      /*
+       * IMPORTANT:
+       *
+       * The backend expects:
+       *
+       * proposal_message
+       * proposed_price
+       * estimated_completion
+       *
+       * We also pass jugaadId so the existing onSend
+       * handler knows which Jugaad this proposal belongs to.
+       *
+       * Skills are kept locally for the UI, but are NOT sent
+       * because the backend proposal schema does not accept them.
+       */
+      const proposalPayload = {
         jugaadId: item.id,
 
-        jugaadTitle:
-          item.title,
+        proposal_message: explanation.trim(),
 
-        category:
-          item.category,
+        proposed_price: Number(proposedPrice),
 
-        poster:
-          item.poster,
+        estimated_completion: completionTime.trim(),
 
-        amount:
-          item.amount,
-
+        // Keep these for the existing frontend context/UI.
+        jugaadTitle: item.title,
+        category: item.category,
+        poster: item.poster,
+        amount: item.amount,
         helper,
+        skills: selectedSkills,
+      };
 
-        explanation:
-          explanation.trim(),
+      console.log(
+        'Submitting proposal:',
+        proposalPayload
+      );
 
-        proposedPrice:
-          Number(proposedPrice),
-
-        completionTime:
-          completionTime.trim(),
-
-        skills:
-          selectedSkills,
-      });
+      await onSend(proposalPayload);
 
       setSent(true);
     } catch (err) {
@@ -175,6 +172,7 @@ export function ProposalModal({
 
       setError(
         err?.message ||
+          err?.data?.error ||
           err?.data?.message ||
           'Failed to send proposal. Please try again.'
       );
@@ -321,11 +319,15 @@ export function ProposalModal({
 
                 <textarea
                   value={explanation}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setExplanation(
                       event.target.value
-                    )
-                  }
+                    );
+
+                    if (error) {
+                      setError('');
+                    }
+                  }}
                   rows={4}
                   placeholder="Tell the poster why you're the right person for this Jugaad. Mention your relevant skills, experience, or what makes your approach useful."
                   className="w-full rounded-lg bg-bg-1 border border-metal-1 p-3 font-mono text-xs outline-none resize-none focus:border-amber/40 text-ink-0"
@@ -352,11 +354,15 @@ export function ProposalModal({
                       type="number"
                       min="1"
                       value={proposedPrice}
-                      onChange={(event) =>
+                      onChange={(event) => {
                         setProposedPrice(
                           event.target.value
-                        )
-                      }
+                        );
+
+                        if (error) {
+                          setError('');
+                        }
+                      }}
                       placeholder={String(
                         item.amount || 500
                       )}
@@ -380,11 +386,15 @@ export function ProposalModal({
                     <input
                       type="text"
                       value={completionTime}
-                      onChange={(event) =>
+                      onChange={(event) => {
                         setCompletionTime(
                           event.target.value
-                        )
-                      }
+                        );
+
+                        if (error) {
+                          setError('');
+                        }
+                      }}
                       placeholder="e.g. 2 days"
                       className="w-full bg-transparent px-2 py-3 font-mono text-sm outline-none text-ink-0"
                       disabled={sending}
@@ -399,9 +409,7 @@ export function ProposalModal({
                 </label>
 
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {Array.isArray(
-                    CAMPUS_SKILLS
-                  ) &&
+                  {Array.isArray(CAMPUS_SKILLS) &&
                     CAMPUS_SKILLS.map(
                       (skill) => {
                         const active =
@@ -464,8 +472,7 @@ export function ProposalModal({
                   </button>
                 </div>
 
-                {selectedSkills.length >
-                  0 && (
+                {selectedSkills.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {selectedSkills.map(
                       (skill) => (

@@ -1,4 +1,7 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://campvault-backend.onrender.com';
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  'https://campvault-backend.onrender.com';
+
 /**
  * Low-level fetch wrapper for CampusJugaad REST API.
  *
@@ -161,14 +164,6 @@ export const api = {
 
   // ================================================================
   // PROPOSALS
-  // Confirmed backend:
-  // GET  /api/v1/proposals/my
-  // GET  /api/v1/proposals/received
-  // PUT  /api/v1/proposals/:id/accept
-  // PUT  /api/v1/proposals/:id/reject
-  // PUT  /api/v1/proposals/:id/withdraw
-  // POST /api/v1/proposals/:id/counter-offer
-  // GET  /api/v1/proposals/:id/counter-offers
   // ================================================================
 
   getMyProposals: () =>
@@ -206,10 +201,6 @@ export const api = {
 
   // ================================================================
   // CONVERSATIONS / MESSAGES
-  // Confirmed backend:
-  // GET  /api/v1/conversations
-  // GET  /api/v1/conversations/:id/messages
-  // POST /api/v1/conversations/:id/messages
   // ================================================================
 
   getConversations: () =>
@@ -220,35 +211,48 @@ export const api = {
       `/api/v1/conversations/${conversationId}/messages`
     ),
 
+  /*
+   * IMPORTANT:
+   *
+   * Backend expects:
+   *
+   * {
+   *   content: "hello"
+   * }
+   *
+   * NOT:
+   *
+   * {
+   *   text: "hello"
+   * }
+   */
   sendMessage: (conversationId, text) =>
     apiRequest(
       `/api/v1/conversations/${conversationId}/messages`,
       {
         method: 'POST',
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({
+          content: text,
+        }),
       }
     ),
 
   // ================================================================
-// NOTIFICATIONS
-// Confirmed backend:
-// GET /api/v1/notifications
-// PUT /api/v1/notifications/read-all
-// PUT /api/v1/notifications/:id/read
-// ================================================================
+  // NOTIFICATIONS
+  // ================================================================
 
-getNotifications: () =>
-  apiRequest('/api/v1/notifications'),
+  getNotifications: () =>
+    apiRequest('/api/v1/notifications'),
 
-markAllNotificationsRead: () =>
-  apiRequest('/api/v1/notifications/read-all', {
-    method: 'PUT',
-    body: JSON.stringify({}),
-  }),
+  markAllNotificationsRead: () =>
+    apiRequest('/api/v1/notifications/read-all', {
+      method: 'PUT',
+      body: JSON.stringify({}),
+    }),
 
-markNotificationRead: (id) =>
-  apiRequest(`/api/v1/notifications/${id}/read`, {
-    method: 'PUT',
-    body: JSON.stringify({}),
-  }),
+  markNotificationRead: (id) =>
+    apiRequest(`/api/v1/notifications/${id}/read`, {
+      method: 'PUT',
+      body: JSON.stringify({}),
+    }),
 };

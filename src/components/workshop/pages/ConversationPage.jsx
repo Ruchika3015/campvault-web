@@ -1,17 +1,27 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { LED } from '@/components/primitives/Details';
 import { useProposals } from '@/context/ProposalContext';
 import {
-  MessageSquare,
-  ArrowRight,
+  ArrowLeft,
+  Send,
+  IndianRupee,
   CheckCircle2,
 } from 'lucide-react';
 
 function getInitials(user) {
-  if (!user) return 'U';
+  if (!user || typeof user !== 'object') {
+    return 'U';
+  }
 
-  if (typeof user.initials === 'string' && user.initials.trim()) {
-    return user.initials.trim().slice(0, 2).toUpperCase();
+  if (
+    typeof user.initials === 'string' &&
+    user.initials.trim()
+  ) {
+    return user.initials
+      .trim()
+      .slice(0, 2)
+      .toUpperCase();
   }
 
   const name =
@@ -21,22 +31,33 @@ function getInitials(user) {
     user.email ||
     '';
 
-  if (!name) return 'U';
+  if (!name) {
+    return 'U';
+  }
 
   const parts = String(name)
     .trim()
     .split(/\s+/)
     .filter(Boolean);
 
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
+  if (parts.length === 0) {
+    return 'U';
   }
 
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  if (parts.length === 1) {
+    return parts[0]
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`
+    .toUpperCase();
 }
 
 function getUserName(user) {
-  if (!user) return 'User';
+  if (!user || typeof user !== 'object') {
+    return 'User';
+  }
 
   return (
     user.name ||
@@ -57,21 +78,13 @@ function getConversationId(conversation) {
   );
 }
 
-function getTitle(conversation) {
+function getJugaadTitle(conversation) {
   return (
     conversation?.jugaadTitle ||
     conversation?.jugaad?.title ||
     conversation?.title ||
     conversation?.jugaad_name ||
     'Jugaad'
-  );
-}
-
-function getStatus(conversation) {
-  return (
-    conversation?.status ||
-    conversation?.proposalStatus ||
-    'accepted'
   );
 }
 
@@ -86,48 +99,90 @@ function getAmount(conversation) {
   );
 }
 
-function getOtherUser(conversation) {
+function getStatus(conversation) {
   return (
-    conversation?.otherUser ||
-    conversation?.other_user ||
-    conversation?.user ||
-    conversation?.participant ||
-    conversation?.partner ||
+    conversation?.status ||
+    conversation?.proposalStatus ||
+    'accepted'
+  );
+}
+
+function getOtherUser(conversation) {
+  if (!conversation || typeof conversation !== 'object') {
+    return null;
+  }
+
+  return (
+    conversation.otherUser ||
+    conversation.other_user ||
+    conversation.user ||
+    conversation.participant ||
+    conversation.partner ||
+    conversation.poster ||
+    conversation.helper ||
     null
   );
 }
 
-function getLastMessage(conversation) {
-  if (conversation?.lastMessage?.text) {
-    return conversation.lastMessage.text;
+function getMessages(conversation) {
+  if (!conversation || typeof conversation !== 'object') {
+    return [];
   }
 
-  if (conversation?.lastMessage?.message) {
-    return conversation.lastMessage.message;
+  if (Array.isArray(conversation.messages)) {
+    return conversation.messages.filter(Boolean);
   }
 
-  if (typeof conversation?.lastMessage === 'string') {
-    return conversation.lastMessage;
+  return [];
+}
+
+function getMessageText(message) {
+  if (!message || typeof message !== 'object') {
+    return '';
   }
 
-  if (Array.isArray(conversation?.messages)) {
-    const last =
-      conversation.messages[conversation.messages.length - 1];
+  if (typeof message.text === 'string') {
+    return message.text;
+  }
 
-    if (last) {
-      return (
-        last.text ||
-        last.message ||
-        last.content ||
-        ''
-      );
-    }
+  if (typeof message.message === 'string') {
+    return message.message;
+  }
+
+  if (typeof message.content === 'string') {
+    return message.content;
   }
 
   return '';
 }
 
-export function ConversationsPage() {
+function isOwnMessage(message) {
+  if (!message || typeof message !== 'object') {
+    return false;
+  }
+
+  if (message.from === 'me') {
+    return true;
+  }
+
+  if (message.sender === 'me') {
+    return true;
+  }
+
+  if (message.senderId === 'me') {
+    return true;
+  }
+
+  if (message.isMine === true) {
+    return true;
+  }
+
+  return false;
+}
+
+export function ConversationPage() {
+  const { conversationId } = useParams();
+
   const proposalContext = useProposals() || {};
 
   const conversations = Array.isArray(
@@ -136,216 +191,271 @@ export function ConversationsPage() {
     ? proposalContext.conversations
     : [];
 
+  const base = conversations.find(
+    (conversation) =>
+      String(getConversationId(conversation)) ===
+      String(conversationId)
+  );
+
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState('');
+
+  /*
+   * Conversations may load asynchronously.
+   * Update local messages whenever the selected
+   * conversation changes.
+   */
+  useEffect(() => {
+    if (!base) {
+      setMessages([]);
+      return;
+    }
+
+    setMessages(getMessages(base));
+  }, [base]);
+
+  /*
+   * Safe fallback values.
+   * Nothing below should access properties
+   * directly from an undefined object.
+   */
+  const otherUser = getOtherUser(base);
+
+  const otherUserName = getUserName(otherUser);
+
+  const otherUserInitials = getInitials(otherUser);
+
+  const jugaadTitle = getJugaadTitle(base);
+
+  const agreedAmount = getAmount(base);
+
+  const status = getStatus(base);
+
+  const send = (event) => {
+    event.preventDefault();
+
+    const trimmedText = text.trim();
+
+    if (!trimmedText) {
+      return;
+    }
+
+    const newMessage = {
+      id: `local-${Date.now()}`,
+      from: 'me',
+      text: trimmedText,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      newMessage,
+    ]);
+
+    setText('');
+  };
+
+  /*
+   * Conversation not found.
+   */
+  if (!base) {
+    return (
+      <div>
+        <section className="pt-12 pb-5">
+          <Link
+            to="/dashboard/messages"
+            className="inline-flex items-center gap-1.5 font-technical text-[8px] text-ink-3 hover:text-ink-0 mb-5"
+          >
+            <ArrowLeft size={12} />
+            ALL MESSAGES
+          </Link>
+
+          <div className="surface-panel rounded-2xl p-6">
+            <p className="font-mono text-sm text-ink-2">
+              This conversation is not available.
+            </p>
+
+            <p className="font-mono text-[10px] text-ink-3 mt-2">
+              The conversation may not have loaded yet,
+              or it may only become available after a
+              proposal is accepted.
+            </p>
+
+            <Link
+              to="/dashboard/messages"
+              className="inline-flex items-center gap-2 mt-5 px-4 py-3 rounded-lg bg-mint text-bg-0 font-technical text-[8px]"
+            >
+              BACK TO MESSAGES
+              <ArrowLeft size={12} />
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* ============================================================
           HEADER
       ============================================================ */}
 
-      <section className="pt-12 pb-7">
-        <div className="flex items-center gap-3 mb-4">
-          <LED
-            color="mint"
-            pulse
-            size={7}
-          />
+      <section className="pt-12 pb-5">
+        <Link
+          to="/dashboard/messages"
+          className="inline-flex items-center gap-1.5 font-technical text-[8px] text-ink-3 hover:text-ink-0 mb-5"
+        >
+          <ArrowLeft size={12} />
+          ALL MESSAGES
+        </Link>
 
-          <span className="font-technical text-[9px] text-ink-2">
-            06 — ACTIVE CONNECTIONS
+        <div className="flex items-center gap-3">
+          <span className="grid place-items-center w-11 h-11 rounded-full bg-mint text-bg-0 font-display text-[10px] shrink-0">
+            {otherUserInitials}
           </span>
+
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl truncate">
+              {otherUserName}
+            </h1>
+
+            <p className="font-mono text-[9px] text-ink-3 mt-1 truncate">
+              {jugaadTitle}
+            </p>
+          </div>
         </div>
-
-        <h1 className="font-display text-4xl sm:text-5xl">
-          MESSAGES
-          <br />
-          <span className="text-mint">/ CONNECTIONS.</span>
-        </h1>
-
-        <p className="mt-4 max-w-xl text-sm text-ink-2">
-          Continue conversations with people you have connected
-          with through accepted Jugaads.
-        </p>
       </section>
 
       {/* ============================================================
-          EMPTY STATE
+          CHAT + DETAILS
       ============================================================ */}
 
-      {conversations.length === 0 ? (
-        <div className="surface-panel rounded-2xl p-8 text-center">
-          <div className="mx-auto grid place-items-center w-14 h-14 rounded-full bg-mint/10 text-mint">
-            <MessageSquare size={22} />
+      <div className="grid lg:grid-cols-[1fr_260px] gap-5">
+        {/* ========================================================
+            CHAT
+        ======================================================== */}
+
+        <div className="surface-metal-brushed rounded-2xl p-4 sm:p-6">
+          <div className="min-h-[390px] max-h-[550px] overflow-y-auto space-y-4 flex flex-col">
+            {messages.length === 0 ? (
+              <div className="m-auto text-center">
+                <p className="font-mono text-xs text-ink-3">
+                  No messages yet. Start the conversation!
+                </p>
+              </div>
+            ) : (
+              messages.map((message, index) => {
+                if (!message) {
+                  return null;
+                }
+
+                const messageId =
+                  message.id ||
+                  message._id ||
+                  `message-${index}`;
+
+                const messageText =
+                  getMessageText(message);
+
+                const mine =
+                  isOwnMessage(message);
+
+                return (
+                  <div
+                    key={String(messageId)}
+                    className={`max-w-[82%] rounded-2xl px-4 py-3 ${
+                      mine
+                        ? 'self-end bg-amber text-bg-0 rounded-tr-sm'
+                        : 'self-start surface-panel rounded-tl-sm'
+                    }`}
+                  >
+                    <p className="font-mono text-xs leading-relaxed break-words">
+                      {messageText || ' '}
+                    </p>
+                  </div>
+                );
+              })
+            )}
           </div>
 
-          <h2 className="font-display text-xl mt-4">
-            NO ACTIVE CONVERSATIONS
-          </h2>
+          {/* ======================================================
+              SEND MESSAGE
+          ====================================================== */}
 
-          <p className="font-mono text-[10px] text-ink-3 mt-2 max-w-md mx-auto">
-            Conversations appear here after a proposal has been
-            accepted.
+          <form
+            onSubmit={send}
+            className="flex items-center gap-2 mt-5 pt-4 border-t border-metal-1/40"
+          >
+            <input
+              type="text"
+              value={text}
+              onChange={(event) =>
+                setText(event.target.value)
+              }
+              placeholder="Write a message..."
+              className="flex-1 rounded-lg bg-bg-1 border border-metal-1 px-3 py-3 font-mono text-xs outline-none text-ink-0"
+            />
+
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              className="grid place-items-center w-11 h-11 rounded-lg bg-mint text-bg-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Send message"
+            >
+              <Send size={15} />
+            </button>
+          </form>
+        </div>
+
+        {/* ========================================================
+            JUGAAD DETAILS
+        ======================================================== */}
+
+        <aside className="surface-panel rounded-2xl p-5 h-fit">
+          <div className="flex items-center gap-2 mb-4">
+            <LED
+              color="mint"
+              pulse
+              size={5}
+            />
+
+            <span className="font-technical text-[8px] text-mint">
+              CONNECTED
+            </span>
+          </div>
+
+          <p className="font-technical text-[8px] text-ink-3">
+            JUGAAD
           </p>
 
-          <Link
-            to="/dashboard/find-jugaad"
-            className="inline-flex items-center gap-2 mt-5 px-4 py-3 rounded-lg bg-mint text-bg-0 font-technical text-[8px]"
-          >
-            FIND JUGAAD
-            <ArrowRight size={13} />
-          </Link>
-        </div>
-      ) : (
-        /* ==========================================================
-           CONVERSATION LIST
-        ========================================================== */
+          <p className="font-editorial text-base mt-1">
+            {jugaadTitle}
+          </p>
 
-        <div className="space-y-3">
-          {conversations.map((conversation, index) => {
-            if (!conversation) {
-              return null;
-            }
+          <div className="flex items-center gap-1 mt-4">
+            <IndianRupee
+              size={14}
+              className="text-amber"
+            />
 
-            const conversationId =
-              getConversationId(conversation);
+            <span className="font-display text-2xl text-amber">
+              {agreedAmount}
+            </span>
 
-            /*
-             * If backend returned malformed data without an ID,
-             * don't render a broken Link.
-             */
-            if (!conversationId) {
-              return (
-                <article
-                  key={`invalid-conversation-${index}`}
-                  className="surface-panel rounded-2xl p-5"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="grid place-items-center w-11 h-11 rounded-full bg-ink-3/20 text-ink-2 font-display text-[10px]">
-                      ?
-                    </span>
+            <span className="font-mono text-[8px] text-ink-3">
+              AGREED
+            </span>
+          </div>
 
-                    <div>
-                      <h2 className="font-display text-lg">
-                        Conversation unavailable
-                      </h2>
+          <div className="mt-5 pt-4 border-t border-metal-1/40 flex items-center gap-2 text-mint">
+            <CheckCircle2 size={14} />
 
-                      <p className="font-mono text-[9px] text-ink-3 mt-1">
-                        This conversation is missing an ID.
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              );
-            }
-
-            const otherUser =
-              getOtherUser(conversation);
-
-            const initials =
-              getInitials(otherUser);
-
-            const userName =
-              getUserName(otherUser);
-
-            const title =
-              getTitle(conversation);
-
-            const status =
-              getStatus(conversation);
-
-            const amount =
-              getAmount(conversation);
-
-            const lastMessage =
-              getLastMessage(conversation);
-
-            return (
-              <Link
-                key={String(conversationId)}
-                to={`/dashboard/messages/${conversationId}`}
-                className="block"
-              >
-                <article className="surface-panel rounded-2xl p-5 hover:border-mint/40 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    {/* ==================================================
-                        AVATAR
-                    ================================================== */}
-
-                    <span className="grid place-items-center w-12 h-12 rounded-full bg-mint text-bg-0 font-display text-[10px] shrink-0">
-                      {initials}
-                    </span>
-
-                    {/* ==================================================
-                        MAIN INFO
-                    ================================================== */}
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="font-display text-lg truncate">
-                          {userName}
-                        </h2>
-
-                        <span className="font-technical text-[7px] px-2 py-1 rounded bg-mint/10 text-mint">
-                          {String(status).toUpperCase()}
-                        </span>
-                      </div>
-
-                      <p className="font-editorial text-base mt-1 truncate">
-                        {title}
-                      </p>
-
-                      {lastMessage ? (
-                        <p className="font-mono text-[9px] text-ink-3 mt-2 truncate">
-                          {lastMessage}
-                        </p>
-                      ) : (
-                        <p className="font-mono text-[9px] text-ink-3 mt-2">
-                          No messages yet. Start the conversation.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* ==================================================
-                        AMOUNT + OPEN
-                    ================================================== */}
-
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-3 shrink-0">
-                      <div className="text-right">
-                        <p className="font-display text-xl text-amber">
-                          ₹{amount}
-                        </p>
-
-                        <p className="font-mono text-[7px] text-ink-3">
-                          AGREED
-                        </p>
-                      </div>
-
-                      <span className="inline-flex items-center gap-1.5 font-technical text-[8px] text-mint">
-                        OPEN
-                        <ArrowRight size={12} />
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* ==================================================
-                      ACCEPTED INDICATOR
-                  ================================================== */}
-
-                  <div className="mt-4 pt-3 border-t border-metal-1/40 flex items-center gap-2">
-                    <CheckCircle2
-                      size={13}
-                      className="text-mint"
-                    />
-
-                    <span className="font-mono text-[8px] text-ink-3">
-                      Connection active
-                    </span>
-                  </div>
-                </article>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+            <span className="font-technical text-[8px]">
+              {String(status).toUpperCase()}
+            </span>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

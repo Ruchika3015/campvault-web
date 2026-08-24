@@ -1,13 +1,26 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { mockMyRequests, mockMyPostedJugaads, mockConversations } from '@/data/jugaadMockData';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react';
+
+import {
+  mockMyRequests,
+  mockConversations,
+} from '@/data/jugaadMockData';
+
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
 
 const ProposalContext = createContext({
   proposals: [],
+  receivedProposals: [],
   myRequests: [],
   conversations: [],
   loading: false,
+
   sendProposal: async () => {},
   acceptProposal: async () => {},
   rejectProposal: async () => {},
@@ -15,8 +28,10 @@ const ProposalContext = createContext({
   acceptCounter: async () => {},
   rejectCounter: async () => {},
   withdrawProposal: async () => {},
+
   getProposalForJugaad: () => null,
   getProposalsForJugaad: () => [],
+
   refreshData: async () => {},
 });
 
@@ -24,14 +39,39 @@ export function useProposals() {
   return useContext(ProposalContext);
 }
 
-let proposalIdCounter = 100;
+function extractList(response, keys = []) {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  for (const key of keys) {
+    if (Array.isArray(response?.[key])) {
+      return response[key];
+    }
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  return [];
+}
 
 export function ProposalProvider({ children }) {
   const { isDemoMode, isAuthenticated } = useAuth();
 
   const [proposals, setProposals] = useState([]);
-  const [myRequests, setMyRequests] = useState(isDemoMode ? mockMyRequests : []);
-  const [conversations, setConversations] = useState(isDemoMode ? mockConversations : []);
+
+  const [receivedProposals, setReceivedProposals] = useState([]);
+
+  const [myRequests, setMyRequests] = useState(
+    isDemoMode ? mockMyRequests : []
+  );
+
+  const [conversations, setConversations] = useState(
+    isDemoMode ? mockConversations : []
+  );
+
   const [loading, setLoading] = useState(false);
 
   const refreshData = useCallback(async () => {
@@ -43,31 +83,58 @@ export function ProposalProvider({ children }) {
 
     if (!isAuthenticated) {
       setMyRequests([]);
+      setReceivedProposals([]);
       setConversations([]);
       setProposals([]);
       return;
     }
 
     setLoading(true);
+
     try {
-      const [reqData, convData] = await Promise.allSettled([
-        api.getMyRequests(),
+      const results = await Promise.allSettled([
+        api.getMyProposals(),
+        api.getReceivedProposals(),
         api.getConversations(),
       ]);
 
-      if (reqData.status === 'fulfilled') {
-        const raw = reqData.value;
-        const list = raw?.requests || raw?.data || (Array.isArray(raw) ? raw : []);
-        setMyRequests(Array.isArray(list) ? list : []);
+      const myProposalsResult = results[0];
+      const receivedResult = results[1];
+      const conversationsResult = results[2];
+
+      if (myProposalsResult.status === 'fulfilled') {
+        const list = extractList(
+          myProposalsResult.value,
+          ['proposals', 'myProposals']
+        );
+
+        setProposals(list);
+
+        setMyRequests(list);
       }
 
-      if (convData.status === 'fulfilled') {
-        const raw = convData.value;
-        const list = raw?.conversations || raw?.data || (Array.isArray(raw) ? raw : []);
-        setConversations(Array.isArray(list) ? list : []);
+      if (receivedResult.status === 'fulfilled') {
+        const list = extractList(
+          receivedResult.value,
+          ['proposals', 'receivedProposals']
+        );
+
+        setReceivedProposals(list);
       }
-    } catch {
-      // ignore fetch errors on background refresh
+
+      if (conversationsResult.status === 'fulfilled') {
+        const list = extractList(
+          conversationsResult.value,
+          ['conversations']
+        );
+
+        setConversations(list);
+      }
+    } catch (error) {
+      console.error(
+        'Failed to refresh proposal data:',
+        error
+      );
     } finally {
       setLoading(false);
     }
@@ -78,305 +145,352 @@ export function ProposalProvider({ children }) {
       setMyRequests(mockMyRequests);
       setConversations(mockConversations);
       setProposals([]);
-    } else if (isAuthenticated) {
+      setReceivedProposals([]);
+      return;
+    }
+
+    if (isAuthenticated) {
       refreshData();
     } else {
       setMyRequests([]);
       setConversations([]);
       setProposals([]);
+      setReceivedProposals([]);
     }
-  }, [isDemoMode, isAuthenticated, refreshData]);
+  }, [
+    isDemoMode,
+    isAuthenticated,
+    refreshData,
+  ]);
 
-  const sendProposal = useCallback(async (payload) => {
-    if (isDemoMode) {
-      const newId = `prop-${++proposalIdCounter}`;
-      const newProposal = {
-        id: newId,
-        jugaadId: payload.jugaadId,
-        jugaadTitle: payload.jugaadTitle,
-        category: payload.category,
-        poster: payload.poster,
-        amount: payload.amount,
-        helper: payload.helper,
-        explanation: payload.explanation,
-        proposedPrice: payload.proposedPrice,
-        completionTime: payload.completionTime,
-        skills: payload.skills || [],
-        status: 'pending',
-        offerHistory: [
-          { from: 'helper', amount: payload.proposedPrice, message: payload.explanation, timestamp: new Date().toISOString() },
-        ],
-        sentAt: new Date().toISOString(),
-      };
-      setProposals((prev) => [...prev, newProposal]);
+  const sendProposal = useCallback(
+    async (payload) => {
+      if (!payload?.jugaadId) {
+        throw new Error('Jugaad ID is missing.');
+      }
 
-      setMyRequests((prev) => [
-        {
-          id: `req-${newId}`,
+      if (isDemoMode) {
+        const newProposal = {
+          id: `demo-proposal-${Date.now()}`,
           jugaadId: payload.jugaadId,
           jugaadTitle: payload.jugaadTitle,
           category: payload.category,
           poster: payload.poster,
           amount: payload.amount,
-          requestType: 'proposal',
-          status: 'waiting',
-          proposedAmount: payload.proposedPrice,
+          helper: payload.helper,
           explanation: payload.explanation,
+          proposedPrice: payload.proposedPrice,
           completionTime: payload.completionTime,
           skills: payload.skills || [],
-          requestedAt: newProposal.sentAt,
-          proposalId: newId,
-        },
-        ...prev,
-      ]);
+          status: 'pending',
+          sentAt: new Date().toISOString(),
+        };
 
-      return newProposal;
-    }
+        setProposals((current) => [
+          ...current,
+          newProposal,
+        ]);
 
-    // Real authenticated user
-    try {
-      if (payload.proposedPrice && payload.proposedPrice !== payload.amount) {
-        await api.sendBargain(payload.jugaadId, {
-          proposedAmount: payload.proposedPrice,
-          message: payload.explanation || '',
-          completionTime: payload.completionTime || '',
-          skills: payload.skills || [],
-          explanation: payload.explanation || '',
-        });
-      } else {
-        await api.expressInterest(payload.jugaadId);
+        setMyRequests((current) => [
+          newProposal,
+          ...current,
+        ]);
+
+        return newProposal;
       }
+
+      /*
+       * IMPORTANT:
+       * Always create a real proposal in the backend.
+       *
+       * Do not use expressInterest() here.
+       */
+      const response = await api.submitProposal(
+        payload.jugaadId,
+        {
+          proposedAmount: Number(
+            payload.proposedPrice
+          ),
+
+          explanation:
+            payload.explanation || '',
+
+          completionTime:
+            payload.completionTime || '',
+
+          skills:
+            payload.skills || [],
+        }
+      );
+
       await refreshData();
-    } catch (err) {
-      throw err;
-    }
-  }, [isDemoMode, refreshData]);
 
-  const acceptProposal = useCallback(async (proposalId) => {
-    if (isDemoMode) {
-      setProposals((prev) =>
-        prev.map((p) => (p.id === proposalId ? { ...p, status: 'accepted' } : p))
-      );
-      setMyRequests((prev) =>
-        prev.map((r) =>
-          r.proposalId === proposalId
-            ? { ...r, status: 'accepted', acceptedAt: new Date().toISOString(), agreedAmount: r.proposedAmount, conversationId: `conv-${proposalId}` }
-            : r
-        )
-      );
-      setProposals((prev) => {
-        const proposal = prev.find((p) => p.id === proposalId);
-        if (proposal) {
-          setConversations((prevConv) => {
-            if (prevConv.find((c) => c.id === `conv-${proposalId}`)) return prevConv;
-            return [
-              ...prevConv,
-              {
-                id: `conv-${proposalId}`,
-                jugaadId: proposal.jugaadId,
-                jugaadTitle: proposal.jugaadTitle,
-                otherUser: { id: proposal.helper.id, name: proposal.helper.name, initials: proposal.helper.initials },
-                agreedAmount: proposal.proposedPrice,
-                status: 'accepted',
-                messages: [],
-              },
-            ];
-          });
-        }
-        return prev;
-      });
-      return;
-    }
+      return response;
+    },
+    [isDemoMode, refreshData]
+  );
 
-    // Real API
-    await api.acceptRequest(proposalId);
-    await refreshData();
-  }, [isDemoMode, refreshData]);
+  const acceptProposal = useCallback(
+    async (proposalId) => {
+      if (!proposalId) {
+        throw new Error('Proposal ID is missing.');
+      }
 
-  const rejectProposal = useCallback(async (proposalId) => {
-    if (isDemoMode) {
-      setProposals((prev) =>
-        prev.map((p) => (p.id === proposalId ? { ...p, status: 'rejected' } : p))
-      );
-      setMyRequests((prev) =>
-        prev.map((r) =>
-          r.proposalId === proposalId
-            ? { ...r, status: 'rejected', rejectedAt: new Date().toISOString() }
-            : r
-        )
-      );
-      return;
-    }
+      if (isDemoMode) {
+        setProposals((current) =>
+          current.map((proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'accepted',
+                }
+              : proposal
+          )
+        );
 
-    // Real API
-    await api.rejectRequest(proposalId);
-    await refreshData();
-  }, [isDemoMode, refreshData]);
+        setReceivedProposals((current) =>
+          current.map((proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'accepted',
+                }
+              : proposal
+          )
+        );
 
-  const counterProposal = useCallback(async (proposalId, counterPrice, counterMessage) => {
-    if (isDemoMode) {
-      setProposals((prev) =>
-        prev.map((p) =>
-          p.id === proposalId
+        return;
+      }
+
+      const response =
+        await api.acceptProposal(proposalId);
+
+      await refreshData();
+
+      return response;
+    },
+    [isDemoMode, refreshData]
+  );
+
+  const rejectProposal = useCallback(
+    async (proposalId) => {
+      if (!proposalId) {
+        throw new Error('Proposal ID is missing.');
+      }
+
+      if (isDemoMode) {
+        setProposals((current) =>
+          current.map((proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'rejected',
+                }
+              : proposal
+          )
+        );
+
+        setReceivedProposals((current) =>
+          current.map((proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'rejected',
+                }
+              : proposal
+          )
+        );
+
+        return;
+      }
+
+      const response =
+        await api.rejectProposal(proposalId);
+
+      await refreshData();
+
+      return response;
+    },
+    [isDemoMode, refreshData]
+  );
+
+  const counterProposal = useCallback(
+    async (
+      proposalId,
+      counterPrice,
+      counterMessage = ''
+    ) => {
+      if (!proposalId) {
+        throw new Error('Proposal ID is missing.');
+      }
+
+      if (!counterPrice || Number(counterPrice) <= 0) {
+        throw new Error(
+          'Counter offer amount must be greater than zero.'
+        );
+      }
+
+      if (isDemoMode) {
+        const updated = (proposal) =>
+          proposal.id === proposalId
             ? {
-                ...p,
+                ...proposal,
                 status: 'counter-offer',
-                offerHistory: [
-                  ...p.offerHistory,
-                  { from: 'poster', amount: counterPrice, message: counterMessage, timestamp: new Date().toISOString() },
-                ],
+                counterOffer: {
+                  amount: Number(counterPrice),
+                  message: counterMessage,
+                  timestamp:
+                    new Date().toISOString(),
+                },
               }
-            : p
-        )
-      );
-      setMyRequests((prev) =>
-        prev.map((r) =>
-          r.proposalId === proposalId
-            ? {
-                ...r,
-                status: 'negotiating',
-                negotiationHistory: [
-                  ...(r.negotiationHistory || []),
-                  { from: 'poster', amount: counterPrice, message: counterMessage, timestamp: new Date().toISOString() },
-                ],
-              }
-            : r
-        )
-      );
-      return;
-    }
+            : proposal;
 
-    // Real API
-    await api.counterOffer(proposalId, {
-      amount: counterPrice,
-      message: counterMessage,
-    });
-    await refreshData();
-  }, [isDemoMode, refreshData]);
+        setProposals((current) =>
+          current.map(updated)
+        );
 
-  const acceptCounter = useCallback(async (proposalId) => {
-    if (isDemoMode) {
-      setProposals((prev) => {
-        const proposal = prev.find((p) => p.id === proposalId);
-        if (proposal && proposal.offerHistory.length > 0) {
-          const lastOffer = proposal.offerHistory[proposal.offerHistory.length - 1];
-          setMyRequests((prevReqs) =>
-            prevReqs.map((r) =>
-              r.proposalId === proposalId
-                ? {
-                    ...r,
-                    status: 'accepted',
-                    agreedAmount: lastOffer.amount,
-                    acceptedAt: new Date().toISOString(),
-                    conversationId: `conv-${proposalId}`,
-                  }
-                : r
-            )
-          );
-          setConversations((prevConv) => {
-            if (prevConv.find((c) => c.id === `conv-${proposalId}`)) return prevConv;
-            return [
-              ...prevConv,
-              {
-                id: `conv-${proposalId}`,
-                jugaadId: proposal.jugaadId,
-                jugaadTitle: proposal.jugaadTitle,
-                otherUser: { id: proposal.helper.id, name: proposal.helper.name, initials: proposal.helper.initials },
-                agreedAmount: lastOffer.amount,
-                status: 'accepted',
-                messages: [],
-              },
-            ];
-          });
-        }
-        return prev.map((p) => (p.id === proposalId ? { ...p, status: 'accepted' } : p));
-      });
-      return;
-    }
+        setReceivedProposals((current) =>
+          current.map(updated)
+        );
 
-    // Real API
-    await api.acceptOffer(proposalId);
-    await refreshData();
-  }, [isDemoMode, refreshData]);
+        return;
+      }
 
-  const rejectCounter = useCallback(async (proposalId) => {
-    if (isDemoMode) {
-      setProposals((prev) =>
-        prev.map((p) => (p.id === proposalId ? { ...p, status: 'rejected' } : p))
-      );
-      setMyRequests((prev) =>
-        prev.map((r) =>
-          r.proposalId === proposalId ? { ...r, status: 'rejected' } : r
-        )
-      );
-      return;
-    }
+      const response =
+        await api.createCounterOffer(
+          proposalId,
+          {
+            amount: Number(counterPrice),
+            message: counterMessage,
+          }
+        );
 
-    // Real API
-    await api.rejectRequest(proposalId);
-    await refreshData();
-  }, [isDemoMode, refreshData]);
+      await refreshData();
 
-  const withdrawProposal = useCallback(async (proposalId) => {
-    if (isDemoMode) {
-      setProposals((prev) =>
-        prev.map((p) => (p.id === proposalId ? { ...p, status: 'withdrawn', withdrawnAt: new Date().toISOString() } : p))
-      );
-      setMyRequests((prev) =>
-        prev.map((r) =>
-          r.proposalId === proposalId
-            ? { ...r, status: 'withdrawn', withdrawnAt: new Date().toISOString() }
-            : r
-        )
-      );
-      return;
-    }
+      return response;
+    },
+    [isDemoMode, refreshData]
+  );
 
-    // Real API (if rejection/withdrawal supported on request)
-    try {
-      await api.rejectRequest(proposalId);
-    } catch {
-      // fallback
-    }
-    await refreshData();
-  }, [isDemoMode, refreshData]);
+  const acceptCounter = useCallback(
+    async (proposalId) => {
+      return acceptProposal(proposalId);
+    },
+    [acceptProposal]
+  );
+
+  const rejectCounter = useCallback(
+    async (proposalId) => {
+      return rejectProposal(proposalId);
+    },
+    [rejectProposal]
+  );
+
+  const withdrawProposal = useCallback(
+    async (proposalId) => {
+      if (!proposalId) {
+        throw new Error('Proposal ID is missing.');
+      }
+
+      if (isDemoMode) {
+        setProposals((current) =>
+          current.map((proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'withdrawn',
+                }
+              : proposal
+          )
+        );
+
+        return;
+      }
+
+      const response =
+        await api.withdrawProposal(proposalId);
+
+      await refreshData();
+
+      return response;
+    },
+    [isDemoMode, refreshData]
+  );
 
   const getProposalForJugaad = useCallback(
     (jugaadId) => {
-      if (isDemoMode) {
-        return proposals.find((p) => p.jugaadId === jugaadId);
+      if (!jugaadId) {
+        return null;
       }
-      return myRequests.find((r) => r.jugaad_id === jugaadId || r.jugaadId === jugaadId);
+
+      const sent = proposals.find(
+        (proposal) =>
+          String(
+            proposal?.jugaadId ??
+              proposal?.jugaad_id
+          ) === String(jugaadId)
+      );
+
+      if (sent) {
+        return sent;
+      }
+
+      const received = receivedProposals.find(
+        (proposal) =>
+          String(
+            proposal?.jugaadId ??
+              proposal?.jugaad_id
+          ) === String(jugaadId)
+      );
+
+      return received || null;
     },
-    [isDemoMode, proposals, myRequests]
+    [proposals, receivedProposals]
   );
 
   const getProposalsForJugaad = useCallback(
     (jugaadId) => {
-      if (isDemoMode) {
-        return proposals.filter((p) => p.jugaadId === jugaadId);
+      if (!jugaadId) {
+        return [];
       }
-      return myRequests.filter((r) => r.jugaad_id === jugaadId || r.jugaadId === jugaadId);
+
+      return [
+        ...proposals,
+        ...receivedProposals,
+      ].filter(
+        (proposal) =>
+          String(
+            proposal?.jugaadId ??
+              proposal?.jugaad_id
+          ) === String(jugaadId)
+      );
     },
-    [isDemoMode, proposals, myRequests]
+    [proposals, receivedProposals]
   );
 
   return (
     <ProposalContext.Provider
       value={{
         proposals,
+        receivedProposals,
         myRequests,
         conversations,
         loading,
+
         sendProposal,
+
         acceptProposal,
         rejectProposal,
+
         counterProposal,
         acceptCounter,
         rejectCounter,
+
         withdrawProposal,
+
         getProposalForJugaad,
         getProposalsForJugaad,
+
         refreshData,
       }}
     >

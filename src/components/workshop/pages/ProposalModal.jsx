@@ -12,6 +12,21 @@ export function ProposalModal({ item, helper, onClose, onSend }) {
   const [sent, setSent] = useState(false);
 
   const color = CATEGORY_COLORS[item.category] || 'amber';
+  const posterName =
+    item.poster?.name ||
+    item.creator?.name ||
+    item.poster_name ||
+    item.posterName ||
+    item.user?.name ||
+    item.owner?.name ||
+    'Student';
+  const posterCollege =
+    item.poster?.college ||
+    item.college ||
+    item.college_name ||
+    item.creator?.college ||
+    item.user?.college ||
+    '';
 
   const toggleSkill = (skillName) => {
     setSelectedSkills((prev) =>
@@ -74,7 +89,7 @@ export function ProposalModal({ item, helper, onClose, onSend }) {
             </div>
             <p className="font-display text-2xl">PROPOSAL SENT</p>
             <p className="font-mono text-[10px] text-ink-2 mt-2 max-w-xs mx-auto">
-              {item.poster.name} will review your proposal. You'll see the status update in My Requests.
+              {posterName} will review your proposal. You'll see the status update in My Requests.
             </p>
             <button onClick={onClose} className="machine-control machine-control--ghost mt-6">
               <span className="ctrl-led" />
@@ -103,7 +118,7 @@ export function ProposalModal({ item, helper, onClose, onSend }) {
                 </span>
               </div>
               <p className="font-mono text-[9px] text-ink-3 mb-3">
-                Posted by <span className="text-ink-1">{item.poster.name}</span> · {item.poster.college}
+                Posted by <span className="text-ink-1">{posterName}</span>{posterCollege ? ` · ${posterCollege}` : ''}
               </p>
               <p className="font-mono text-[10px] text-ink-2 leading-relaxed mb-3">{item.description}</p>
               <div className="flex flex-wrap items-center gap-3 text-[9px] font-mono text-ink-3">

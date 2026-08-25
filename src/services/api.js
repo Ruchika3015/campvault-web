@@ -96,6 +96,18 @@ export const api = {
   getProfile: () =>
     apiRequest('/api/v1/users/profile'),
 
+  /**
+   * Update the currently authenticated user's profile.
+   *
+   * Backend:
+   * PUT /api/v1/users/profile
+   */
+  updateProfile: (payload) =>
+    apiRequest('/api/v1/users/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
   // ================================================================
   // COLLEGES
   // ================================================================

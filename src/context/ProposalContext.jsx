@@ -39,6 +39,10 @@ export function useProposals() {
   return useContext(ProposalContext);
 }
 
+/* ============================================================
+   HELPERS
+============================================================ */
+
 function extractList(response, keys = []) {
   if (Array.isArray(response)) {
     return response;
@@ -57,12 +61,303 @@ function extractList(response, keys = []) {
   return [];
 }
 
+/*
+ * Convert a user object into a safe display object.
+ */
+function normalizeUser(user) {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+
+  const name =
+    user.name ||
+    user.fullName ||
+    user.full_name ||
+    user.username ||
+    user.displayName ||
+    user.display_name ||
+    user.email ||
+    '';
+
+  const explicitInitials =
+    typeof user.initials === 'string'
+      ? user.initials.trim()
+      : '';
+
+  let initials = explicitInitials;
+
+  if (!initials && name) {
+    initials = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join('')
+      .toUpperCase();
+  }
+
+  return {
+    ...user,
+    id:
+      user.id ??
+      user.userId ??
+      user.user_id ??
+      user._id ??
+      null,
+
+    name: name || 'User',
+
+    initials:
+      initials
+        ? initials.slice(0, 2).toUpperCase()
+        : 'U',
+  };
+}
+
+/*
+ * Find the other participant in a conversation.
+
+ * Different backend implementations may return:
+ *
+ * otherUser
+ * other_user
+ * user
+ * poster
+ * helper
+ * recipient
+ * participant
+ * participants[]
+ * users[]
+ */
+function getOtherUser(conversation, currentUser) {
+  const currentUserId = String(
+    currentUser?.id ??
+      currentUser?.userId ??
+      currentUser?.user_id ??
+      currentUser?._id ??
+      ''
+  );
+
+  const directCandidates = [
+    conversation?.otherUser,
+    conversation?.other_user,
+    conversation?.user,
+    conversation?.recipient,
+    conversation?.participant,
+    conversation?.poster,
+    conversation?.helper,
+  ];
+
+  for (const candidate of directCandidates) {
+    const user = normalizeUser(candidate);
+
+    if (user) {
+      return user;
+    }
+  }
+
+  /*
+   * Some APIs return:
+   *
+   * participants: [user1, user2]
+   *
+   * Pick the participant who is not the logged-in user.
+   */
+  const participantArrays = [
+    conversation?.participants,
+    conversation?.users,
+    conversation?.members,
+  ];
+
+  for (const participants of participantArrays) {
+    if (!Array.isArray(participants)) {
+      continue;
+    }
+
+    const users = participants
+      .map(normalizeUser)
+      .filter(Boolean);
+
+    if (users.length === 0) {
+      continue;
+    }
+
+    if (currentUserId) {
+      const other = users.find(
+        (user) => String(user.id ?? '') !== currentUserId
+      );
+
+      if (other) {
+        return other;
+      }
+    }
+
+    if (users.length >= 2) {
+      return users[1];
+    }
+
+    return users[0];
+  }
+
+  return null;
+}
+
+/*
+ * Safely get the Jugaad title.
+ */
+function getConversationTitle(conversation) {
+  return (
+    conversation?.jugaadTitle ||
+    conversation?.jugaad_title ||
+    conversation?.jugaad?.title ||
+    conversation?.request?.title ||
+    conversation?.proposal?.jugaadTitle ||
+    conversation?.proposal?.jugaad?.title ||
+    conversation?.title ||
+    conversation?.requestTitle ||
+    'Jugaad'
+  );
+}
+
+/*
+ * Safely get agreed amount.
+ */
+function getConversationAmount(conversation) {
+  return (
+    conversation?.agreedAmount ??
+    conversation?.agreed_amount ??
+    conversation?.agreedPrice ??
+    conversation?.agreed_price ??
+    conversation?.finalPrice ??
+    conversation?.final_price ??
+    conversation?.proposedAmount ??
+    conversation?.proposed_amount ??
+    conversation?.proposedPrice ??
+    conversation?.proposed_price ??
+    conversation?.amount ??
+    conversation?.price ??
+    conversation?.proposal?.agreedAmount ??
+    conversation?.proposal?.agreed_price ??
+    conversation?.proposal?.proposedAmount ??
+    conversation?.proposal?.proposed_price ??
+    0
+  );
+}
+
+/*
+ * Normalize message objects.
+ */
+function normalizeMessages(messages) {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+
+  return messages
+    .filter(Boolean)
+    .map((message, index) => ({
+      ...message,
+
+      id:
+        message.id ??
+        message._id ??
+        `message-${index}`,
+
+      text:
+        message.text ??
+        message.message ??
+        message.content ??
+        '',
+
+      from:
+        message.from ??
+        message.sender ??
+        message.sender_type ??
+        null,
+
+      timestamp:
+        message.timestamp ??
+        message.createdAt ??
+        message.created_at ??
+        null,
+    }));
+}
+
+/*
+ * Normalize a conversation so the frontend ALWAYS receives:
+ *
+ * {
+ *   id,
+ *   otherUser,
+ *   jugaadTitle,
+ *   agreedAmount,
+ *   messages,
+ *   status
+ * }
+ */
+function normalizeConversation(conversation, currentUser) {
+  if (!conversation || typeof conversation !== 'object') {
+    return null;
+  }
+
+  const otherUser = getOtherUser(
+    conversation,
+    currentUser
+  );
+
+  const id =
+    conversation.id ??
+    conversation.conversationId ??
+    conversation.conversation_id ??
+    conversation._id;
+
+  if (!id) {
+    return null;
+  }
+
+  return {
+    ...conversation,
+
+    id: String(id),
+
+    otherUser:
+      otherUser || {
+        id: null,
+        name: 'User',
+        initials: 'U',
+      },
+
+    jugaadTitle:
+      getConversationTitle(conversation),
+
+    agreedAmount:
+      getConversationAmount(conversation),
+
+    messages:
+      normalizeMessages(conversation.messages),
+
+    status:
+      conversation.status ||
+      conversation.state ||
+      'accepted',
+  };
+}
+
+/* ============================================================
+   PROVIDER
+============================================================ */
+
 export function ProposalProvider({ children }) {
-  const { isDemoMode, isAuthenticated } = useAuth();
+  const {
+    isDemoMode,
+    isAuthenticated,
+    user: currentUser,
+  } = useAuth();
 
   const [proposals, setProposals] = useState([]);
 
-  const [receivedProposals, setReceivedProposals] = useState([]);
+  const [receivedProposals, setReceivedProposals] =
+    useState([]);
 
   const [myRequests, setMyRequests] = useState(
     isDemoMode ? mockMyRequests : []
@@ -74,11 +369,9 @@ export function ProposalProvider({ children }) {
 
   const [loading, setLoading] = useState(false);
 
-  /*
-   * ============================================================
-   * REFRESH PROPOSAL DATA
-   * ============================================================
-   */
+  /* ============================================================
+     REFRESH DATA
+  ============================================================ */
 
   const refreshData = useCallback(async () => {
     if (isDemoMode) {
@@ -108,9 +401,9 @@ export function ProposalProvider({ children }) {
       const receivedResult = results[1];
       const conversationsResult = results[2];
 
-      /*
-       * PROPOSALS CREATED BY CURRENT USER
-       */
+      /* ========================================================
+         MY PROPOSALS
+      ======================================================== */
 
       if (myProposalsResult.status === 'fulfilled') {
         const list = extractList(
@@ -122,9 +415,9 @@ export function ProposalProvider({ children }) {
         setMyRequests(list);
       }
 
-      /*
-       * PROPOSALS RECEIVED BY JUGAAD POSTER
-       */
+      /* ========================================================
+         RECEIVED PROPOSALS
+      ======================================================== */
 
       if (receivedResult.status === 'fulfilled') {
         const list = extractList(
@@ -135,17 +428,39 @@ export function ProposalProvider({ children }) {
         setReceivedProposals(list);
       }
 
-      /*
-       * CONVERSATIONS
-       */
+      /* ========================================================
+         CONVERSATIONS
+      ======================================================== */
 
       if (conversationsResult.status === 'fulfilled') {
-        const list = extractList(
+        const rawConversations = extractList(
           conversationsResult.value,
           ['conversations']
         );
 
-        setConversations(list);
+        console.log(
+          'RAW CONVERSATIONS FROM BACKEND:',
+          rawConversations
+        );
+
+        const normalizedConversations =
+          rawConversations
+            .map((conversation) =>
+              normalizeConversation(
+                conversation,
+                currentUser
+              )
+            )
+            .filter(Boolean);
+
+        console.log(
+          'NORMALIZED CONVERSATIONS:',
+          normalizedConversations
+        );
+
+        setConversations(
+          normalizedConversations
+        );
       }
     } catch (error) {
       console.error(
@@ -155,13 +470,15 @@ export function ProposalProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [isDemoMode, isAuthenticated]);
+  }, [
+    isDemoMode,
+    isAuthenticated,
+    currentUser,
+  ]);
 
-  /*
-   * ============================================================
-   * INITIAL LOAD
-   * ============================================================
-   */
+  /* ============================================================
+     INITIAL LOAD
+  ============================================================ */
 
   useEffect(() => {
     if (isDemoMode) {
@@ -176,9 +493,9 @@ export function ProposalProvider({ children }) {
       refreshData();
     } else {
       setMyRequests([]);
+      setReceivedProposals([]);
       setConversations([]);
       setProposals([]);
-      setReceivedProposals([]);
     }
   }, [
     isDemoMode,
@@ -186,11 +503,9 @@ export function ProposalProvider({ children }) {
     refreshData,
   ]);
 
-  /*
-   * ============================================================
-   * SEND PROPOSAL
-   * ============================================================
-   */
+  /* ============================================================
+     SEND PROPOSAL
+  ============================================================ */
 
   const sendProposal = useCallback(
     async (payload = {}) => {
@@ -198,10 +513,6 @@ export function ProposalProvider({ children }) {
         'SEND PROPOSAL - ORIGINAL PAYLOAD:',
         payload
       );
-
-      /*
-       * Accept all possible Jugaad ID names.
-       */
 
       const jugaadId =
         payload.jugaadId ??
@@ -220,16 +531,9 @@ export function ProposalProvider({ children }) {
         );
       }
 
-      /*
-       * ========================================================
-       * DEMO MODE
-       * ========================================================
-       */
-
       if (isDemoMode) {
         const newProposal = {
           id: `demo-proposal-${Date.now()}`,
-
           jugaadId,
 
           jugaadTitle:
@@ -279,7 +583,8 @@ export function ProposalProvider({ children }) {
 
           status: 'pending',
 
-          sentAt: new Date().toISOString(),
+          sentAt:
+            new Date().toISOString(),
         };
 
         setProposals((current) => [
@@ -294,18 +599,6 @@ export function ProposalProvider({ children }) {
 
         return newProposal;
       }
-
-      /*
-       * ========================================================
-       * REAL BACKEND
-       *
-       * BACKEND REQUIRES EXACTLY:
-       *
-       * proposal_message: string
-       * proposed_price: number
-       * estimated_completion: string | null
-       * ========================================================
-       */
 
       const proposalMessage =
         payload.proposal_message ??
@@ -329,13 +622,11 @@ export function ProposalProvider({ children }) {
         null;
 
       const proposalPayload = {
-        proposal_message: String(
-          proposalMessage
-        ).trim(),
+        proposal_message:
+          String(proposalMessage).trim(),
 
-        proposed_price: Number(
-          proposedPriceRaw
-        ),
+        proposed_price:
+          Number(proposedPriceRaw),
 
         estimated_completion:
           estimatedCompletion === null ||
@@ -351,12 +642,6 @@ export function ProposalProvider({ children }) {
         'SEND PROPOSAL - BACKEND PAYLOAD:',
         proposalPayload
       );
-
-      /*
-       * ========================================================
-       * FRONTEND VALIDATION
-       * ========================================================
-       */
 
       if (
         !proposalPayload.proposal_message
@@ -377,12 +662,6 @@ export function ProposalProvider({ children }) {
         );
       }
 
-      /*
-       * ========================================================
-       * SEND TO BACKEND
-       * ========================================================
-       */
-
       const response =
         await api.submitProposal(
           jugaadId,
@@ -394,13 +673,6 @@ export function ProposalProvider({ children }) {
         response
       );
 
-      /*
-       * Refresh proposal lists so:
-       *
-       * Account B sees it in My Requests
-       * Account A sees it in Received Proposals
-       */
-
       await refreshData();
 
       return response;
@@ -411,11 +683,9 @@ export function ProposalProvider({ children }) {
     ]
   );
 
-  /*
-   * ============================================================
-   * ACCEPT PROPOSAL
-   * ============================================================
-   */
+  /* ============================================================
+     ACCEPT PROPOSAL
+  ============================================================ */
 
   const acceptProposal = useCallback(
     async (proposalId) => {
@@ -426,13 +696,14 @@ export function ProposalProvider({ children }) {
       }
 
       if (isDemoMode) {
-        const updateProposal = (proposal) =>
-          proposal.id === proposalId
-            ? {
-                ...proposal,
-                status: 'accepted',
-              }
-            : proposal;
+        const updateProposal =
+          (proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'accepted',
+                }
+              : proposal;
 
         setProposals((current) =>
           current.map(updateProposal)
@@ -460,11 +731,9 @@ export function ProposalProvider({ children }) {
     ]
   );
 
-  /*
-   * ============================================================
-   * REJECT PROPOSAL
-   * ============================================================
-   */
+  /* ============================================================
+     REJECT PROPOSAL
+  ============================================================ */
 
   const rejectProposal = useCallback(
     async (proposalId) => {
@@ -475,13 +744,14 @@ export function ProposalProvider({ children }) {
       }
 
       if (isDemoMode) {
-        const updateProposal = (proposal) =>
-          proposal.id === proposalId
-            ? {
-                ...proposal,
-                status: 'rejected',
-              }
-            : proposal;
+        const updateProposal =
+          (proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'rejected',
+                }
+              : proposal;
 
         setProposals((current) =>
           current.map(updateProposal)
@@ -509,11 +779,9 @@ export function ProposalProvider({ children }) {
     ]
   );
 
-  /*
-   * ============================================================
-   * COUNTER PROPOSAL
-   * ============================================================
-   */
+  /* ============================================================
+     COUNTER PROPOSAL
+  ============================================================ */
 
   const counterProposal = useCallback(
     async (
@@ -537,21 +805,23 @@ export function ProposalProvider({ children }) {
       }
 
       if (isDemoMode) {
-        const updateProposal = (proposal) =>
-          proposal.id === proposalId
-            ? {
-                ...proposal,
-                status: 'counter-offer',
-                counterOffer: {
-                  amount:
-                    Number(counterPrice),
-                  message:
-                    counterMessage,
-                  timestamp:
-                    new Date().toISOString(),
-                },
-              }
-            : proposal;
+        const updateProposal =
+          (proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status:
+                    'counter-offer',
+                  counterOffer: {
+                    amount:
+                      Number(counterPrice),
+                    message:
+                      counterMessage,
+                    timestamp:
+                      new Date().toISOString(),
+                  },
+                }
+              : proposal;
 
         setProposals((current) =>
           current.map(updateProposal)
@@ -568,9 +838,9 @@ export function ProposalProvider({ children }) {
         await api.createCounterOffer(
           proposalId,
           {
-            amount: Number(
-              counterPrice
-            ),
+            amount:
+              Number(counterPrice),
+
             message:
               counterMessage || '',
           }
@@ -586,11 +856,9 @@ export function ProposalProvider({ children }) {
     ]
   );
 
-  /*
-   * ============================================================
-   * ACCEPT COUNTER
-   * ============================================================
-   */
+  /* ============================================================
+     ACCEPT COUNTER
+  ============================================================ */
 
   const acceptCounter = useCallback(
     async (proposalId) => {
@@ -601,11 +869,9 @@ export function ProposalProvider({ children }) {
     [acceptProposal]
   );
 
-  /*
-   * ============================================================
-   * REJECT COUNTER
-   * ============================================================
-   */
+  /* ============================================================
+     REJECT COUNTER
+  ============================================================ */
 
   const rejectCounter = useCallback(
     async (proposalId) => {
@@ -616,11 +882,9 @@ export function ProposalProvider({ children }) {
     [rejectProposal]
   );
 
-  /*
-   * ============================================================
-   * WITHDRAW PROPOSAL
-   * ============================================================
-   */
+  /* ============================================================
+     WITHDRAW
+  ============================================================ */
 
   const withdrawProposal =
     useCallback(
@@ -633,13 +897,15 @@ export function ProposalProvider({ children }) {
 
         if (isDemoMode) {
           setProposals((current) =>
-            current.map((proposal) =>
-              proposal.id === proposalId
-                ? {
-                    ...proposal,
-                    status: 'withdrawn',
-                  }
-                : proposal
+            current.map(
+              (proposal) =>
+                proposal.id === proposalId
+                  ? {
+                      ...proposal,
+                      status:
+                        'withdrawn',
+                    }
+                  : proposal
             )
           );
 
@@ -661,11 +927,9 @@ export function ProposalProvider({ children }) {
       ]
     );
 
-  /*
-   * ============================================================
-   * GET SINGLE PROPOSAL FOR JUGAAD
-   * ============================================================
-   */
+  /* ============================================================
+     GET SINGLE PROPOSAL
+  ============================================================ */
 
   const getProposalForJugaad =
     useCallback(
@@ -682,7 +946,7 @@ export function ProposalProvider({ children }) {
             (proposal) =>
               String(
                 proposal?.jugaadId ??
-                proposal?.jugaad_id
+                  proposal?.jugaad_id
               ) ===
               String(jugaadId)
           );
@@ -696,7 +960,7 @@ export function ProposalProvider({ children }) {
             (proposal) =>
               String(
                 proposal?.jugaadId ??
-                proposal?.jugaad_id
+                  proposal?.jugaad_id
               ) ===
               String(jugaadId)
           );
@@ -709,11 +973,9 @@ export function ProposalProvider({ children }) {
       ]
     );
 
-  /*
-   * ============================================================
-   * GET ALL PROPOSALS FOR JUGAAD
-   * ============================================================
-   */
+  /* ============================================================
+     GET ALL PROPOSALS
+  ============================================================ */
 
   const getProposalsForJugaad =
     useCallback(
@@ -732,7 +994,7 @@ export function ProposalProvider({ children }) {
           (proposal) =>
             String(
               proposal?.jugaadId ??
-              proposal?.jugaad_id
+                proposal?.jugaad_id
             ) ===
             String(jugaadId)
         );
@@ -743,41 +1005,28 @@ export function ProposalProvider({ children }) {
       ]
     );
 
-  /*
-   * ============================================================
-   * PROVIDER
-   * ============================================================
-   */
+  /* ============================================================
+     PROVIDER
+  ============================================================ */
 
   return (
     <ProposalContext.Provider
       value={{
         proposals,
-
         receivedProposals,
-
         myRequests,
-
         conversations,
-
         loading,
 
         sendProposal,
-
         acceptProposal,
-
         rejectProposal,
-
         counterProposal,
-
         acceptCounter,
-
         rejectCounter,
-
         withdrawProposal,
 
         getProposalForJugaad,
-
         getProposalsForJugaad,
 
         refreshData,

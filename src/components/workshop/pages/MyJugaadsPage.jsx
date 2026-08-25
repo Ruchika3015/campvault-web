@@ -247,6 +247,11 @@ export function MyJugaadsPage() {
     isDemoMode ? mockMyPostedJugaads : []
   );
 
+  // Proposals are fetched directly for each Jugaad from the backend.
+  // This is required because the global ProposalContext may not contain
+  // proposals received for the currently logged-in poster.
+  const [jugaadProposals, setJugaadProposals] = useState({});
+
   const [loading, setLoading] = useState(!isDemoMode);
 
   const [selected, setSelected] = useState(null);
@@ -294,9 +299,67 @@ export function MyJugaadsPage() {
     }
   }, [isDemoMode, isAuthenticated]);
 
+  /*
+   * Fetch proposals/interest requests directly for every Jugaad owned
+   * by the current user.
+   *
+   * This fixes the problem where INTERESTED/BARGAIN requests exist in
+   * the backend but do not appear on the My Jugaads page.
+   */
+  const fetchJugaadProposals = useCallback(async (items) => {
+    if (isDemoMode || !isAuthenticated) {
+      return;
+    }
+
+    const list = Array.isArray(items) ? items : [];
+
+    if (list.length === 0) {
+      setJugaadProposals({});
+      return;
+    }
+
+    const results = {};
+
+    await Promise.all(
+      list.map(async (item) => {
+        if (!item?.id) {
+          return;
+        }
+
+        try {
+          const response = await api.getProposalsForJugaad(item.id);
+
+          const data =
+            response?.data ||
+            response?.proposals ||
+            (Array.isArray(response) ? response : []);
+
+          results[String(item.id)] = Array.isArray(data)
+            ? data
+            : [];
+        } catch (error) {
+          console.error(
+            `Failed to load proposals for Jugaad ${item.id}:`,
+            error
+          );
+
+          results[String(item.id)] = [];
+        }
+      })
+    );
+
+    setJugaadProposals(results);
+  }, [isDemoMode, isAuthenticated]);
+
   useEffect(() => {
     fetchMyJugaads();
   }, [fetchMyJugaads]);
+
+  useEffect(() => {
+    if (!loading) {
+      fetchJugaadProposals(jugaadsList);
+    }
+  }, [loading, jugaadsList, fetchJugaadProposals]);
 
   /*
    * Update Jugaad status.
@@ -398,17 +461,10 @@ export function MyJugaadsPage() {
      * which otherwise fails with strict ===.
      */
     const itemProposals =
-      Array.isArray(proposals)
-        ? proposals.filter((p) => {
-            const proposalJugaadId =
-              getProposalJugaadId(p);
-
-            return (
-              proposalJugaadId !== null &&
-              String(proposalJugaadId) ===
-                String(item.id)
-            );
-          })
+      Array.isArray(
+        jugaadProposals[String(item.id)]
+      )
+        ? jugaadProposals[String(item.id)]
         : [];
 
     return (
@@ -464,6 +520,9 @@ export function MyJugaadsPage() {
             }
 
             await fetchMyJugaads();
+
+            // Refresh the received requests after accept/reject.
+            await fetchJugaadProposals(jugaadsList);
           } catch (error) {
             console.error(
               'Failed to process proposal:',
@@ -540,17 +599,10 @@ export function MyJugaadsPage() {
         <div className="grid lg:grid-cols-2 gap-3">
           {items.map((item) => {
             const itemProposals =
-              Array.isArray(proposals)
-                ? proposals.filter((p) => {
-                    const proposalJugaadId =
-                      getProposalJugaadId(p);
-
-                    return (
-                      proposalJugaadId !== null &&
-                      String(proposalJugaadId) ===
-                        String(item.id)
-                    );
-                  })
+              Array.isArray(
+                jugaadProposals[String(item.id)]
+              )
+                ? jugaadProposals[String(item.id)]
                 : [];
 
             const statusConfig =
@@ -660,6 +712,7 @@ export function MyJugaadsPage() {
               );
 
               await fetchMyJugaads();
+              await fetchJugaadProposals(jugaadsList);
             } catch (error) {
               console.error(
                 'Failed to send counter offer:',

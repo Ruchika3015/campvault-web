@@ -247,11 +247,6 @@ export function MyJugaadsPage() {
     isDemoMode ? mockMyPostedJugaads : []
   );
 
-  // Proposals are fetched directly for each Jugaad from the backend.
-  // This is required because the global ProposalContext may not contain
-  // proposals received for the currently logged-in poster.
-  const [jugaadProposals, setJugaadProposals] = useState({});
-
   const [loading, setLoading] = useState(!isDemoMode);
 
   const [selected, setSelected] = useState(null);
@@ -299,67 +294,9 @@ export function MyJugaadsPage() {
     }
   }, [isDemoMode, isAuthenticated]);
 
-  /*
-   * Fetch proposals/interest requests directly for every Jugaad owned
-   * by the current user.
-   *
-   * This fixes the problem where INTERESTED/BARGAIN requests exist in
-   * the backend but do not appear on the My Jugaads page.
-   */
-  const fetchJugaadProposals = useCallback(async (items) => {
-    if (isDemoMode || !isAuthenticated) {
-      return;
-    }
-
-    const list = Array.isArray(items) ? items : [];
-
-    if (list.length === 0) {
-      setJugaadProposals({});
-      return;
-    }
-
-    const results = {};
-
-    await Promise.all(
-      list.map(async (item) => {
-        if (!item?.id) {
-          return;
-        }
-
-        try {
-          const response = await api.getProposalsForJugaad(item.id);
-
-          const data =
-            response?.data ||
-            response?.proposals ||
-            (Array.isArray(response) ? response : []);
-
-          results[String(item.id)] = Array.isArray(data)
-            ? data
-            : [];
-        } catch (error) {
-          console.error(
-            `Failed to load proposals for Jugaad ${item.id}:`,
-            error
-          );
-
-          results[String(item.id)] = [];
-        }
-      })
-    );
-
-    setJugaadProposals(results);
-  }, [isDemoMode, isAuthenticated]);
-
   useEffect(() => {
     fetchMyJugaads();
   }, [fetchMyJugaads]);
-
-  useEffect(() => {
-    if (!loading) {
-      fetchJugaadProposals(jugaadsList);
-    }
-  }, [loading, jugaadsList, fetchJugaadProposals]);
 
   /*
    * Update Jugaad status.
@@ -461,10 +398,17 @@ export function MyJugaadsPage() {
      * which otherwise fails with strict ===.
      */
     const itemProposals =
-      Array.isArray(
-        jugaadProposals[String(item.id)]
-      )
-        ? jugaadProposals[String(item.id)]
+      Array.isArray(proposals)
+        ? proposals.filter((p) => {
+            const proposalJugaadId =
+              getProposalJugaadId(p);
+
+            return (
+              proposalJugaadId !== null &&
+              String(proposalJugaadId) ===
+                String(item.id)
+            );
+          })
         : [];
 
     return (
@@ -520,9 +464,6 @@ export function MyJugaadsPage() {
             }
 
             await fetchMyJugaads();
-
-            // Refresh the received requests after accept/reject.
-            await fetchJugaadProposals(jugaadsList);
           } catch (error) {
             console.error(
               'Failed to process proposal:',
@@ -599,10 +540,17 @@ export function MyJugaadsPage() {
         <div className="grid lg:grid-cols-2 gap-3">
           {items.map((item) => {
             const itemProposals =
-              Array.isArray(
-                jugaadProposals[String(item.id)]
-              )
-                ? jugaadProposals[String(item.id)]
+              Array.isArray(proposals)
+                ? proposals.filter((p) => {
+                    const proposalJugaadId =
+                      getProposalJugaadId(p);
+
+                    return (
+                      proposalJugaadId !== null &&
+                      String(proposalJugaadId) ===
+                        String(item.id)
+                    );
+                  })
                 : [];
 
             const statusConfig =
@@ -712,7 +660,6 @@ export function MyJugaadsPage() {
               );
 
               await fetchMyJugaads();
-              await fetchJugaadProposals(jugaadsList);
             } catch (error) {
               console.error(
                 'Failed to send counter offer:',
@@ -1046,6 +993,54 @@ function Detail({
                         acceptedStudent.id !==
                           student.id
                       }
+                      onAccept={() => {
+                        const proposal = proposals.find(
+                          (p) =>
+                            String(p.id) ===
+                            String(student?.proposalId)
+                        );
+
+                        if (proposal) {
+                          onAcceptProposal(proposal);
+                        } else {
+                          console.error(
+                            'Proposal not found for ACCEPT:',
+                            student
+                          );
+                        }
+                      }}
+                      onReject={() => {
+                        const proposal = proposals.find(
+                          (p) =>
+                            String(p.id) ===
+                            String(student?.proposalId)
+                        );
+
+                        if (proposal) {
+                          onRejectProposal(proposal);
+                        } else {
+                          console.error(
+                            'Proposal not found for REJECT:',
+                            student
+                          );
+                        }
+                      }}
+                      onCounter={() => {
+                        const proposal = proposals.find(
+                          (p) =>
+                            String(p.id) ===
+                            String(student?.proposalId)
+                        );
+
+                        if (proposal) {
+                          onCounterProposal(proposal);
+                        } else {
+                          console.error(
+                            'Proposal not found for COUNTER:',
+                            student
+                          );
+                        }
+                      }}
                     />
                   )
                 )
@@ -1301,22 +1296,19 @@ function StudentRequest({
   student,
   assigned,
   locked,
+  onAccept,
+  onReject,
+  onCounter,
 }) {
-  const skills = Array.isArray(
-    student?.skills
-  )
+  const skills = Array.isArray(student?.skills)
     ? student.skills
     : [];
 
   const isBargain =
-    student?.requestType ===
-      'bargain' ||
-    student?.request_type ===
-      'bargain' ||
-    student?.proposal?.proposedPrice !=
-      null ||
-    student?.proposal?.proposed_price !=
-      null;
+    student?.requestType === 'bargain' ||
+    student?.request_type === 'bargain' ||
+    student?.proposal?.proposedPrice != null ||
+    student?.proposal?.proposed_price != null;
 
   const proposedAmount =
     student?.proposedAmount ??
@@ -1326,6 +1318,8 @@ function StudentRequest({
     student?.proposal?.amount ??
     0;
 
+  const hasProposal = student?.proposalId != null;
+
   return (
     <div className="surface-panel rounded-xl p-4">
       <div className="flex items-start gap-3">
@@ -1334,7 +1328,8 @@ function StudentRequest({
             getInitials(
               student?.name ||
                 student?.fullName ||
-                student?.username
+                student?.username ||
+                'Student'
             )}
         </span>
 
@@ -1379,7 +1374,9 @@ function StudentRequest({
         <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
           <button
             type="button"
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px]"
+            onClick={onAccept}
+            disabled={!hasProposal}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Check size={12} />
             ACCEPT
@@ -1387,7 +1384,9 @@ function StudentRequest({
 
           <button
             type="button"
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px]"
+            onClick={onReject}
+            disabled={!hasProposal}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <X size={12} />
             REJECT
@@ -1396,7 +1395,9 @@ function StudentRequest({
           {isBargain && (
             <button
               type="button"
-              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px]"
+              onClick={onCounter}
+              disabled={!hasProposal}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px] hover:bg-amber/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <HandCoins size={12} />
               COUNTER

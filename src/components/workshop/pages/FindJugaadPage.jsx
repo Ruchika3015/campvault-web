@@ -26,7 +26,6 @@ import { ProposalModal } from '@/components/workshop/pages/ProposalModal';
 import { useAuth } from '@/context/AuthContext';
 import { useProposals } from '@/context/ProposalContext';
 
-
 /* =========================================================
    SAFETY HELPERS
    ========================================================= */
@@ -106,7 +105,6 @@ function normalizeItem(raw) {
   };
 }
 
-
 function normalizeFeed(data) {
   let list = [];
 
@@ -127,7 +125,6 @@ function normalizeFeed(data) {
     .filter(Boolean);
 }
 
-
 function safeDaysUntil(deadline) {
   if (!deadline) {
     return 'No deadline';
@@ -140,7 +137,6 @@ function safeDaysUntil(deadline) {
   }
 }
 
-
 function safeTimeAgo(date) {
   if (!date) {
     return '';
@@ -152,7 +148,6 @@ function safeTimeAgo(date) {
     return '';
   }
 }
-
 
 /* =========================================================
    MAIN PAGE
@@ -170,7 +165,6 @@ export function FindJugaadPage() {
     getProposalForJugaad,
     refreshData,
   } = useProposals();
-
 
   const [feedItems, setFeedItems] = useState(() => {
     if (!isDemoMode) {
@@ -193,7 +187,6 @@ export function FindJugaadPage() {
   const [query, setQuery] = useState('');
 
   const [category, setCategory] = useState('ALL');
-
 
   /* =======================================================
      LOAD FEED
@@ -232,11 +225,9 @@ export function FindJugaadPage() {
     }
   }, [isDemoMode, isAuthenticated]);
 
-
   useEffect(() => {
     fetchFeed();
   }, [fetchFeed]);
-
 
   /* =======================================================
      CURRENT USER / HELPER
@@ -245,6 +236,7 @@ export function FindJugaadPage() {
   const helper = user
     ? {
         id: user?.id ?? 'user',
+
         name:
           user?.name ??
           user?.email ??
@@ -264,7 +256,6 @@ export function FindJugaadPage() {
         name: 'Guest',
         initials: 'GU',
       };
-
 
   /* =======================================================
      FILTERING
@@ -307,7 +298,6 @@ export function FindJugaadPage() {
     );
   });
 
-
   /* =======================================================
      HIDE OPPORTUNITY
      ======================================================= */
@@ -347,7 +337,6 @@ export function FindJugaadPage() {
     }, 5000);
   };
 
-
   /* =======================================================
      SEND PROPOSAL
      ======================================================= */
@@ -364,7 +353,6 @@ export function FindJugaadPage() {
       await refreshData();
     }
   };
-
 
   /* =======================================================
      SECTIONS
@@ -430,7 +418,6 @@ export function FindJugaadPage() {
     ],
   ];
 
-
   /* =======================================================
      RENDER
      ======================================================= */
@@ -466,7 +453,6 @@ export function FindJugaadPage() {
         </p>
       </section>
 
-
       {/* ===================================================
           SEARCH + CATEGORY
           =================================================== */}
@@ -488,7 +474,6 @@ export function FindJugaadPage() {
             className="w-full bg-transparent px-3 py-2.5 font-mono text-xs outline-none text-ink-0"
           />
         </div>
-
 
         <div className="flex flex-wrap gap-1.5">
           {[
@@ -518,7 +503,6 @@ export function FindJugaadPage() {
         </div>
       </div>
 
-
       {/* ===================================================
           UNDO
           =================================================== */}
@@ -547,7 +531,6 @@ export function FindJugaadPage() {
           </button>
         </div>
       )}
-
 
       {/* ===================================================
           FEED
@@ -631,7 +614,6 @@ export function FindJugaadPage() {
         </div>
       )}
 
-
       {/* ===================================================
           EMPTY STATE
           =================================================== */}
@@ -650,7 +632,6 @@ export function FindJugaadPage() {
           </div>
         )}
 
-
       {/* ===================================================
           BARGAIN MODAL
           =================================================== */}
@@ -661,9 +642,9 @@ export function FindJugaadPage() {
           onClose={() =>
             setBargain(null)
           }
+          onSend={handleSendProposal}
         />
       )}
-
 
       {/* ===================================================
           PROPOSAL MODAL
@@ -682,7 +663,6 @@ export function FindJugaadPage() {
     </div>
   );
 }
-
 
 /* =========================================================
    OPPORTUNITY CARD
@@ -705,26 +685,21 @@ function OpportunityCard({
     return null;
   }
 
-
   const category =
     typeof item.category === 'string'
       ? item.category
       : 'OTHER';
 
-
   const color =
     CATEGORY_COLORS?.[category] ||
     'amber';
 
-
   const proposalSent =
     Boolean(existingProposal);
-
 
   const proposalStatus =
     existingProposal?.status ??
     null;
-
 
   /* =======================================================
      POSTER DATA
@@ -736,13 +711,11 @@ function OpportunityCard({
       ? item.poster
       : null;
 
-
   const creator =
     item?.creator &&
     typeof item.creator === 'object'
       ? item.creator
       : null;
-
 
   /*
    * IMPORTANT:
@@ -756,14 +729,12 @@ function OpportunityCard({
     item?.creatorName ??
     'Student';
 
-
   const posterInitials =
     poster?.initials ??
     creator?.initials ??
     String(posterName)
       .slice(0, 2)
       .toUpperCase();
-
 
   const posterRating =
     poster?.rating ??
@@ -772,10 +743,8 @@ function OpportunityCard({
     item?.rating ??
     '4.8';
 
-
   const categoryChar =
     category.charAt(0) || 'J';
-
 
   /* =======================================================
      CARD
@@ -813,13 +782,11 @@ function OpportunityCard({
             </span>
           </span>
 
-
           <div>
             <h2 className="font-display text-lg text-ink-0 leading-tight">
               {item?.title ||
                 'Untitled opportunity'}
             </h2>
-
 
             <div className="flex flex-wrap items-center gap-2 mt-1.5">
 
@@ -836,7 +803,6 @@ function OpportunityCard({
                 {category}
               </span>
 
-
               <span className="font-mono text-[8px] text-ink-3">
                 {item?.skillRequired ||
                   'General'}
@@ -846,7 +812,6 @@ function OpportunityCard({
           </div>
         </div>
 
-
         {item?.matchPercentage != null && (
           <span className="font-mono text-[9px] text-mint">
             {item.matchPercentage}% match
@@ -854,7 +819,6 @@ function OpportunityCard({
         )}
 
       </div>
-
 
       {/* ---------------------------------------------------
           DESCRIPTION
@@ -864,7 +828,6 @@ function OpportunityCard({
         {item?.description ||
           'No description available.'}
       </p>
-
 
       {/* ---------------------------------------------------
           META
@@ -876,7 +839,6 @@ function OpportunityCard({
           ₹{item?.amount ?? 0}
         </span>
 
-
         <span className="flex items-center gap-1">
           <Clock size={11} />
 
@@ -884,7 +846,6 @@ function OpportunityCard({
             item?.deadline
           )}
         </span>
-
 
         <span className="flex items-center gap-1">
           <Star
@@ -894,7 +855,6 @@ function OpportunityCard({
 
           {posterRating}
         </span>
-
 
         {safeTimeAgo(
           item?.postedAt ??
@@ -911,7 +871,6 @@ function OpportunityCard({
         )}
 
       </div>
-
 
       {/* ---------------------------------------------------
           PROPOSAL STATUS
@@ -931,7 +890,6 @@ function OpportunityCard({
             }
           />
 
-
           <span className="font-mono text-[9px] text-ink-2">
 
             {proposalStatus === 'accepted'
@@ -950,7 +908,6 @@ function OpportunityCard({
         </div>
       )}
 
-
       {/* ---------------------------------------------------
           FOOTER / ACTIONS
           --------------------------------------------------- */}
@@ -961,11 +918,9 @@ function OpportunityCard({
           {posterInitials}
         </span>
 
-
         <span className="font-mono text-[9px] text-ink-1 flex-1">
           {posterName}
         </span>
-
 
         <button
           type="button"
@@ -976,7 +931,6 @@ function OpportunityCard({
           <X size={14} />
         </button>
 
-
         <button
           type="button"
           onClick={onBargain}
@@ -986,7 +940,6 @@ function OpportunityCard({
           <HandCoins size={12} />
           BARGAIN
         </button>
-
 
         <button
           type="button"
@@ -1024,3 +977,5 @@ function OpportunityCard({
     </article>
   );
 }
+
+export default FindJugaadPage;

@@ -32,46 +32,33 @@ const DEMO_USER = {
    STORAGE KEYS
 ================================================================ */
 
-const DEMO_TOKEN_KEY =
-  'cj_demo_token';
+const DEMO_TOKEN_KEY = 'cj_demo_token';
+const DEMO_USER_KEY = 'cj_demo_user';
 
-const DEMO_USER_KEY =
-  'cj_demo_user';
-
-const REAL_TOKEN_KEY =
-  'cj_token';
+const REAL_TOKEN_KEY = 'cj_token';
+const REAL_USER_KEY = 'cj_user';
 
 
 /* ================================================================
    AUTH CONTEXT
 ================================================================ */
 
-const AuthContext =
-  createContext({
-    user: null,
-    token: null,
-    isAuthenticated: false,
-    isDemoMode: false,
-    loading: true,
+const AuthContext = createContext({
+  user: null,
+  token: null,
+  isAuthenticated: false,
+  isDemoMode: false,
+  loading: true,
 
-    login: async () => {},
+  login: async () => {},
+  register: async () => {},
+  demoLogin: () => {},
+  logout: () => {},
+});
 
-    register: async () => {},
-
-    demoLogin: () => {},
-
-    logout: () => {},
-  });
-
-
-/* ================================================================
-   useAuth
-================================================================ */
 
 export function useAuth() {
-  return useContext(
-    AuthContext
-  );
+  return useContext(AuthContext);
 }
 
 
@@ -79,266 +66,269 @@ export function useAuth() {
    AUTH PROVIDER
 ================================================================ */
 
-export function AuthProvider({
-  children,
-}) {
-  const [
-    user,
-    setUser,
-  ] = useState(null);
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
 
-  const [
-    token,
-    setToken,
-  ] = useState(null);
+  const [token, setToken] = useState(null);
 
-  const [
-    isDemoMode,
-    setIsDemoMode,
-  ] = useState(false);
+  const [isDemoMode, setIsDemoMode] =
+    useState(false);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
 
   /* ==============================================================
-     RESTORE SESSION
+     RESTORE SESSION ON PAGE LOAD
   ============================================================== */
 
   useEffect(() => {
     let mounted = true;
 
-    const restoreSession =
-      async () => {
-        try {
+
+    const restoreSession = async () => {
+      try {
+
+        /* ========================================================
+           REAL SESSION
+        ======================================================== */
+
+        const storedToken =
+          sessionStorage.getItem(
+            REAL_TOKEN_KEY
+          );
+
+        const storedUserString =
+          sessionStorage.getItem(
+            REAL_USER_KEY
+          );
+
+
+        if (storedToken) {
 
           /*
-           * ======================================================
-           * 1. REAL LOGIN SESSION
+           * Restore the user immediately from
+           * sessionStorage.
            *
-           * IMPORTANT:
-           * Authentication is now stored in sessionStorage.
-           *
-           * This means:
-           * - refresh keeps the session
-           * - closing the tab removes the session
-           * - opening a fresh tab requires login
-           * ======================================================
+           * This prevents the navbar/dashboard
+           * from temporarily showing Guest.
            */
 
-          const storedToken =
-            sessionStorage.getItem(
-              REAL_TOKEN_KEY
+          let cachedUser = null;
+
+          if (storedUserString) {
+            try {
+              cachedUser =
+                JSON.parse(
+                  storedUserString
+                );
+            } catch {
+              sessionStorage.removeItem(
+                REAL_USER_KEY
+              );
+            }
+          }
+
+
+          if (!mounted) {
+            return;
+          }
+
+
+          /*
+           * Immediately restore the token and
+           * cached user.
+           */
+
+          setToken(storedToken);
+
+          if (cachedUser) {
+            setUser(cachedUser);
+          }
+
+          setIsDemoMode(false);
+
+
+          /*
+           * Ask the backend for the latest profile.
+           */
+
+          try {
+            const profileResponse =
+              await api.getProfile();
+
+
+            if (!mounted) {
+              return;
+            }
+
+
+            const currentUser =
+              profileResponse?.data ||
+              profileResponse?.user ||
+              profileResponse;
+
+
+            if (currentUser) {
+              setUser(currentUser);
+
+              sessionStorage.setItem(
+                REAL_USER_KEY,
+                JSON.stringify(
+                  currentUser
+                )
+              );
+            }
+
+          } catch (error) {
+
+            console.error(
+              'Failed to refresh user profile:',
+              error
             );
 
+            /*
+             * IMPORTANT:
+             *
+             * Do NOT immediately log the user
+             * out just because the profile
+             * request temporarily fails.
+             *
+             * If the token still exists, keep
+             * the cached user and session alive.
+             */
 
-          if (storedToken) {
-
-            try {
-
-              const profileResponse =
-                await api.getProfile();
-
-              if (!mounted) {
-                return;
-              }
-
-
-              /*
-               * Backend normally returns:
-               *
-               * {
-               *   success: true,
-               *   data: user
-               * }
-               */
-
-              const currentUser =
-                profileResponse?.data ||
-                profileResponse?.user ||
-                profileResponse;
-
-
-              if (!currentUser) {
-                throw new Error(
-                  'User profile was not returned.'
-                );
-              }
-
-
-              setToken(
-                storedToken
-              );
-
-              setUser(
-                currentUser
-              );
-
-              setIsDemoMode(
-                false
-              );
-
-              setLoading(
-                false
-              );
-
-              return;
-
-            } catch (error) {
-
-              /*
-               * Stored token is invalid,
-               * expired, or belongs to an
-               * invalid session.
-               */
-
-              console.error(
-                'Stored authentication session is invalid:',
-                error
-              );
-
-
+            if (!cachedUser) {
               sessionStorage.removeItem(
                 REAL_TOKEN_KEY
               );
 
+              sessionStorage.removeItem(
+                REAL_USER_KEY
+              );
 
-              if (mounted) {
-
-                setToken(null);
-
-                setUser(null);
-
-                setIsDemoMode(false);
-              }
+              setToken(null);
+              setUser(null);
+              setIsDemoMode(false);
             }
           }
 
-
-          /*
-           * ======================================================
-           * 2. DEMO SESSION
-           * ======================================================
-           */
-
-          const demoToken =
-            sessionStorage.getItem(
-              DEMO_TOKEN_KEY
-            );
-
-          const demoUserString =
-            sessionStorage.getItem(
-              DEMO_USER_KEY
-            );
-
-
-          if (
-            demoToken &&
-            demoUserString
-          ) {
-
-            try {
-
-              const demoUser =
-                JSON.parse(
-                  demoUserString
-                );
-
-
-              if (!mounted) {
-                return;
-              }
-
-
-              setToken(
-                demoToken
-              );
-
-              setUser(
-                demoUser
-              );
-
-              setIsDemoMode(
-                true
-              );
-
-              setLoading(
-                false
-              );
-
-              return;
-
-            } catch (error) {
-
-              console.error(
-                'Invalid demo session:',
-                error
-              );
-
-
-              sessionStorage.removeItem(
-                DEMO_TOKEN_KEY
-              );
-
-              sessionStorage.removeItem(
-                DEMO_USER_KEY
-              );
-            }
-          }
-
-
-          /*
-           * ======================================================
-           * 3. NO SESSION
-           * ======================================================
-           */
 
           if (mounted) {
-
-            setToken(null);
-
-            setUser(null);
-
-            setIsDemoMode(false);
-
             setLoading(false);
           }
 
-        } catch (error) {
-
-          console.error(
-            'Failed to restore authentication session:',
-            error
-          );
+          return;
+        }
 
 
-          sessionStorage.removeItem(
-            REAL_TOKEN_KEY
-          );
+        /* ========================================================
+           DEMO SESSION
+        ======================================================== */
 
-          sessionStorage.removeItem(
+        const demoToken =
+          sessionStorage.getItem(
             DEMO_TOKEN_KEY
           );
 
-          sessionStorage.removeItem(
+        const demoUserString =
+          sessionStorage.getItem(
             DEMO_USER_KEY
           );
 
 
-          if (mounted) {
+        if (
+          demoToken &&
+          demoUserString
+        ) {
 
-            setToken(null);
+          try {
 
-            setUser(null);
+            const demoUser =
+              JSON.parse(
+                demoUserString
+              );
 
-            setIsDemoMode(false);
+
+            if (!mounted) {
+              return;
+            }
+
+
+            setToken(demoToken);
+
+            setUser(demoUser);
+
+            setIsDemoMode(true);
 
             setLoading(false);
+
+            return;
+
+          } catch {
+            sessionStorage.removeItem(
+              DEMO_TOKEN_KEY
+            );
+
+            sessionStorage.removeItem(
+              DEMO_USER_KEY
+            );
           }
         }
-      };
+
+
+        /* ========================================================
+           NO SESSION
+        ======================================================== */
+
+        if (mounted) {
+
+          setToken(null);
+
+          setUser(null);
+
+          setIsDemoMode(false);
+
+          setLoading(false);
+        }
+
+      } catch (error) {
+
+        console.error(
+          'Failed to restore authentication session:',
+          error
+        );
+
+
+        sessionStorage.removeItem(
+          REAL_TOKEN_KEY
+        );
+
+        sessionStorage.removeItem(
+          REAL_USER_KEY
+        );
+
+        sessionStorage.removeItem(
+          DEMO_TOKEN_KEY
+        );
+
+        sessionStorage.removeItem(
+          DEMO_USER_KEY
+        );
+
+
+        if (mounted) {
+
+          setToken(null);
+
+          setUser(null);
+
+          setIsDemoMode(false);
+
+          setLoading(false);
+        }
+      }
+    };
 
 
     restoreSession();
@@ -355,238 +345,113 @@ export function AuthProvider({
      REAL LOGIN
   ============================================================== */
 
-  const login =
-    useCallback(
-      async (
-        email,
-        password
-      ) => {
+  const login = useCallback(
+    async (email, password) => {
 
-        const data =
-          await api.login({
-            email,
-            password,
-          });
+      const data =
+        await api.login({
+          email,
+          password,
+        });
 
 
-        const newToken =
-          data?.token;
+      const newToken =
+        data?.token;
 
-        const newUser =
-          data?.user;
-
-
-        /*
-         * Validate token.
-         */
-
-        if (!newToken) {
-
-          throw {
-            status: 500,
-            message:
-              'Authentication failed. No token received.',
-          };
-        }
+      const newUser =
+        data?.user ||
+        data?.data;
 
 
-        /*
-         * Validate user.
-         */
-
-        if (!newUser) {
-
-          throw {
-            status: 500,
-            message:
-              'Authentication failed. User information was not received.',
-          };
-        }
+      if (!newToken) {
+        throw {
+          status: 500,
+          message:
+            'Authentication failed. No token received.',
+        };
+      }
 
 
-        /*
-         * Remove demo session.
-         */
-
-        sessionStorage.removeItem(
-          DEMO_TOKEN_KEY
-        );
-
-        sessionStorage.removeItem(
-          DEMO_USER_KEY
-        );
+      if (!newUser) {
+        throw {
+          status: 500,
+          message:
+            'Authentication failed. User information was not received.',
+        };
+      }
 
 
-        /*
-         * IMPORTANT:
-         *
-         * Store the real authentication
-         * token in sessionStorage.
-         */
+      /*
+       * Remove demo session.
+       */
 
-        sessionStorage.setItem(
-          REAL_TOKEN_KEY,
-          newToken
-        );
+      sessionStorage.removeItem(
+        DEMO_TOKEN_KEY
+      );
+
+      sessionStorage.removeItem(
+        DEMO_USER_KEY
+      );
 
 
-        /*
-         * Update React state.
-         */
+      /*
+       * Save real session.
+       */
 
-        setToken(
-          newToken
-        );
+      sessionStorage.setItem(
+        REAL_TOKEN_KEY,
+        newToken
+      );
 
-        setUser(
+
+      /*
+       * Save user as well.
+       */
+
+      sessionStorage.setItem(
+        REAL_USER_KEY,
+        JSON.stringify(
           newUser
-        );
-
-        setIsDemoMode(
-          false
-        );
+        )
+      );
 
 
-        return newUser;
-      },
-      []
-    );
+      /*
+       * Update React state.
+       */
+
+      setToken(newToken);
+
+      setUser(newUser);
+
+      setIsDemoMode(false);
+
+
+      return newUser;
+    },
+    []
+  );
 
 
   /* ==============================================================
      REGISTER
   ============================================================== */
 
-  const register =
-    useCallback(
-      async (
-        payload
-      ) => {
+  const register = useCallback(
+    async (payload) => {
 
-        const data =
-          await api.register(
-            payload
-          );
-
-
-        /*
-         * Some backends automatically
-         * log the user in after registration.
-         */
-
-        if (data?.token) {
-
-          sessionStorage.removeItem(
-            DEMO_TOKEN_KEY
-          );
-
-          sessionStorage.removeItem(
-            DEMO_USER_KEY
-          );
-
-
-          sessionStorage.setItem(
-            REAL_TOKEN_KEY,
-            data.token
-          );
-
-
-          setToken(
-            data.token
-          );
-
-          setUser(
-            data.user ||
-            data.data ||
-            null
-          );
-
-          setIsDemoMode(
-            false
-          );
-        }
-
-
-        return data;
-      },
-      []
-    );
-
-
-  /* ==============================================================
-     DEMO LOGIN
-  ============================================================== */
-
-  const demoLogin =
-    useCallback(
-      () => {
-
-        /*
-         * Remove real authentication.
-         */
-
-        sessionStorage.removeItem(
-          REAL_TOKEN_KEY
+      const data =
+        await api.register(
+          payload
         );
 
 
-        /*
-         * Create demo session.
-         */
+      if (data?.token) {
 
-        const demoToken =
-          `demo-session-${Date.now()}`;
-
-
-        sessionStorage.setItem(
-          DEMO_TOKEN_KEY,
-          demoToken
-        );
-
-
-        sessionStorage.setItem(
-          DEMO_USER_KEY,
-          JSON.stringify(
-            DEMO_USER
-          )
-        );
-
-
-        /*
-         * Update state.
-         */
-
-        setToken(
-          demoToken
-        );
-
-        setUser(
-          DEMO_USER
-        );
-
-        setIsDemoMode(
-          true
-        );
-      },
-      []
-    );
-
-
-  /* ==============================================================
-     LOGOUT
-  ============================================================== */
-
-  const logout =
-    useCallback(
-      () => {
-
-        /*
-         * Remove real session.
-         */
-
-        sessionStorage.removeItem(
-          REAL_TOKEN_KEY
-        );
+        const registeredUser =
+          data?.user ||
+          data?.data ||
+          null;
 
 
         /*
@@ -603,23 +468,144 @@ export function AuthProvider({
 
 
         /*
-         * Clear React state.
+         * Save real session.
          */
 
-        setToken(
-          null
+        sessionStorage.setItem(
+          REAL_TOKEN_KEY,
+          data.token
         );
+
+
+        /*
+         * Save user.
+         */
+
+        if (registeredUser) {
+          sessionStorage.setItem(
+            REAL_USER_KEY,
+            JSON.stringify(
+              registeredUser
+            )
+          );
+        }
+
+
+        setToken(data.token);
 
         setUser(
-          null
+          registeredUser
         );
 
-        setIsDemoMode(
-          false
-        );
-      },
-      []
+        setIsDemoMode(false);
+      }
+
+
+      return data;
+    },
+    []
+  );
+
+
+  /* ==============================================================
+     DEMO LOGIN
+  ============================================================== */
+
+  const demoLogin = useCallback(() => {
+
+    /*
+     * Remove real session.
+     */
+
+    sessionStorage.removeItem(
+      REAL_TOKEN_KEY
     );
+
+    sessionStorage.removeItem(
+      REAL_USER_KEY
+    );
+
+
+    /*
+     * Create demo session.
+     */
+
+    const demoToken =
+      `demo-session-${Date.now()}`;
+
+
+    sessionStorage.setItem(
+      DEMO_TOKEN_KEY,
+      demoToken
+    );
+
+
+    sessionStorage.setItem(
+      DEMO_USER_KEY,
+      JSON.stringify(
+        DEMO_USER
+      )
+    );
+
+
+    /*
+     * Update state.
+     */
+
+    setToken(
+      demoToken
+    );
+
+    setUser(
+      DEMO_USER
+    );
+
+    setIsDemoMode(true);
+  }, []);
+
+
+  /* ==============================================================
+     LOGOUT
+  ============================================================== */
+
+  const logout = useCallback(() => {
+
+    /*
+     * Clear real session.
+     */
+
+    sessionStorage.removeItem(
+      REAL_TOKEN_KEY
+    );
+
+    sessionStorage.removeItem(
+      REAL_USER_KEY
+    );
+
+
+    /*
+     * Clear demo session.
+     */
+
+    sessionStorage.removeItem(
+      DEMO_TOKEN_KEY
+    );
+
+    sessionStorage.removeItem(
+      DEMO_USER_KEY
+    );
+
+
+    /*
+     * Clear React state.
+     */
+
+    setToken(null);
+
+    setUser(null);
+
+    setIsDemoMode(false);
+  }, []);
 
 
   /* ==============================================================
@@ -628,7 +614,6 @@ export function AuthProvider({
 
   const value = {
     user,
-
     token,
 
     isAuthenticated:
@@ -656,3 +641,6 @@ export function AuthProvider({
     </AuthContext.Provider>
   );
 }
+
+
+export default AuthContext;

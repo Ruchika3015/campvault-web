@@ -242,6 +242,7 @@ export function MyJugaadsPage() {
     rejectProposal,
     counterProposal,
     refreshData,
+    conversations,
   } = useProposals();
 
   const [jugaadsList, setJugaadsList] = useState(
@@ -427,6 +428,7 @@ export function MyJugaadsPage() {
       <Detail
         item={item}
         proposals={itemProposals}
+        conversations={conversations}
         onBack={() => setSelected(null)}
         onStatus={(newStatus) =>
           handleUpdateStatus(
@@ -726,6 +728,7 @@ function Header({
 function Detail({
   item,
   proposals,
+  conversations,
   onBack,
   onStatus,
   onAcceptProposal,
@@ -764,6 +767,46 @@ function Detail({
     ? proposals
         .map(proposalToStudentRequest)
         .filter(Boolean)
+        .map((student) => {
+          const proposalId =
+            student?.proposalId ??
+            student?.proposal?.id;
+
+          const matchingConversation =
+            Array.isArray(conversations)
+              ? conversations.find((conversation) => {
+                  const conversationProposalId =
+                    conversation?.proposal_id ??
+                    conversation?.proposalId ??
+                    conversation?.proposal?.id;
+
+                  return (
+                    proposalId != null &&
+                    conversationProposalId != null &&
+                    String(proposalId) ===
+                      String(conversationProposalId)
+                  );
+                })
+              : null;
+
+          const conversationId =
+            getValidConversationId(
+              matchingConversation
+            );
+
+          if (!conversationId) {
+            return student;
+          }
+
+          return {
+            ...student,
+            conversationId,
+            proposal: {
+              ...student.proposal,
+              conversationId,
+            },
+          };
+        })
     : [];
 
   /*

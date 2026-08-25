@@ -237,11 +237,10 @@ export function MyJugaadsPage() {
   } = useAuth();
 
   const {
-    receivedProposals = [],
+    proposals = [],
     acceptProposal,
     rejectProposal,
     counterProposal,
-    refreshData,
   } = useProposals();
 
   const [jugaadsList, setJugaadsList] = useState(
@@ -266,7 +265,6 @@ export function MyJugaadsPage() {
     }
 
     if (!isAuthenticated) {
-      setJugaadsList([]);
       setLoading(false);
       return;
     }
@@ -274,25 +272,19 @@ export function MyJugaadsPage() {
     setLoading(true);
 
     try {
-      const [jugaadsResult] = await Promise.all([
-        api.getMyJugaads(),
-        refreshData(),
-      ]);
+      const data = await api.getMyJugaads();
 
       const list =
-        jugaadsResult?.jugaads ||
-        jugaadsResult?.data?.jugaads ||
-        jugaadsResult?.data ||
-        (Array.isArray(jugaadsResult)
-          ? jugaadsResult
-          : []);
+        data?.jugaads ||
+        data?.data ||
+        (Array.isArray(data) ? data : []);
 
       setJugaadsList(
         Array.isArray(list) ? list : []
       );
     } catch (error) {
       console.error(
-        'Failed to load my jugaads/proposals:',
+        'Failed to load my jugaads:',
         error
       );
 
@@ -300,11 +292,7 @@ export function MyJugaadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    isDemoMode,
-    isAuthenticated,
-    refreshData,
-  ]);
+  }, [isDemoMode, isAuthenticated]);
 
   useEffect(() => {
     fetchMyJugaads();
@@ -410,8 +398,8 @@ export function MyJugaadsPage() {
      * which otherwise fails with strict ===.
      */
     const itemProposals =
-      Array.isArray(receivedProposals)
-        ? receivedProposals.filter((p) => {
+      Array.isArray(proposals)
+        ? proposals.filter((p) => {
             const proposalJugaadId =
               getProposalJugaadId(p);
 
@@ -552,8 +540,8 @@ export function MyJugaadsPage() {
         <div className="grid lg:grid-cols-2 gap-3">
           {items.map((item) => {
             const itemProposals =
-              Array.isArray(receivedProposals)
-                ? receivedProposals.filter((p) => {
+              Array.isArray(proposals)
+                ? proposals.filter((p) => {
                     const proposalJugaadId =
                       getProposalJugaadId(p);
 

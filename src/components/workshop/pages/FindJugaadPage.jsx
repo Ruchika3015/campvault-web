@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 
 import { BargainModal } from '@/components/workshop/pages/BargainModal';
-import { ProposalModal } from '@/components/workshop/pages/ProposalModal';
 
 import { useAuth } from '@/context/AuthContext';
 import { useProposals } from '@/context/ProposalContext';
@@ -650,16 +649,7 @@ export function FindJugaadPage() {
           PROPOSAL MODAL
           =================================================== */}
 
-      {proposalItem && (
-        <ProposalModal
-          item={proposalItem}
-          helper={helper}
-          onClose={() =>
-            setProposalItem(null)
-          }
-          onSend={handleSendProposal}
-        />
-      )}
+    
     </div>
   );
 }

@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -73,6 +74,19 @@ export function ProfilePage() {
   const [myJugaads, setMyJugaads] = useState([]);
   const [loading, setLoading] = useState(!isDemoMode);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState('');
+
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    number: '',
+    location: '',
+    college_id: '',
+  });
+
   const [skills, setSkills] = useState(
     isDemoMode ? mockSkills : []
   );
@@ -91,10 +105,20 @@ export function ProfilePage() {
 
   useEffect(() => {
     if (isDemoMode) {
-      setProfile({
+      const demoProfile = {
         ...mockUser,
         ...mockProfileData,
         ...(authUser || {}),
+      };
+
+      setProfile(demoProfile);
+
+      setEditForm({
+        name: demoProfile.name || '',
+        email: demoProfile.email || '',
+        number: demoProfile.number || '',
+        location: demoProfile.location || '',
+        college_id: demoProfile.college_id || '',
       });
 
       setSkills(mockSkills);
@@ -142,12 +166,32 @@ export function ProfilePage() {
           raw ??
           {};
 
-        setProfile({
+        const loadedProfile = {
           ...(authUser || {}),
           ...realProfile,
+        };
+
+        setProfile(loadedProfile);
+
+        setEditForm({
+          name: loadedProfile.name || '',
+          email: loadedProfile.email || '',
+          number: loadedProfile.number || '',
+          location: loadedProfile.location || '',
+          college_id: loadedProfile.college_id || '',
         });
       } else {
-        setProfile(authUser || {});
+        const fallbackProfile = authUser || {};
+
+        setProfile(fallbackProfile);
+
+        setEditForm({
+          name: fallbackProfile.name || '',
+          email: fallbackProfile.email || '',
+          number: fallbackProfile.number || '',
+          location: fallbackProfile.location || '',
+          college_id: fallbackProfile.college_id || '',
+        });
       }
 
       if (jugaadsResult.status === 'fulfilled') {
@@ -165,7 +209,7 @@ export function ProfilePage() {
         setMyJugaads([]);
       }
 
-      // No confirmed backend APIs yet for these.
+      // Backend APIs for these sections are not currently confirmed.
       setSkills([]);
       setLinks([]);
       setProjects([]);
@@ -253,6 +297,133 @@ export function ProfilePage() {
     profile?.bio ??
     '';
 
+  const handleEditChange = (event) => {
+    const { name, value } = event.target;
+
+    setEditForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  };
+
+  const openEditProfile = () => {
+    setSaveError('');
+    setSaveSuccess('');
+
+    setEditForm({
+      name: profile?.name || '',
+      email: profile?.email || '',
+      number: profile?.number || '',
+      location: profile?.location || '',
+      college_id: profile?.college_id || '',
+    });
+
+    setIsEditing(true);
+  };
+
+  const cancelEditProfile = () => {
+    setIsEditing(false);
+    setSaveError('');
+    setSaveSuccess('');
+
+    setEditForm({
+      name: profile?.name || '',
+      email: profile?.email || '',
+      number: profile?.number || '',
+      location: profile?.location || '',
+      college_id: profile?.college_id || '',
+    });
+  };
+
+  const handleSaveProfile = async (event) => {
+    event.preventDefault();
+
+    setSaving(true);
+    setSaveError('');
+    setSaveSuccess('');
+
+    try {
+      const payload = {
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+        number: editForm.number.trim(),
+        location: editForm.location.trim(),
+        college_id: Number(editForm.college_id),
+      };
+
+      if (!payload.name || payload.name.length < 2) {
+        throw new Error(
+          'Name must be at least 2 characters.'
+        );
+      }
+
+      if (!/^\d{10}$/.test(payload.number)) {
+        throw new Error(
+          'Phone number must contain exactly 10 digits.'
+        );
+      }
+
+      if (
+        !Number.isFinite(payload.college_id) ||
+        payload.college_id <= 0
+      ) {
+        throw new Error(
+          'Please enter a valid college ID.'
+        );
+      }
+
+      const result =
+        await api.updateProfile(payload);
+
+      const updatedProfile =
+        result?.data ||
+        result?.user ||
+        result;
+
+      setProfile((current) => ({
+        ...current,
+        ...updatedProfile,
+      }));
+
+      setEditForm({
+        name:
+          updatedProfile.name ||
+          payload.name,
+
+        email:
+          updatedProfile.email ||
+          payload.email,
+
+        number:
+          updatedProfile.number ||
+          payload.number,
+
+        location:
+          updatedProfile.location ||
+          payload.location,
+
+        college_id:
+          updatedProfile.college_id ||
+          payload.college_id,
+      });
+
+      setSaveSuccess(
+        'Profile updated successfully.'
+      );
+
+      setIsEditing(false);
+    } catch (error) {
+      setSaveError(
+        error?.message ||
+          error?.data?.message ||
+          error?.data?.error ||
+          'Unable to update your profile. Please try again.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -323,8 +494,7 @@ export function ProfilePage() {
               ) : (
                 <>
                   <h1 className="font-display text-3xl sm:text-4xl">
-                    {profile?.name ||
-                      'Student'}
+                    {profile?.name || 'Student'}
                   </h1>
 
                   <p className="font-mono text-xs text-ink-2 mt-2">
@@ -376,23 +546,150 @@ export function ProfilePage() {
         </div>
       </section>
 
+      {!isDemoMode && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-h-[18px]">
+            {saveSuccess && (
+              <p className="font-mono text-[9px] text-mint">
+                {saveSuccess}
+              </p>
+            )}
+
+            {saveError && (
+              <p className="font-mono text-[9px] text-coral">
+                {saveError}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={openEditProfile}
+            className="machine-control"
+          >
+            <span className="ctrl-led" />
+            EDIT PROFILE
+          </button>
+        </div>
+      )}
+
+      {isEditing && !isDemoMode && (
+        <section className="surface-panel rounded-2xl p-5 mt-6 mb-8">
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div>
+              <p className="font-technical text-[9px] text-amber">
+                PROFILE EDITOR
+              </p>
+
+              <h2 className="font-display text-xl mt-1">
+                Edit Profile
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={cancelEditProfile}
+              disabled={saving}
+              className="machine-control machine-control--ghost disabled:opacity-50"
+            >
+              <span className="ctrl-led" />
+              CANCEL
+            </button>
+          </div>
+
+          <form
+            onSubmit={handleSaveProfile}
+            className="grid sm:grid-cols-2 gap-4"
+          >
+            <ProfileInput
+              id="profile-name"
+              label="NAME"
+              name="name"
+              value={editForm.name}
+              onChange={handleEditChange}
+              required
+              minLength={2}
+              maxLength={100}
+            />
+
+            <ProfileInput
+              id="profile-email"
+              label="EMAIL"
+              name="email"
+              type="email"
+              value={editForm.email}
+              onChange={handleEditChange}
+              required
+            />
+
+            <ProfileInput
+              id="profile-number"
+              label="PHONE NUMBER"
+              name="number"
+              type="tel"
+              inputMode="numeric"
+              value={editForm.number}
+              onChange={handleEditChange}
+              required
+              maxLength={10}
+              pattern="[0-9]{10}"
+            />
+
+            <ProfileInput
+              id="profile-location"
+              label="LOCATION"
+              name="location"
+              value={editForm.location}
+              onChange={handleEditChange}
+              maxLength={200}
+            />
+
+            <ProfileInput
+              id="profile-college-id"
+              label="COLLEGE ID"
+              name="college_id"
+              type="number"
+              min="1"
+              value={editForm.college_id}
+              onChange={handleEditChange}
+              required
+            />
+
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="machine-control disabled:opacity-50"
+              >
+                <span className="ctrl-led" />
+                {saving
+                  ? 'SAVING...'
+                  : 'SAVE CHANGES'}
+              </button>
+
+              {saveError && (
+                <p className="font-mono text-[9px] text-coral">
+                  {saveError}
+                </p>
+              )}
+            </div>
+          </form>
+        </section>
+      )}
+
       {/* Stats */}
       <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-8">
         <StatBlock
           label="JUGAADS POSTED"
           value={stats.jugaadsPosted}
-          icon={
-            <TrendingUp size={14} />
-          }
+          icon={<TrendingUp size={14} />}
           color="amber"
         />
 
         <StatBlock
           label="COMPLETED"
           value={stats.jugaadsCompleted}
-          icon={
-            <CheckCircle2 size={14} />
-          }
+          icon={<CheckCircle2 size={14} />}
           color="mint"
         />
 
@@ -517,9 +814,7 @@ export function ProfilePage() {
                     >
                       {link.url}
 
-                      <ExternalLink
-                        size={9}
-                      />
+                      <ExternalLink size={9} />
                     </a>
                   </div>
                 );
@@ -556,9 +851,7 @@ export function ProfilePage() {
 
                   {project.description && (
                     <p className="font-mono text-[10px] text-ink-2 mt-2">
-                      {
-                        project.description
-                      }
+                      {project.description}
                     </p>
                   )}
 
@@ -569,14 +862,10 @@ export function ProfilePage() {
                       {project.technologies.map(
                         (technology) => (
                           <span
-                            key={
-                              technology
-                            }
+                            key={technology}
                             className="font-technical text-[7px] px-2 py-1 rounded bg-bg-2 text-ink-2 border border-metal-1"
                           >
-                            {
-                              technology
-                            }
+                            {technology}
                           </span>
                         )
                       )}
@@ -586,16 +875,12 @@ export function ProfilePage() {
                   <div className="flex gap-3 mt-3">
                     {project.github && (
                       <a
-                        href={
-                          project.github
-                        }
+                        href={project.github}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 font-mono text-[9px] text-mint"
                       >
-                        <Github
-                          size={11}
-                        />
+                        <Github size={11} />
                         GitHub
                       </a>
                     )}
@@ -607,9 +892,7 @@ export function ProfilePage() {
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 font-mono text-[9px] text-amber"
                       >
-                        <Globe
-                          size={11}
-                        />
+                        <Globe size={11} />
                         Live
                       </a>
                     )}
@@ -638,22 +921,16 @@ export function ProfilePage() {
                     className="surface-metal rounded-xl p-3 flex items-start gap-3"
                   >
                     <span className="grid place-items-center w-8 h-8 rounded-lg bg-amber/10 text-amber shrink-0">
-                      <GraduationCap
-                        size={14}
-                      />
+                      <GraduationCap size={14} />
                     </span>
 
                     <div>
                       <p className="font-display text-sm">
-                        {
-                          certificate.title
-                        }
+                        {certificate.title}
                       </p>
 
                       <p className="font-mono text-[9px] text-ink-3 mt-1">
-                        {
-                          certificate.organization
-                        }
+                        {certificate.organization}
                         {certificate.date
                           ? ` · ${certificate.date}`
                           : ''}
@@ -679,22 +956,16 @@ export function ProfilePage() {
                   className="surface-metal rounded-xl p-3 flex items-center gap-3 mt-2"
                 >
                   <span className="text-lg">
-                    {
-                      achievement.emoji
-                    }
+                    {achievement.emoji}
                   </span>
 
                   <div>
                     <p className="font-technical text-[9px] text-ink-0">
-                      {
-                        achievement.title
-                      }
+                      {achievement.title}
                     </p>
 
                     <p className="font-mono text-[8px] text-ink-3">
-                      {
-                        achievement.desc
-                      }
+                      {achievement.desc}
                     </p>
                   </div>
                 </div>
@@ -776,6 +1047,37 @@ export function ProfilePage() {
           BACK TO WORKSPACE
         </Link>
       </div>
+    </div>
+  );
+}
+
+function ProfileInput({
+  id,
+  label,
+  name,
+  type = 'text',
+  value,
+  onChange,
+  ...props
+}) {
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="font-technical text-[8px] text-ink-3"
+      >
+        {label}
+      </label>
+
+      <input
+        id={id}
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        className="w-full mt-2 rounded-lg bg-bg-2 border border-metal-1 px-3 py-3 font-mono text-xs text-ink-0 outline-none focus:border-amber"
+        {...props}
+      />
     </div>
   );
 }

@@ -25,6 +25,7 @@ import { BargainModal } from '@/components/workshop/pages/BargainModal';
 import { useAuth } from '@/context/AuthContext';
 import { useProposals } from '@/context/ProposalContext';
 
+
 /* =========================================================
    SAFETY HELPERS
    ========================================================= */
@@ -104,6 +105,7 @@ function normalizeItem(raw) {
   };
 }
 
+
 function normalizeFeed(data) {
   let list = [];
 
@@ -124,6 +126,7 @@ function normalizeFeed(data) {
     .filter(Boolean);
 }
 
+
 function safeDaysUntil(deadline) {
   if (!deadline) {
     return 'No deadline';
@@ -136,6 +139,7 @@ function safeDaysUntil(deadline) {
   }
 }
 
+
 function safeTimeAgo(date) {
   if (!date) {
     return '';
@@ -147,6 +151,7 @@ function safeTimeAgo(date) {
     return '';
   }
 }
+
 
 /* =========================================================
    MAIN PAGE
@@ -165,6 +170,7 @@ export function FindJugaadPage() {
     refreshData,
   } = useProposals();
 
+
   const [feedItems, setFeedItems] = useState(() => {
     if (!isDemoMode) {
       return [];
@@ -179,6 +185,9 @@ export function FindJugaadPage() {
 
   const [bargain, setBargain] = useState(null);
 
+  /*
+   * This stores the Jugaad selected by INTERESTED.
+   */
   const [proposalItem, setProposalItem] = useState(null);
 
   const [undo, setUndo] = useState(null);
@@ -187,29 +196,38 @@ export function FindJugaadPage() {
 
   const [category, setCategory] = useState('ALL');
 
+
   /* =======================================================
      LOAD FEED
      ======================================================= */
 
   const fetchFeed = useCallback(async () => {
     if (isDemoMode) {
-      setFeedItems(normalizeFeed(mockDiscoveryFeed));
+      setFeedItems(
+        normalizeFeed(mockDiscoveryFeed)
+      );
+
       setLoading(false);
+
       return;
     }
 
     if (!isAuthenticated) {
       setFeedItems([]);
+
       setLoading(false);
+
       return;
     }
 
     setLoading(true);
 
     try {
-      const data = await api.getDiscoveryFeed();
+      const data =
+        await api.getDiscoveryFeed();
 
-      const list = normalizeFeed(data);
+      const list =
+        normalizeFeed(data);
 
       setFeedItems(list);
     } catch (error) {
@@ -222,11 +240,16 @@ export function FindJugaadPage() {
     } finally {
       setLoading(false);
     }
-  }, [isDemoMode, isAuthenticated]);
+  }, [
+    isDemoMode,
+    isAuthenticated,
+  ]);
+
 
   useEffect(() => {
     fetchFeed();
   }, [fetchFeed]);
+
 
   /* =======================================================
      CURRENT USER / HELPER
@@ -234,7 +257,9 @@ export function FindJugaadPage() {
 
   const helper = user
     ? {
-        id: user?.id ?? 'user',
+        id:
+          user?.id ??
+          'user',
 
         name:
           user?.name ??
@@ -256,53 +281,59 @@ export function FindJugaadPage() {
         initials: 'GU',
       };
 
+
   /* =======================================================
      FILTERING
      ======================================================= */
 
-  const visible = feedItems.filter((item) => {
-    if (!item) {
-      return false;
-    }
+  const visible =
+    feedItems.filter((item) => {
+      if (!item) {
+        return false;
+      }
 
-    if (
-      item.id !== undefined &&
-      hidden.includes(item.id)
-    ) {
-      return false;
-    }
+      if (
+        item.id !== undefined &&
+        hidden.includes(item.id)
+      ) {
+        return false;
+      }
 
-    const search =
-      query.trim().toLowerCase();
+      const search =
+        query.trim().toLowerCase();
 
-    const matchesQuery =
-      !search ||
-      String(item.title ?? '')
-        .toLowerCase()
-        .includes(search) ||
-      String(item.skillRequired ?? '')
-        .toLowerCase()
-        .includes(search) ||
-      String(item.description ?? '')
-        .toLowerCase()
-        .includes(search);
+      const matchesQuery =
+        !search ||
+        String(item.title ?? '')
+          .toLowerCase()
+          .includes(search) ||
+        String(item.skillRequired ?? '')
+          .toLowerCase()
+          .includes(search) ||
+        String(item.description ?? '')
+          .toLowerCase()
+          .includes(search);
 
-    const matchesCategory =
-      category === 'ALL' ||
-      item.category === category;
+      const matchesCategory =
+        category === 'ALL' ||
+        item.category === category;
 
-    return (
-      matchesQuery &&
-      matchesCategory
-    );
-  });
+      return (
+        matchesQuery &&
+        matchesCategory
+      );
+    });
+
 
   /* =======================================================
      HIDE OPPORTUNITY
      ======================================================= */
 
   const hide = async (id) => {
-    if (id === undefined || id === null) {
+    if (
+      id === undefined ||
+      id === null
+    ) {
       return;
     }
 
@@ -311,7 +342,10 @@ export function FindJugaadPage() {
         return current;
       }
 
-      return [...current, id];
+      return [
+        ...current,
+        id,
+      ];
     });
 
     setUndo(id);
@@ -336,22 +370,55 @@ export function FindJugaadPage() {
     }, 5000);
   };
 
+
   /* =======================================================
      SEND PROPOSAL
      ======================================================= */
 
-  const handleSendProposal = async (payload) => {
-    await sendProposal({
-      ...payload,
-      helper,
-    });
+  const handleSendProposal = async (
+    payload
+  ) => {
+    try {
+      console.log(
+        'FIND JUGAAD - sending proposal:',
+        payload
+      );
 
-    await fetchFeed();
+      await sendProposal({
+        ...payload,
+        helper,
+      });
 
-    if (refreshData) {
-      await refreshData();
+      console.log(
+        'FIND JUGAAD - proposal sent successfully'
+      );
+
+      await fetchFeed();
+
+      if (refreshData) {
+        await refreshData();
+      }
+
+      /*
+       * Close whichever modal opened the proposal.
+       */
+      setBargain(null);
+      setProposalItem(null);
+    } catch (error) {
+      console.error(
+        'FIND JUGAAD - failed to send proposal:',
+        error
+      );
+
+      /*
+       * Important:
+       * Re-throw so BargainModal can show
+       * the error message.
+       */
+      throw error;
     }
   };
+
 
   /* =======================================================
      SECTIONS
@@ -362,7 +429,9 @@ export function FindJugaadPage() {
       'RECOMMENDED FOR YOU',
       visible.filter(
         (item) =>
-          Number(item?.matchPercentage ?? 0) >= 80
+          Number(
+            item?.matchPercentage ?? 0
+          ) >= 80
       ),
     ],
 
@@ -401,7 +470,9 @@ export function FindJugaadPage() {
       'ENDING SOON',
       visible.filter((item) => {
         const remaining =
-          safeDaysUntil(item?.deadline);
+          safeDaysUntil(
+            item?.deadline
+          );
 
         return (
           remaining === 'today' ||
@@ -417,14 +488,22 @@ export function FindJugaadPage() {
     ],
   ];
 
+
   /* =======================================================
      RENDER
      ======================================================= */
 
   return (
     <div>
+
+      {/* ===================================================
+          HEADER
+          =================================================== */}
+
       <section className="pt-12 pb-7">
+
         <div className="flex items-center gap-3 mb-4">
+
           <LED
             color="amber"
             pulse
@@ -434,15 +513,22 @@ export function FindJugaadPage() {
           <span className="font-technical text-[9px] text-ink-2">
             02 — CAMPUS OPPORTUNITY FEED
           </span>
+
         </div>
 
+
         <h1 className="font-display text-4xl sm:text-5xl">
+
           FIND A
+
           <br />
+
           <span className="text-amber">
             JUGAAD.
           </span>
+
         </h1>
+
 
         <p className="mt-4 max-w-xl text-sm text-ink-2">
           Opportunities selected for you.
@@ -450,7 +536,9 @@ export function FindJugaadPage() {
           students, then choose how you want
           to approach it.
         </p>
+
       </section>
+
 
       {/* ===================================================
           SEARCH + CATEGORY
@@ -459,6 +547,7 @@ export function FindJugaadPage() {
       <div className="surface-panel rounded-xl p-3 flex flex-col sm:flex-row gap-3 mb-8">
 
         <div className="flex items-center flex-1 rounded-lg bg-bg-1 border border-metal-1">
+
           <Search
             size={14}
             className="ml-3 text-ink-3"
@@ -467,14 +556,19 @@ export function FindJugaadPage() {
           <input
             value={query}
             onChange={(event) =>
-              setQuery(event.target.value)
+              setQuery(
+                event.target.value
+              )
             }
             placeholder="Search opportunities or skills..."
             className="w-full bg-transparent px-3 py-2.5 font-mono text-xs outline-none text-ink-0"
           />
+
         </div>
 
+
         <div className="flex flex-wrap gap-1.5">
+
           {[
             'ALL',
             'CODE',
@@ -483,24 +577,32 @@ export function FindJugaadPage() {
             'ACADEMICS',
             'PRESENTATION',
             'OTHER',
-          ].map((currentCategory) => (
-            <button
-              key={currentCategory}
-              type="button"
-              onClick={() =>
-                setCategory(currentCategory)
-              }
-              className={`px-2.5 py-2 rounded-md font-technical text-[8px] ${
-                category === currentCategory
-                  ? 'bg-amber text-bg-0'
-                  : 'bg-bg-2 text-ink-3 border border-metal-1'
-              }`}
-            >
-              {currentCategory}
-            </button>
-          ))}
+          ].map(
+            (currentCategory) => (
+              <button
+                key={currentCategory}
+                type="button"
+                onClick={() =>
+                  setCategory(
+                    currentCategory
+                  )
+                }
+                className={`px-2.5 py-2 rounded-md font-technical text-[8px] ${
+                  category ===
+                  currentCategory
+                    ? 'bg-amber text-bg-0'
+                    : 'bg-bg-2 text-ink-3 border border-metal-1'
+                }`}
+              >
+                {currentCategory}
+              </button>
+            )
+          )}
+
         </div>
+
       </div>
+
 
       {/* ===================================================
           UNDO
@@ -508,17 +610,21 @@ export function FindJugaadPage() {
 
       {undo !== null && (
         <div className="mb-4 flex items-center justify-between surface-wood rounded-lg px-4 py-3">
+
           <span className="font-mono text-[10px] text-paper">
             Opportunity hidden from your feed.
           </span>
 
+
           <button
             type="button"
             onClick={() => {
-              setHidden((current) =>
-                current.filter(
-                  (id) => id !== undo
-                )
+              setHidden(
+                (current) =>
+                  current.filter(
+                    (id) =>
+                      id !== undo
+                  )
               );
 
               setUndo(null);
@@ -526,25 +632,35 @@ export function FindJugaadPage() {
             className="flex items-center gap-1.5 font-technical text-[8px] text-amber"
           >
             <Undo2 size={12} />
+
             UNDO
           </button>
+
         </div>
       )}
+
 
       {/* ===================================================
           FEED
           =================================================== */}
 
       {loading ? (
+
         <div className="py-16 text-center">
+
           <p className="font-mono text-sm text-ink-2">
             Loading opportunities...
           </p>
+
         </div>
+
       ) : (
+
         <div className="space-y-9">
+
           {sections.map(
             ([title, items]) => {
+
               if (
                 !Array.isArray(items) ||
                 items.length === 0
@@ -552,66 +668,97 @@ export function FindJugaadPage() {
                 return null;
               }
 
+
               return (
-                <section key={title}>
+                <section
+                  key={title}
+                >
+
                   <div className="flex items-center gap-2 mb-3">
+
                     <span className="font-technical text-[9px] text-ink-0">
                       {title}
                     </span>
+
 
                     <span className="font-mono text-[8px] text-ink-3">
                       ({items.length})
                     </span>
 
+
                     <span className="h-px flex-1 bg-metal-1/40" />
+
                   </div>
+
 
                   <div className="grid lg:grid-cols-2 gap-3">
-                    {items.map((item) => {
-                      if (!item) {
-                        return null;
-                      }
 
-                      let existingProposal = null;
+                    {items.map(
+                      (item) => {
 
-                      try {
-                        existingProposal =
-                          getProposalForJugaad(
-                            item.id
+                        if (!item) {
+                          return null;
+                        }
+
+
+                        let existingProposal =
+                          null;
+
+
+                        try {
+                          existingProposal =
+                            getProposalForJugaad(
+                              item.id
+                            );
+                        } catch (error) {
+                          console.error(
+                            'Failed to get proposal:',
+                            error
                           );
-                      } catch (error) {
-                        console.error(
-                          'Failed to get proposal:',
-                          error
+                        }
+
+
+                        return (
+                          <OpportunityCard
+                            key={item.id}
+                            item={item}
+                            existingProposal={
+                              existingProposal
+                            }
+
+                            onHide={() =>
+                              hide(item.id)
+                            }
+
+                            onBargain={() =>
+                              setBargain(item)
+                            }
+
+                            onInterest={() => {
+                              console.log(
+                                'INTERESTED clicked:',
+                                item
+                              );
+
+                              setProposalItem(
+                                item
+                              );
+                            }}
+                          />
                         );
                       }
+                    )}
 
-                      return (
-                        <OpportunityCard
-                          key={item.id}
-                          item={item}
-                          existingProposal={
-                            existingProposal
-                          }
-                          onHide={() =>
-                            hide(item.id)
-                          }
-                          onBargain={() =>
-                            setBargain(item)
-                          }
-                          onInterest={() =>
-                            setProposalItem(item)
-                          }
-                        />
-                      );
-                    })}
                   </div>
+
                 </section>
               );
             }
           )}
+
         </div>
       )}
+
 
       {/* ===================================================
           EMPTY STATE
@@ -619,7 +766,9 @@ export function FindJugaadPage() {
 
       {!loading &&
         visible.length === 0 && (
+
           <div className="py-16 text-center">
+
             <Search
               size={32}
               className="mx-auto text-ink-3 mb-3"
@@ -628,31 +777,61 @@ export function FindJugaadPage() {
             <p className="font-mono text-sm text-ink-2">
               No opportunities match this view.
             </p>
+
           </div>
+
         )}
+
 
       {/* ===================================================
           BARGAIN MODAL
           =================================================== */}
 
       {bargain && (
+
         <BargainModal
           item={bargain}
+
+          mode="bargain"
+
           onClose={() =>
             setBargain(null)
           }
-          onSend={handleSendProposal}
+
+          onSend={
+            handleSendProposal
+          }
         />
+
       )}
 
+
       {/* ===================================================
-          PROPOSAL MODAL
+          INTERESTED / PROPOSAL MODAL
           =================================================== */}
 
-    
+      {proposalItem && (
+
+        <BargainModal
+          item={proposalItem}
+
+          mode="interest"
+
+          onClose={() =>
+            setProposalItem(null)
+          }
+
+          onSend={
+            handleSendProposal
+          }
+        />
+
+      )}
+
     </div>
   );
 }
+
 
 /* =========================================================
    OPPORTUNITY CARD
@@ -665,9 +844,7 @@ function OpportunityCard({
   onHide,
   onBargain,
 }) {
-  /*
-   * Absolute safety guard.
-   */
+
   if (
     !item ||
     typeof item !== 'object'
@@ -675,21 +852,26 @@ function OpportunityCard({
     return null;
   }
 
+
   const category =
     typeof item.category === 'string'
       ? item.category
       : 'OTHER';
 
+
   const color =
     CATEGORY_COLORS?.[category] ||
     'amber';
 
+
   const proposalSent =
     Boolean(existingProposal);
+
 
   const proposalStatus =
     existingProposal?.status ??
     null;
+
 
   /* =======================================================
      POSTER DATA
@@ -701,16 +883,13 @@ function OpportunityCard({
       ? item.poster
       : null;
 
+
   const creator =
     item?.creator &&
     typeof item.creator === 'object'
       ? item.creator
       : null;
 
-  /*
-   * IMPORTANT:
-   * Never access .name on poster/creator directly.
-   */
 
   const posterName =
     poster?.name ??
@@ -719,12 +898,14 @@ function OpportunityCard({
     item?.creatorName ??
     'Student';
 
+
   const posterInitials =
     poster?.initials ??
     creator?.initials ??
     String(posterName)
       .slice(0, 2)
       .toUpperCase();
+
 
   const posterRating =
     poster?.rating ??
@@ -733,14 +914,17 @@ function OpportunityCard({
     item?.rating ??
     '4.8';
 
+
   const categoryChar =
     category.charAt(0) || 'J';
+
 
   /* =======================================================
      CARD
      ======================================================= */
 
   return (
+
     <article
       className="surface-metal-brushed rounded-2xl p-5 relative"
       style={{
@@ -767,16 +951,21 @@ function OpportunityCard({
                 `var(--${color})`,
             }}
           >
+
             <span className="font-display text-lg">
               {categoryChar}
             </span>
+
           </span>
 
+
           <div>
+
             <h2 className="font-display text-lg text-ink-0 leading-tight">
               {item?.title ||
                 'Untitled opportunity'}
             </h2>
+
 
             <div className="flex flex-wrap items-center gap-2 mt-1.5">
 
@@ -793,31 +982,41 @@ function OpportunityCard({
                 {category}
               </span>
 
+
               <span className="font-mono text-[8px] text-ink-3">
                 {item?.skillRequired ||
                   'General'}
               </span>
 
             </div>
+
           </div>
+
         </div>
 
+
         {item?.matchPercentage != null && (
+
           <span className="font-mono text-[9px] text-mint">
             {item.matchPercentage}% match
           </span>
+
         )}
 
       </div>
+
 
       {/* ---------------------------------------------------
           DESCRIPTION
           --------------------------------------------------- */}
 
       <p className="font-mono text-[10px] leading-relaxed text-ink-2 mt-4">
+
         {item?.description ||
           'No description available.'}
+
       </p>
+
 
       {/* ---------------------------------------------------
           META
@@ -829,74 +1028,98 @@ function OpportunityCard({
           ₹{item?.amount ?? 0}
         </span>
 
+
         <span className="flex items-center gap-1">
+
           <Clock size={11} />
 
           {safeDaysUntil(
             item?.deadline
           )}
+
         </span>
 
+
         <span className="flex items-center gap-1">
+
           <Star
             size={11}
             className="text-amber fill-amber"
           />
 
           {posterRating}
+
         </span>
+
 
         {safeTimeAgo(
           item?.postedAt ??
           item?.created_at ??
           item?.createdAt
         ) && (
+
           <span>
+
             {safeTimeAgo(
               item?.postedAt ??
               item?.created_at ??
               item?.createdAt
             )}
+
           </span>
+
         )}
 
       </div>
+
 
       {/* ---------------------------------------------------
           PROPOSAL STATUS
           --------------------------------------------------- */}
 
       {proposalSent && (
+
         <div className="mt-3 surface-panel rounded-lg px-3 py-2 flex items-center gap-2">
 
           <CheckCircle2
             size={13}
             className={
-              proposalStatus === 'accepted'
+              proposalStatus ===
+              'accepted'
                 ? 'text-mint'
-                : proposalStatus === 'rejected'
+                : proposalStatus ===
+                    'rejected'
                   ? 'text-coral'
                   : 'text-amber'
             }
           />
 
+
           <span className="font-mono text-[9px] text-ink-2">
 
-            {proposalStatus === 'accepted'
+            {proposalStatus ===
+            'accepted'
+
               ? 'Proposal Accepted — check My Requests to message'
 
-              : proposalStatus === 'rejected'
+              : proposalStatus ===
+                  'rejected'
+
                 ? 'Proposal Rejected'
 
                 : proposalStatus ===
                     'counter-offer'
+
                   ? 'Counter offer received — check My Requests'
 
                   : 'Proposal Sent — see status in My Requests'}
 
           </span>
+
         </div>
+
       )}
+
 
       {/* ---------------------------------------------------
           FOOTER / ACTIONS
@@ -908,9 +1131,13 @@ function OpportunityCard({
           {posterInitials}
         </span>
 
+
         <span className="font-mono text-[9px] text-ink-1 flex-1">
           {posterName}
         </span>
+
+
+        {/* NOT INTERESTED */}
 
         <button
           type="button"
@@ -921,15 +1148,24 @@ function OpportunityCard({
           <X size={14} />
         </button>
 
+
+        {/* BARGAIN */}
+
         <button
           type="button"
           onClick={onBargain}
           disabled={proposalSent}
           className="flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] text-amber border border-amber/30 hover:bg-amber/10 disabled:opacity-40"
         >
+
           <HandCoins size={12} />
+
           BARGAIN
+
         </button>
+
+
+        {/* INTERESTED */}
 
         <button
           type="button"
@@ -951,11 +1187,13 @@ function OpportunityCard({
             }
           />
 
+
           {!proposalSent && (
             <span className="text-xs">
               ♥
             </span>
           )}
+
 
           {proposalSent
             ? 'PROPOSAL SENT'
@@ -964,8 +1202,10 @@ function OpportunityCard({
         </button>
 
       </div>
+
     </article>
   );
 }
+
 
 export default FindJugaadPage;

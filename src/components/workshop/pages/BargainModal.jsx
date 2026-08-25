@@ -10,8 +10,20 @@ export function BargainModal({
   item,
   onClose,
   onSend,
+  mode = 'bargain',
 }) {
-  const [amount, setAmount] = useState('');
+  const isInterest = mode === 'interest';
+
+  const initialAmount =
+    item?.amount ??
+    item?.budget ??
+    item?.price ??
+    0;
+
+  const [amount, setAmount] = useState(
+    isInterest ? String(initialAmount) : ''
+  );
+
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -36,7 +48,10 @@ export function BargainModal({
 
     if (!jugaadId) {
       setError('Jugaad ID is missing.');
-      console.error('BARGAIN: Jugaad ID missing:', item);
+      console.error(
+        'PROPOSAL: Jugaad ID missing:',
+        item
+      );
       return;
     }
 
@@ -47,20 +62,23 @@ export function BargainModal({
 
     const proposedPrice = Number(amount);
 
-    if (!Number.isFinite(proposedPrice) || proposedPrice <= 0) {
-      setError('Please enter a valid positive amount.');
+    if (
+      !Number.isFinite(proposedPrice) ||
+      proposedPrice <= 0
+    ) {
+      setError(
+        'Please enter a valid positive amount.'
+      );
       return;
     }
 
-    /*
-     * The backend requires proposal_message.
-     *
-     * If the user leaves the optional message empty,
-     * we still send a useful bargain message.
-     */
     const proposalMessage =
       message.trim() ||
-      `I would like to offer ₹${proposedPrice} for this Jugaad.`;
+      (
+        isInterest
+          ? `I am interested in helping with this Jugaad for ₹${proposedPrice}.`
+          : `I would like to offer ₹${proposedPrice} for this Jugaad.`
+      );
 
     try {
       setSending(true);
@@ -77,32 +95,36 @@ export function BargainModal({
       };
 
       console.log(
-        'BARGAIN - SENDING PROPOSAL:',
+        isInterest
+          ? 'INTERESTED - SENDING PROPOSAL:'
+          : 'BARGAIN - SENDING PROPOSAL:',
         payload
       );
 
       if (!onSend) {
         throw new Error(
-          'Bargain submission handler is not connected.'
+          'Proposal submission handler is not connected.'
         );
       }
 
       await onSend(payload);
 
       console.log(
-        'BARGAIN - PROPOSAL SENT SUCCESSFULLY'
+        isInterest
+          ? 'INTERESTED - PROPOSAL SENT SUCCESSFULLY'
+          : 'BARGAIN - PROPOSAL SENT SUCCESSFULLY'
       );
 
       setSent(true);
     } catch (err) {
       console.error(
-        'BARGAIN - FAILED TO SEND PROPOSAL:',
+        'PROPOSAL - FAILED TO SEND:',
         err
       );
 
       setError(
         err?.message ||
-          'Unable to send bargain offer. Please try again.'
+          'Unable to send proposal. Please try again.'
       );
     } finally {
       setSending(false);
@@ -119,8 +141,10 @@ export function BargainModal({
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-3 right-3 text-ink-3 hover:text-ink-0"
+          disabled={sending}
         >
           <X size={17} />
         </button>
@@ -132,15 +156,16 @@ export function BargainModal({
             </div>
 
             <p className="font-display text-2xl">
-              OFFER SENT
+              PROPOSAL SENT
             </p>
 
             <p className="font-mono text-[10px] text-ink-2 mt-2">
-              {posterName} will see your proposal in
-              their requests.
+              {posterName} will see your proposal
+              in their requests.
             </p>
 
             <button
+              type="button"
               onClick={onClose}
               className="machine-control machine-control--ghost mt-6"
             >
@@ -158,7 +183,9 @@ export function BargainModal({
 
               <div>
                 <p className="font-technical text-[10px]">
-                  BARGAIN / NEGOTIATE
+                  {isInterest
+                    ? 'SEND PROPOSAL'
+                    : 'BARGAIN / NEGOTIATE'}
                 </p>
 
                 <p className="font-mono text-[9px] text-ink-3 mt-1">
@@ -174,13 +201,15 @@ export function BargainModal({
               </p>
 
               <p className="font-display text-3xl text-amber mt-1">
-                ₹{item?.amount ?? 0}
+                ₹{initialAmount}
               </p>
             </div>
 
             {/* PROPOSED AMOUNT */}
             <label className="font-technical text-[8px] text-ink-2 block mb-2">
-              YOUR PROPOSED AMOUNT
+              {isInterest
+                ? 'PROPOSED AMOUNT'
+                : 'YOUR PROPOSED AMOUNT'}
             </label>
 
             <div className="flex items-center rounded-lg bg-bg-1 border border-metal-1 mb-4">
@@ -198,7 +227,7 @@ export function BargainModal({
                 }
                 placeholder="650"
                 className="w-full bg-transparent px-2 py-3 font-mono text-sm outline-none"
-                disabled={sending}
+                disabled={sending || isInterest}
               />
             </div>
 
@@ -213,7 +242,11 @@ export function BargainModal({
                 setMessage(e.target.value)
               }
               rows={3}
-              placeholder="Add a short note to the poster"
+              placeholder={
+                isInterest
+                  ? 'Add a short message to the poster'
+                  : 'Add a short note to the poster'
+              }
               className="w-full rounded-lg bg-bg-1 border border-metal-1 p-3 font-mono text-xs outline-none resize-none mb-5"
               disabled={sending}
             />
@@ -227,6 +260,7 @@ export function BargainModal({
 
             {/* SEND */}
             <button
+              type="button"
               disabled={!amount || sending}
               onClick={handleSendOffer}
               className="machine-control machine-control--primary w-full justify-center disabled:opacity-40"
@@ -237,7 +271,9 @@ export function BargainModal({
 
               {sending
                 ? 'SENDING...'
-                : 'SEND OFFER'}
+                : isInterest
+                  ? 'SEND PROPOSAL'
+                  : 'SEND OFFER'}
             </button>
           </>
         )}

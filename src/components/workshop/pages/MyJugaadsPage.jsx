@@ -241,6 +241,7 @@ export function MyJugaadsPage() {
     acceptProposal,
     rejectProposal,
     counterProposal,
+    refreshData,
   } = useProposals();
 
   const [jugaadsList, setJugaadsList] = useState(
@@ -265,6 +266,7 @@ export function MyJugaadsPage() {
     }
 
     if (!isAuthenticated) {
+      setJugaadsList([]);
       setLoading(false);
       return;
     }
@@ -272,19 +274,25 @@ export function MyJugaadsPage() {
     setLoading(true);
 
     try {
-      const data = await api.getMyJugaads();
+      const [jugaadsResult] = await Promise.all([
+        api.getMyJugaads(),
+        refreshData(),
+      ]);
 
       const list =
-        data?.jugaads ||
-        data?.data ||
-        (Array.isArray(data) ? data : []);
+        jugaadsResult?.jugaads ||
+        jugaadsResult?.data?.jugaads ||
+        jugaadsResult?.data ||
+        (Array.isArray(jugaadsResult)
+          ? jugaadsResult
+          : []);
 
       setJugaadsList(
         Array.isArray(list) ? list : []
       );
     } catch (error) {
       console.error(
-        'Failed to load my jugaads:',
+        'Failed to load my jugaads/proposals:',
         error
       );
 
@@ -292,7 +300,11 @@ export function MyJugaadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [isDemoMode, isAuthenticated]);
+  }, [
+    isDemoMode,
+    isAuthenticated,
+    refreshData,
+  ]);
 
   useEffect(() => {
     fetchMyJugaads();

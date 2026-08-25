@@ -1,562 +1,1044 @@
-import { useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react';
 
 import {
-  X,
-  Send,
-  IndianRupee,
-  Clock,
-  Tag,
-  AlertTriangle,
-  CheckCircle2,
-} from 'lucide-react';
-
-import {
-  CAMPUS_SKILLS,
-  CATEGORY_COLORS,
+  mockMyRequests,
+  mockConversations,
 } from '@/data/jugaadMockData';
 
-export function ProposalModal({
-  item,
-  helper,
-  onClose,
-  onSend,
-}) {
-  const [explanation, setExplanation] = useState('');
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/services/api';
 
-  const [proposedPrice, setProposedPrice] = useState(
-    item?.amount ? String(item.amount) : ''
-  );
+const ProposalContext = createContext({
+  proposals: [],
+  receivedProposals: [],
+  myRequests: [],
+  conversations: [],
+  loading: false,
 
-  const [completionTime, setCompletionTime] = useState('');
+  sendProposal: async () => {},
+  acceptProposal: async () => {},
+  rejectProposal: async () => {},
+  counterProposal: async () => {},
+  acceptCounter: async () => {},
+  rejectCounter: async () => {},
+  withdrawProposal: async () => {},
 
-  const [selectedSkills, setSelectedSkills] = useState([]);
+  getProposalForJugaad: () => null,
+  getProposalsForJugaad: () => [],
 
-  const [customSkill, setCustomSkill] = useState('');
+  refreshData: async () => {},
+});
 
-  const [error, setError] = useState('');
+export function useProposals() {
+  return useContext(ProposalContext);
+}
 
-  const [sent, setSent] = useState(false);
+/* ============================================================
+   HELPERS
+============================================================ */
 
-  const [sending, setSending] = useState(false);
+function extractList(response, keys = []) {
+  if (Array.isArray(response)) {
+    return response;
+  }
 
-  if (!item) {
+  for (const key of keys) {
+    if (Array.isArray(response?.[key])) {
+      return response[key];
+    }
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  for (const key of keys) {
+    if (Array.isArray(response?.data?.[key])) {
+      return response.data[key];
+    }
+  }
+
+  return [];
+}
+
+/*
+ * Convert a user object into a safe display object.
+ */
+function normalizeUser(user) {
+  if (!user || typeof user !== 'object') {
     return null;
   }
 
-  const color =
-    CATEGORY_COLORS?.[item.category] || 'amber';
-
-  const posterName =
-    item?.poster?.name ??
-    item?.creator?.name ??
-    item?.poster_name ??
-    item?.posterName ??
-    item?.user?.name ??
-    item?.owner?.name ??
-    'Student';
-
-  const posterCollege =
-    item?.poster?.college ??
-    item?.college ??
-    item?.college_name ??
-    item?.creator?.college ??
-    item?.user?.college ??
+  const name =
+    user.name ||
+    user.fullName ||
+    user.full_name ||
+    user.username ||
+    user.displayName ||
+    user.display_name ||
+    user.email ||
     '';
 
-  const toggleSkill = (skillName) => {
-    setSelectedSkills((previous) =>
-      previous.includes(skillName)
-        ? previous.filter((skill) => skill !== skillName)
-        : [...previous, skillName]
-    );
+  const explicitInitials =
+    typeof user.initials === 'string'
+      ? user.initials.trim()
+      : '';
+
+  let initials = explicitInitials;
+
+  if (!initials && name) {
+    initials = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join('')
+      .toUpperCase();
+  }
+
+  return {
+    ...user,
+    id:
+      user.id ??
+      user.userId ??
+      user.user_id ??
+      user._id ??
+      null,
+
+    name: name || 'User',
+
+    initials:
+      initials
+        ? initials.slice(0, 2).toUpperCase()
+        : 'U',
   };
+}
 
-  const addCustomSkill = () => {
-    const trimmed = customSkill.trim();
+/*
+ * Find the other participant in a conversation.
 
-    if (
-      trimmed &&
-      !selectedSkills.includes(trimmed)
-    ) {
-      setSelectedSkills((previous) => [
-        ...previous,
-        trimmed,
-      ]);
+ * Different backend implementations may return:
+ *
+ * otherUser
+ * other_user
+ * user
+ * poster
+ * helper
+ * recipient
+ * participant
+ * participants[]
+ * users[]
+ */
+function getOtherUser(conversation, currentUser) {
+  const currentUserId = String(
+    currentUser?.id ??
+      currentUser?.userId ??
+      currentUser?.user_id ??
+      currentUser?._id ??
+      ''
+  );
 
-      setCustomSkill('');
+  const directCandidates = [
+    conversation?.otherUser,
+    conversation?.other_user,
+    conversation?.user,
+    conversation?.recipient,
+    conversation?.participant,
+    conversation?.poster,
+    conversation?.helper,
+  ];
+
+  for (const candidate of directCandidates) {
+    const user = normalizeUser(candidate);
+
+    if (user) {
+      return user;
     }
+  }
+
+  /*
+   * Some APIs return:
+   *
+   * participants: [user1, user2]
+   *
+   * Pick the participant who is not the logged-in user.
+   */
+  const participantArrays = [
+    conversation?.participants,
+    conversation?.users,
+    conversation?.members,
+  ];
+
+  for (const participants of participantArrays) {
+    if (!Array.isArray(participants)) {
+      continue;
+    }
+
+    const users = participants
+      .map(normalizeUser)
+      .filter(Boolean);
+
+    if (users.length === 0) {
+      continue;
+    }
+
+    if (currentUserId) {
+      const other = users.find(
+        (user) => String(user.id ?? '') !== currentUserId
+      );
+
+      if (other) {
+        return other;
+      }
+    }
+
+    if (users.length >= 2) {
+      return users[1];
+    }
+
+    return users[0];
+  }
+
+  return null;
+}
+
+/*
+ * Safely get the Jugaad title.
+ */
+function getConversationTitle(conversation) {
+  return (
+    conversation?.jugaadTitle ||
+    conversation?.jugaad_title ||
+    conversation?.jugaad?.title ||
+    conversation?.request?.title ||
+    conversation?.proposal?.jugaadTitle ||
+    conversation?.proposal?.jugaad?.title ||
+    conversation?.title ||
+    conversation?.requestTitle ||
+    'Jugaad'
+  );
+}
+
+/*
+ * Safely get agreed amount.
+ */
+function getConversationAmount(conversation) {
+  return (
+    conversation?.agreedAmount ??
+    conversation?.agreed_amount ??
+    conversation?.agreedPrice ??
+    conversation?.agreed_price ??
+    conversation?.finalPrice ??
+    conversation?.final_price ??
+    conversation?.proposedAmount ??
+    conversation?.proposed_amount ??
+    conversation?.proposedPrice ??
+    conversation?.proposed_price ??
+    conversation?.amount ??
+    conversation?.price ??
+    conversation?.proposal?.agreedAmount ??
+    conversation?.proposal?.agreed_price ??
+    conversation?.proposal?.proposedAmount ??
+    conversation?.proposal?.proposed_price ??
+    0
+  );
+}
+
+/*
+ * Normalize message objects.
+ */
+function normalizeMessages(messages) {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+
+  return messages
+    .filter(Boolean)
+    .map((message, index) => ({
+      ...message,
+
+      id:
+        message.id ??
+        message._id ??
+        `message-${index}`,
+
+      text:
+        message.text ??
+        message.message ??
+        message.content ??
+        '',
+
+      from:
+        message.from ??
+        message.sender ??
+        message.sender_type ??
+        null,
+
+      timestamp:
+        message.timestamp ??
+        message.createdAt ??
+        message.created_at ??
+        null,
+    }));
+}
+
+/*
+ * Normalize a conversation so the frontend ALWAYS receives:
+ *
+ * {
+ *   id,
+ *   otherUser,
+ *   jugaadTitle,
+ *   agreedAmount,
+ *   messages,
+ *   status
+ * }
+ */
+function normalizeConversation(conversation, currentUser) {
+  if (!conversation || typeof conversation !== 'object') {
+    return null;
+  }
+
+  const otherUser = getOtherUser(
+    conversation,
+    currentUser
+  );
+
+  const id =
+    conversation.id ??
+    conversation.conversationId ??
+    conversation.conversation_id ??
+    conversation._id;
+
+  if (!id) {
+    return null;
+  }
+
+  return {
+    ...conversation,
+
+    id: String(id),
+
+    otherUser:
+      otherUser || {
+        id: null,
+        name: 'User',
+        initials: 'U',
+      },
+
+    jugaadTitle:
+      getConversationTitle(conversation),
+
+    agreedAmount:
+      getConversationAmount(conversation),
+
+    messages:
+      normalizeMessages(conversation.messages),
+
+    status:
+      conversation.status ||
+      conversation.state ||
+      'accepted',
   };
+}
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+/* ============================================================
+   PROVIDER
+============================================================ */
 
-    if (sending) {
+export function ProposalProvider({ children }) {
+  const {
+    isDemoMode,
+    isAuthenticated,
+    user: currentUser,
+  } = useAuth();
+
+  const [proposals, setProposals] = useState([]);
+
+  const [receivedProposals, setReceivedProposals] =
+    useState([]);
+
+  const [myRequests, setMyRequests] = useState(
+    isDemoMode ? mockMyRequests : []
+  );
+
+  const [conversations, setConversations] = useState(
+    isDemoMode ? mockConversations : []
+  );
+
+  const [loading, setLoading] = useState(false);
+
+  /* ============================================================
+     REFRESH DATA
+  ============================================================ */
+
+  const refreshData = useCallback(async () => {
+    if (isDemoMode) {
+      setMyRequests(mockMyRequests);
+      setConversations(mockConversations);
       return;
     }
 
-    if (!explanation.trim()) {
-      setError(
-        'Please explain why they should choose you before sending.'
-      );
+    if (!isAuthenticated) {
+      setMyRequests([]);
+      setReceivedProposals([]);
+      setConversations([]);
+      setProposals([]);
       return;
     }
 
-    if (
-      !proposedPrice ||
-      Number.isNaN(Number(proposedPrice)) ||
-      Number(proposedPrice) <= 0
-    ) {
-      setError(
-        'Please enter a valid proposed price.'
-      );
-      return;
-    }
-
-    if (!completionTime.trim()) {
-      setError(
-        'Please specify an expected completion time.'
-      );
-      return;
-    }
-
-    setError('');
-    setSending(true);
+    setLoading(true);
 
     try {
-      /*
-       * IMPORTANT:
-       *
-       * The backend expects:
-       *
-       * proposal_message
-       * proposed_price
-       * estimated_completion
-       *
-       * We also pass jugaadId so the existing onSend
-       * handler knows which Jugaad this proposal belongs to.
-       *
-       * Skills are kept locally for the UI, but are NOT sent
-       * because the backend proposal schema does not accept them.
-       */
+      const results = await Promise.allSettled([
+        api.getMyProposals(),
+        api.getReceivedProposals(),
+        api.getConversations(),
+      ]);
+
+      const myProposalsResult = results[0];
+      const receivedResult = results[1];
+      const conversationsResult = results[2];
+
+      /* ========================================================
+         MY PROPOSALS
+      ======================================================== */
+
+      if (myProposalsResult.status === 'fulfilled') {
+        const list = extractList(
+          myProposalsResult.value,
+          ['proposals', 'myProposals']
+        );
+
+        setProposals(list);
+        setMyRequests(list);
+      }
+
+      /* ========================================================
+         RECEIVED PROPOSALS
+      ======================================================== */
+
+      if (receivedResult.status === 'fulfilled') {
+        const list = extractList(
+          receivedResult.value,
+          ['proposals', 'receivedProposals']
+        );
+
+        setReceivedProposals(list);
+      }
+
+      /* ========================================================
+         CONVERSATIONS
+      ======================================================== */
+
+      if (conversationsResult.status === 'fulfilled') {
+        const rawConversations = extractList(
+          conversationsResult.value,
+          ['conversations']
+        );
+
+        console.log(
+          'RAW CONVERSATIONS FROM BACKEND:',
+          rawConversations
+        );
+
+        const normalizedConversations =
+          rawConversations
+            .map((conversation) =>
+              normalizeConversation(
+                conversation,
+                currentUser
+              )
+            )
+            .filter(Boolean);
+
+        console.log(
+          'NORMALIZED CONVERSATIONS:',
+          normalizedConversations
+        );
+
+        setConversations(
+          normalizedConversations
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Failed to refresh proposal data:',
+        error
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    isDemoMode,
+    isAuthenticated,
+    currentUser,
+  ]);
+
+  /* ============================================================
+     INITIAL LOAD
+  ============================================================ */
+
+  useEffect(() => {
+    if (isDemoMode) {
+      setMyRequests(mockMyRequests);
+      setConversations(mockConversations);
+      setProposals([]);
+      setReceivedProposals([]);
+      return;
+    }
+
+    if (isAuthenticated) {
+      refreshData();
+    } else {
+      setMyRequests([]);
+      setReceivedProposals([]);
+      setConversations([]);
+      setProposals([]);
+    }
+  }, [
+    isDemoMode,
+    isAuthenticated,
+    refreshData,
+  ]);
+
+  /* ============================================================
+     SEND PROPOSAL
+  ============================================================ */
+
+  const sendProposal = useCallback(
+    async (payload = {}) => {
+      console.log(
+        'SEND PROPOSAL - ORIGINAL PAYLOAD:',
+        payload
+      );
+
+      const jugaadId =
+        payload.jugaadId ??
+        payload.jugaad_id ??
+        payload.item?.id ??
+        payload.item?.jugaadId ??
+        payload.item?.jugaad_id;
+
+      if (
+        jugaadId === undefined ||
+        jugaadId === null ||
+        jugaadId === ''
+      ) {
+        throw new Error(
+          'Jugaad ID is missing.'
+        );
+      }
+
+      if (isDemoMode) {
+        const newProposal = {
+          id: `demo-proposal-${Date.now()}`,
+          jugaadId,
+
+          jugaadTitle:
+            payload.jugaadTitle ??
+            payload.item?.title ??
+            '',
+
+          category:
+            payload.category ??
+            payload.item?.category ??
+            'OTHER',
+
+          poster:
+            payload.poster ??
+            payload.item?.poster ??
+            null,
+
+          amount:
+            payload.amount ??
+            payload.item?.amount ??
+            0,
+
+          helper:
+            payload.helper ??
+            null,
+
+          explanation:
+            payload.proposal_message ??
+            payload.explanation ??
+            '',
+
+          proposedPrice:
+            payload.proposed_price ??
+            payload.proposedPrice ??
+            payload.proposedAmount ??
+            0,
+
+          completionTime:
+            payload.estimated_completion ??
+            payload.completionTime ??
+            '',
+
+          skills:
+            Array.isArray(payload.skills)
+              ? payload.skills
+              : [],
+
+          status: 'pending',
+
+          sentAt:
+            new Date().toISOString(),
+        };
+
+        setProposals((current) => [
+          ...current,
+          newProposal,
+        ]);
+
+        setMyRequests((current) => [
+          newProposal,
+          ...current,
+        ]);
+
+        return newProposal;
+      }
+
+      const proposalMessage =
+        payload.proposal_message ??
+        payload.proposalMessage ??
+        payload.explanation ??
+        payload.message ??
+        '';
+
+      const proposedPriceRaw =
+        payload.proposed_price ??
+        payload.proposedPrice ??
+        payload.proposedAmount ??
+        payload.price ??
+        '';
+
+      const estimatedCompletion =
+        payload.estimated_completion ??
+        payload.estimatedCompletion ??
+        payload.completionTime ??
+        payload.completion_time ??
+        null;
+
       const proposalPayload = {
-        jugaadId: item.id,
+        proposal_message:
+          String(proposalMessage).trim(),
 
-        proposal_message: explanation.trim(),
+        proposed_price:
+          Number(proposedPriceRaw),
 
-        proposed_price: Number(proposedPrice),
-
-        estimated_completion: completionTime.trim(),
-
-        // Keep these for the existing frontend context/UI.
-        jugaadTitle: item.title,
-        category: item.category,
-        poster: item.poster,
-        amount: item.amount,
-        helper,
-        skills: selectedSkills,
+        estimated_completion:
+          estimatedCompletion === null ||
+          estimatedCompletion === undefined ||
+          estimatedCompletion === ''
+            ? null
+            : String(
+                estimatedCompletion
+              ).trim(),
       };
 
       console.log(
-        'Submitting proposal:',
+        'SEND PROPOSAL - BACKEND PAYLOAD:',
         proposalPayload
       );
 
-      await onSend(proposalPayload);
+      if (
+        !proposalPayload.proposal_message
+      ) {
+        throw new Error(
+          'Proposal message is required.'
+        );
+      }
 
-      setSent(true);
-    } catch (err) {
-      console.error(
-        'Failed to send proposal:',
-        err
+      if (
+        !Number.isFinite(
+          proposalPayload.proposed_price
+        ) ||
+        proposalPayload.proposed_price <= 0
+      ) {
+        throw new Error(
+          'Proposed price must be a positive number.'
+        );
+      }
+
+      const response =
+        await api.submitProposal(
+          jugaadId,
+          proposalPayload
+        );
+
+      console.log(
+        'PROPOSAL SUBMITTED SUCCESSFULLY:',
+        response
       );
 
-      setError(
-        err?.message ||
-          err?.data?.error ||
-          err?.data?.message ||
-          'Failed to send proposal. Please try again.'
+      await refreshData();
+
+      return response;
+    },
+    [
+      isDemoMode,
+      refreshData,
+    ]
+  );
+
+  /* ============================================================
+     ACCEPT PROPOSAL
+  ============================================================ */
+
+  const acceptProposal = useCallback(
+    async (proposalId) => {
+      if (!proposalId) {
+        throw new Error(
+          'Proposal ID is missing.'
+        );
+      }
+
+      if (isDemoMode) {
+        const updateProposal =
+          (proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'accepted',
+                }
+              : proposal;
+
+        setProposals((current) =>
+          current.map(updateProposal)
+        );
+
+        setReceivedProposals((current) =>
+          current.map(updateProposal)
+        );
+
+        return;
+      }
+
+      const response =
+        await api.acceptProposal(
+          proposalId
+        );
+
+      await refreshData();
+
+      return response;
+    },
+    [
+      isDemoMode,
+      refreshData,
+    ]
+  );
+
+  /* ============================================================
+     REJECT PROPOSAL
+  ============================================================ */
+
+  const rejectProposal = useCallback(
+    async (proposalId) => {
+      if (!proposalId) {
+        throw new Error(
+          'Proposal ID is missing.'
+        );
+      }
+
+      if (isDemoMode) {
+        const updateProposal =
+          (proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status: 'rejected',
+                }
+              : proposal;
+
+        setProposals((current) =>
+          current.map(updateProposal)
+        );
+
+        setReceivedProposals((current) =>
+          current.map(updateProposal)
+        );
+
+        return;
+      }
+
+      const response =
+        await api.rejectProposal(
+          proposalId
+        );
+
+      await refreshData();
+
+      return response;
+    },
+    [
+      isDemoMode,
+      refreshData,
+    ]
+  );
+
+  /* ============================================================
+     COUNTER PROPOSAL
+  ============================================================ */
+
+  const counterProposal = useCallback(
+    async (
+      proposalId,
+      counterPrice,
+      counterMessage = ''
+    ) => {
+      if (!proposalId) {
+        throw new Error(
+          'Proposal ID is missing.'
+        );
+      }
+
+      if (
+        !counterPrice ||
+        Number(counterPrice) <= 0
+      ) {
+        throw new Error(
+          'Counter offer amount must be greater than zero.'
+        );
+      }
+
+      if (isDemoMode) {
+        const updateProposal =
+          (proposal) =>
+            proposal.id === proposalId
+              ? {
+                  ...proposal,
+                  status:
+                    'counter-offer',
+                  counterOffer: {
+                    amount:
+                      Number(counterPrice),
+                    message:
+                      counterMessage,
+                    timestamp:
+                      new Date().toISOString(),
+                  },
+                }
+              : proposal;
+
+        setProposals((current) =>
+          current.map(updateProposal)
+        );
+
+        setReceivedProposals((current) =>
+          current.map(updateProposal)
+        );
+
+        return;
+      }
+
+      const response =
+        await api.createCounterOffer(
+          proposalId,
+          {
+            amount:
+              Number(counterPrice),
+
+            message:
+              counterMessage || '',
+          }
+        );
+
+      await refreshData();
+
+      return response;
+    },
+    [
+      isDemoMode,
+      refreshData,
+    ]
+  );
+
+  /* ============================================================
+     ACCEPT COUNTER
+  ============================================================ */
+
+  const acceptCounter = useCallback(
+    async (proposalId) => {
+      return acceptProposal(
+        proposalId
       );
-    } finally {
-      setSending(false);
-    }
-  };
+    },
+    [acceptProposal]
+  );
+
+  /* ============================================================
+     REJECT COUNTER
+  ============================================================ */
+
+  const rejectCounter = useCallback(
+    async (proposalId) => {
+      return rejectProposal(
+        proposalId
+      );
+    },
+    [rejectProposal]
+  );
+
+  /* ============================================================
+     WITHDRAW
+  ============================================================ */
+
+  const withdrawProposal =
+    useCallback(
+      async (proposalId) => {
+        if (!proposalId) {
+          throw new Error(
+            'Proposal ID is missing.'
+          );
+        }
+
+        if (isDemoMode) {
+          setProposals((current) =>
+            current.map(
+              (proposal) =>
+                proposal.id === proposalId
+                  ? {
+                      ...proposal,
+                      status:
+                        'withdrawn',
+                    }
+                  : proposal
+            )
+          );
+
+          return;
+        }
+
+        const response =
+          await api.withdrawProposal(
+            proposalId
+          );
+
+        await refreshData();
+
+        return response;
+      },
+      [
+        isDemoMode,
+        refreshData,
+      ]
+    );
+
+  /* ============================================================
+     GET SINGLE PROPOSAL
+  ============================================================ */
+
+  const getProposalForJugaad =
+    useCallback(
+      (jugaadId) => {
+        if (
+          jugaadId === undefined ||
+          jugaadId === null
+        ) {
+          return null;
+        }
+
+        const sent =
+          proposals.find(
+            (proposal) =>
+              String(
+                proposal?.jugaadId ??
+                  proposal?.jugaad_id
+              ) ===
+              String(jugaadId)
+          );
+
+        if (sent) {
+          return sent;
+        }
+
+        const received =
+          receivedProposals.find(
+            (proposal) =>
+              String(
+                proposal?.jugaadId ??
+                  proposal?.jugaad_id
+              ) ===
+              String(jugaadId)
+          );
+
+        return received || null;
+      },
+      [
+        proposals,
+        receivedProposals,
+      ]
+    );
+
+  /* ============================================================
+     GET ALL PROPOSALS
+  ============================================================ */
+
+  const getProposalsForJugaad =
+    useCallback(
+      (jugaadId) => {
+        if (
+          jugaadId === undefined ||
+          jugaadId === null
+        ) {
+          return [];
+        }
+
+        return [
+          ...proposals,
+          ...receivedProposals,
+        ].filter(
+          (proposal) =>
+            String(
+              proposal?.jugaadId ??
+                proposal?.jugaad_id
+            ) ===
+            String(jugaadId)
+        );
+      },
+      [
+        proposals,
+        receivedProposals,
+      ]
+    );
+
+  /* ============================================================
+     PROVIDER
+  ============================================================ */
 
   return (
-    <div
-      className="workshop-overlay"
-      onClick={onClose}
+    <ProposalContext.Provider
+      value={{
+        proposals,
+        receivedProposals,
+        myRequests,
+        conversations,
+        loading,
+
+        sendProposal,
+        acceptProposal,
+        rejectProposal,
+        counterProposal,
+        acceptCounter,
+        rejectCounter,
+        withdrawProposal,
+
+        getProposalForJugaad,
+        getProposalsForJugaad,
+
+        refreshData,
+      }}
     >
-      <div
-        className="workshop-panel surface-metal-brushed rounded-2xl p-6 w-full max-w-lg mx-4 relative max-h-[90vh] overflow-y-auto"
-        onClick={(event) =>
-          event.stopPropagation()
-        }
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={sending}
-          className="absolute top-3 right-3 text-ink-3 hover:text-ink-0 z-10 disabled:opacity-40"
-        >
-          <X size={18} />
-        </button>
-
-        {sent ? (
-          <div className="text-center py-10">
-            <div className="mx-auto grid place-items-center w-14 h-14 rounded-full bg-mint/15 text-mint mb-4">
-              <CheckCircle2 size={24} />
-            </div>
-
-            <p className="font-display text-2xl">
-              PROPOSAL SENT
-            </p>
-
-            <p className="font-mono text-[10px] text-ink-2 mt-2 max-w-xs mx-auto">
-              {posterName} will review your
-              proposal. You'll see the status
-              update in My Requests.
-            </p>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="machine-control machine-control--ghost mt-6"
-            >
-              <span className="ctrl-led" />
-              CLOSE
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-3 border-b border-metal-1/40 pb-4 mb-5">
-              <span
-                className="grid place-items-center w-10 h-10 rounded-lg"
-                style={{
-                  background:
-                    `color-mix(in srgb, var(--${color}) 14%, transparent)`,
-                  color:
-                    `var(--${color})`,
-                }}
-              >
-                <Send size={19} />
-              </span>
-
-              <div>
-                <p className="font-technical text-[10px] text-ink-0">
-                  SEND YOUR PROPOSAL
-                </p>
-
-                <p className="font-mono text-[9px] text-ink-3 mt-0.5">
-                  CJ-PROPOSAL-X24
-                </p>
-              </div>
-            </div>
-
-            <div className="surface-panel rounded-xl p-4 mb-5">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h2 className="font-display text-lg text-ink-0 leading-tight">
-                  {item.title ||
-                    'Untitled opportunity'}
-                </h2>
-
-                <span
-                  className="font-technical text-[7px] px-2 py-1 rounded shrink-0"
-                  style={{
-                    background:
-                      `var(--${color})`,
-                    color:
-                      'var(--bg-0)',
-                  }}
-                >
-                  {item.category ||
-                    'OTHER'}
-                </span>
-              </div>
-
-              <p className="font-mono text-[9px] text-ink-3 mb-3">
-                Posted by{' '}
-                <span className="text-ink-1">
-                  {posterName}
-                </span>
-
-                {posterCollege
-                  ? ` · ${posterCollege}`
-                  : ''}
-              </p>
-
-              <p className="font-mono text-[10px] text-ink-2 leading-relaxed mb-3">
-                {item.description ||
-                  'No description available.'}
-              </p>
-
-              <div className="flex flex-wrap items-center gap-3 text-[9px] font-mono text-ink-3">
-                <span className="flex items-center gap-1">
-                  <span className="font-technical text-[7px] text-ink-3">
-                    BUDGET
-                  </span>
-
-                  <span className="font-display text-lg text-amber">
-                    ₹{item.amount ?? 0}
-                  </span>
-                </span>
-
-                <span className="flex items-center gap-1">
-                  <Tag size={11} />
-                  {item.skillRequired ||
-                    'General'}
-                </span>
-              </div>
-            </div>
-
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-4"
-            >
-              <div>
-                <label className="font-technical text-[8px] text-ink-2 block mb-2">
-                  WHY SHOULD THEY CHOOSE YOU?
-                </label>
-
-                <textarea
-                  value={explanation}
-                  onChange={(event) => {
-                    setExplanation(
-                      event.target.value
-                    );
-
-                    if (error) {
-                      setError('');
-                    }
-                  }}
-                  rows={4}
-                  placeholder="Tell the poster why you're the right person for this Jugaad. Mention your relevant skills, experience, or what makes your approach useful."
-                  className="w-full rounded-lg bg-bg-1 border border-metal-1 p-3 font-mono text-xs outline-none resize-none focus:border-amber/40 text-ink-0"
-                  style={{
-                    lineHeight: '1.6',
-                  }}
-                  disabled={sending}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-technical text-[8px] text-ink-2 block mb-2">
-                    YOUR PROPOSED PRICE
-                  </label>
-
-                  <div className="flex items-center rounded-lg bg-bg-1 border border-metal-1">
-                    <IndianRupee
-                      size={14}
-                      className="ml-3 text-ink-3"
-                    />
-
-                    <input
-                      type="number"
-                      min="1"
-                      value={proposedPrice}
-                      onChange={(event) => {
-                        setProposedPrice(
-                          event.target.value
-                        );
-
-                        if (error) {
-                          setError('');
-                        }
-                      }}
-                      placeholder={String(
-                        item.amount || 500
-                      )}
-                      className="w-full bg-transparent px-2 py-3 font-mono text-sm outline-none text-ink-0"
-                      disabled={sending}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="font-technical text-[8px] text-ink-2 block mb-2">
-                    EXPECTED COMPLETION TIME
-                  </label>
-
-                  <div className="flex items-center rounded-lg bg-bg-1 border border-metal-1">
-                    <Clock
-                      size={14}
-                      className="ml-3 text-ink-3"
-                    />
-
-                    <input
-                      type="text"
-                      value={completionTime}
-                      onChange={(event) => {
-                        setCompletionTime(
-                          event.target.value
-                        );
-
-                        if (error) {
-                          setError('');
-                        }
-                      }}
-                      placeholder="e.g. 2 days"
-                      className="w-full bg-transparent px-2 py-3 font-mono text-sm outline-none text-ink-0"
-                      disabled={sending}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-technical text-[8px] text-ink-2 block mb-2">
-                  RELEVANT SKILLS (OPTIONAL)
-                </label>
-
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {Array.isArray(CAMPUS_SKILLS) &&
-                    CAMPUS_SKILLS.map(
-                      (skill) => {
-                        const active =
-                          selectedSkills.includes(
-                            skill.name
-                          );
-
-                        return (
-                          <button
-                            key={skill.id}
-                            type="button"
-                            onClick={() =>
-                              toggleSkill(
-                                skill.name
-                              )
-                            }
-                            disabled={sending}
-                            className={`px-2.5 py-1.5 rounded-md font-technical text-[7px] transition-colors ${
-                              active
-                                ? 'bg-amber text-bg-0'
-                                : 'bg-bg-2 text-ink-3 border border-metal-1 hover:border-amber/30'
-                            }`}
-                          >
-                            {skill.name}
-                          </button>
-                        );
-                      }
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={customSkill}
-                    onChange={(event) =>
-                      setCustomSkill(
-                        event.target.value
-                      )
-                    }
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === 'Enter'
-                      ) {
-                        event.preventDefault();
-                        addCustomSkill();
-                      }
-                    }}
-                    placeholder="Add a custom skill..."
-                    className="flex-1 rounded-lg bg-bg-1 border border-metal-1 px-3 py-2 font-mono text-xs outline-none text-ink-0"
-                    disabled={sending}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={addCustomSkill}
-                    disabled={sending}
-                    className="px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px] hover:bg-amber/10 disabled:opacity-40"
-                  >
-                    ADD
-                  </button>
-                </div>
-
-                {selectedSkills.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {selectedSkills.map(
-                      (skill) => (
-                        <span
-                          key={skill}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-mint/10 text-mint font-mono text-[8px]"
-                        >
-                          {skill}
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              toggleSkill(
-                                skill
-                              )
-                            }
-                            disabled={sending}
-                            className="hover:text-coral"
-                          >
-                            <X size={10} />
-                          </button>
-                        </span>
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {error && (
-                <div
-                  className="flex items-start gap-2 surface-panel rounded-lg p-3"
-                  style={{
-                    borderColor:
-                      'rgba(199,93,93,0.3)',
-                  }}
-                >
-                  <AlertTriangle
-                    size={14}
-                    className="text-coral shrink-0 mt-0.5"
-                  />
-
-                  <span className="font-mono text-[10px] text-coral-soft leading-relaxed">
-                    {error}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={sending}
-                  className="machine-control machine-control--ghost flex-1 justify-center disabled:opacity-40"
-                  style={{
-                    padding: '13px 18px',
-                  }}
-                >
-                  <span className="ctrl-led" />
-                  CANCEL
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={sending}
-                  className="machine-control machine-control--primary flex-[1.5] justify-center disabled:opacity-50"
-                  style={{
-                    padding: '13px 18px',
-                  }}
-                >
-                  <span className="ctrl-led" />
-
-                  <span className="flex items-center gap-2">
-                    <Send size={14} />
-
-                    {sending
-                      ? 'SENDING...'
-                      : 'SEND PROPOSAL'}
-                  </span>
-                </button>
-              </div>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
+      {children}
+    </ProposalContext.Provider>
   );
 }

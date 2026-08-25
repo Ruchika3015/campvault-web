@@ -2,24 +2,39 @@ const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   'https://campvault-backend.onrender.com';
 
+
 /**
- * Low-level fetch wrapper for CampusJugaad REST API.
+ * ================================================================
+ * LOW-LEVEL API REQUEST
+ * ================================================================
  *
- * - Automatically attaches JWT
+ * - Reads JWT from sessionStorage
+ * - Automatically attaches Authorization header
  * - Supports JSON requests
  * - Supports FormData requests
  * - Normalizes backend errors
  */
+
 export async function apiRequest(
   path,
   options = {}
 ) {
+  /*
+   * IMPORTANT:
+   *
+   * AuthContext now stores cj_token in sessionStorage.
+   * Therefore API requests MUST also read it from sessionStorage.
+   */
   const token =
-    localStorage.getItem('cj_token');
+    sessionStorage.getItem(
+      'cj_token'
+    );
+
 
   const isFormData =
     typeof FormData !== 'undefined' &&
     options.body instanceof FormData;
+
 
   const headers = {
     ...(token
@@ -39,19 +54,27 @@ export async function apiRequest(
     ...(options.headers || {}),
   };
 
+
   const config = {
     ...options,
     headers,
   };
 
+
   let response;
+
 
   try {
     response = await fetch(
       `${BASE_URL}${path}`,
       config
     );
-  } catch {
+  } catch (error) {
+    console.error(
+      'API NETWORK ERROR:',
+      error
+    );
+
     throw {
       status: 0,
       message:
@@ -59,7 +82,9 @@ export async function apiRequest(
     };
   }
 
+
   let data = null;
+
 
   try {
     data =
@@ -68,13 +93,30 @@ export async function apiRequest(
     data = null;
   }
 
+
   if (!response.ok) {
     const message =
       data?.message ||
       data?.error ||
       (response.status === 401
-        ? 'Invalid email or password.'
+        ? 'Your session has expired. Please log in again.'
+        : response.status === 403
+        ? 'You are not authorized to perform this action.'
+        : response.status === 404
+        ? 'Requested resource was not found.'
         : 'Something went wrong on the exchange. Please try again.');
+
+
+    console.error(
+      'API ERROR:',
+      {
+        path,
+        status:
+          response.status,
+        data,
+      }
+    );
+
 
     throw {
       status:
@@ -84,37 +126,53 @@ export async function apiRequest(
     };
   }
 
+
   return data;
 }
 
 
+/* ================================================================
+   API
+================================================================ */
+
 export const api = {
+
 
   // ================================================================
   // AUTH / USERS
   // ================================================================
 
-  register: (payload) =>
+  register: (
+    payload
+  ) =>
     apiRequest(
       '/api/v1/users/register',
       {
         method: 'POST',
-        body: JSON.stringify(
-          payload
-        ),
+
+        body:
+          JSON.stringify(
+            payload
+          ),
       }
     ),
 
-  login: (payload) =>
+
+  login: (
+    payload
+  ) =>
     apiRequest(
       '/api/v1/users/login',
       {
         method: 'POST',
-        body: JSON.stringify(
-          payload
-        ),
+
+        body:
+          JSON.stringify(
+            payload
+          ),
       }
     ),
+
 
   getProfile: () =>
     apiRequest(
@@ -136,31 +194,41 @@ export const api = {
   // JUGAADS
   // ================================================================
 
-  createJugaad: (payload) =>
+  createJugaad: (
+    payload
+  ) =>
     apiRequest(
       '/api/v1/jugaads',
       {
         method: 'POST',
-        body: JSON.stringify(
-          payload
-        ),
+
+        body:
+          JSON.stringify(
+            payload
+          ),
       }
     ),
+
 
   getDiscoveryFeed: () =>
     apiRequest(
       '/api/v1/jugaads'
     ),
 
+
   getMyJugaads: () =>
     apiRequest(
       '/api/v1/jugaads/my'
     ),
 
-  getJugaad: (id) =>
+
+  getJugaad: (
+    id
+  ) =>
     apiRequest(
       `/api/v1/jugaads/${id}`
     ),
+
 
   updateJugaad: (
     id,
@@ -170,13 +238,18 @@ export const api = {
       `/api/v1/jugaads/${id}`,
       {
         method: 'PUT',
-        body: JSON.stringify(
-          payload
-        ),
+
+        body:
+          JSON.stringify(
+            payload
+          ),
       }
     ),
 
-  deleteJugaad: (id) =>
+
+  deleteJugaad: (
+    id
+  ) =>
     apiRequest(
       `/api/v1/jugaads/${id}`,
       {
@@ -196,9 +269,12 @@ export const api = {
       `/api/v1/jugaads/${jugaadId}/interested`,
       {
         method: 'POST',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
+
 
   markNotInterested: (
     jugaadId
@@ -207,7 +283,9 @@ export const api = {
       `/api/v1/jugaads/${jugaadId}/not-interested`,
       {
         method: 'POST',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
 
@@ -224,11 +302,14 @@ export const api = {
       `/api/v1/jugaads/${jugaadId}/proposals`,
       {
         method: 'POST',
-        body: JSON.stringify(
-          payload
-        ),
+
+        body:
+          JSON.stringify(
+            payload
+          ),
       }
     ),
+
 
   getProposalsForJugaad: (
     jugaadId
@@ -247,10 +328,12 @@ export const api = {
       '/api/v1/proposals/my'
     ),
 
+
   getReceivedProposals: () =>
     apiRequest(
       '/api/v1/proposals/received'
     ),
+
 
   acceptProposal: (
     proposalId
@@ -259,9 +342,12 @@ export const api = {
       `/api/v1/proposals/${proposalId}/accept`,
       {
         method: 'PUT',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
+
 
   rejectProposal: (
     proposalId
@@ -270,9 +356,12 @@ export const api = {
       `/api/v1/proposals/${proposalId}/reject`,
       {
         method: 'PUT',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
+
 
   withdrawProposal: (
     proposalId
@@ -281,9 +370,12 @@ export const api = {
       `/api/v1/proposals/${proposalId}/withdraw`,
       {
         method: 'PUT',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
+
 
   createCounterOffer: (
     proposalId,
@@ -293,11 +385,14 @@ export const api = {
       `/api/v1/proposals/${proposalId}/counter-offer`,
       {
         method: 'POST',
-        body: JSON.stringify(
-          payload
-        ),
+
+        body:
+          JSON.stringify(
+            payload
+          ),
       }
     ),
+
 
   getCounterOffers: (
     proposalId
@@ -316,6 +411,7 @@ export const api = {
       '/api/v1/conversations'
     ),
 
+
   getConversationMessages: (
     conversationId
   ) =>
@@ -323,9 +419,7 @@ export const api = {
       `/api/v1/conversations/${conversationId}/messages`
     ),
 
-  /*
-   * Send a message.
-   */
+
   sendMessage: (
     conversationId,
     text
@@ -334,16 +428,15 @@ export const api = {
       `/api/v1/conversations/${conversationId}/messages`,
       {
         method: 'POST',
-        body: JSON.stringify({
-          content: text,
-        }),
+
+        body:
+          JSON.stringify({
+            content: text,
+          }),
       }
     ),
 
-  /*
-   * Mark all messages sent by the
-   * other participant as read.
-   */
+
   markConversationAsRead: (
     conversationId
   ) =>
@@ -351,7 +444,9 @@ export const api = {
       `/api/v1/conversations/${conversationId}/read`,
       {
         method: 'PUT',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
 
@@ -365,14 +460,18 @@ export const api = {
       '/api/v1/notifications'
     ),
 
+
   markAllNotificationsRead: () =>
     apiRequest(
       '/api/v1/notifications/read-all',
       {
         method: 'PUT',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
+
 
   markNotificationRead: (
     id
@@ -381,7 +480,9 @@ export const api = {
       `/api/v1/notifications/${id}/read`,
       {
         method: 'PUT',
-        body: JSON.stringify({}),
+
+        body:
+          JSON.stringify({}),
       }
     ),
 };

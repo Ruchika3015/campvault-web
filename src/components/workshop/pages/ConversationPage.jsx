@@ -3,6 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { api } from '@/services/api';
 
+
+/* ================================================================
+   HELPERS
+================================================================ */
+
 function getInitials(name) {
   const value = String(name || '').trim();
 
@@ -14,9 +19,12 @@ function getInitials(name) {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
+    .map((part) =>
+      part.charAt(0).toUpperCase()
+    )
     .join('');
 }
+
 
 function extractList(response, key) {
   if (Array.isArray(response)) {
@@ -38,9 +46,11 @@ function extractList(response, key) {
   return [];
 }
 
+
 function extractMessages(response) {
   return extractList(response, 'messages');
 }
+
 
 function getMessageText(message) {
   return (
@@ -50,6 +60,7 @@ function getMessageText(message) {
     ''
   );
 }
+
 
 function getSenderId(message) {
   return (
@@ -63,6 +74,7 @@ function getSenderId(message) {
   );
 }
 
+
 function getMessageId(message, index) {
   return (
     message?.id ??
@@ -70,6 +82,7 @@ function getMessageId(message, index) {
     `message-${index}`
   );
 }
+
 
 function getMessageTime(message) {
   const value =
@@ -83,41 +96,49 @@ function getMessageTime(message) {
   }
 
   try {
-    return new Date(value).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return new Date(value).toLocaleTimeString(
+      [],
+      {
+        hour: '2-digit',
+        minute: '2-digit',
+      }
+    );
   } catch {
     return '';
   }
 }
 
+
+/* ================================================================
+   CONVERSATION PAGE
+================================================================ */
+
 export function ConversationPage() {
   const { conversationId } = useParams();
   const navigate = useNavigate();
 
-  const [conversation, setConversation] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [conversation, setConversation] =
+    useState(null);
+
+  const [messages, setMessages] =
+    useState([]);
+
   const [text, setText] = useState('');
 
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] =
+    useState(true);
 
-  /*
-   * Load:
-   *
-   * 1. Conversation information
-   * 2. Messages
-   *
-   * The backend gives us:
-   * - other_user_name
-   * - other_user_id
-   * - other_user_email
-   * - jugaad_title
-   * - jugaad_id
-   * - proposal_id
-   */
+  const [sending, setSending] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+
+  /* ==============================================================
+     LOAD CONVERSATION
+  ============================================================== */
+
   const loadConversation = async () => {
     try {
       setLoading(true);
@@ -128,13 +149,16 @@ export function ConversationPage() {
         messagesResponse,
       ] = await Promise.all([
         api.getConversations(),
-        api.getConversationMessages(conversationId),
+        api.getConversationMessages(
+          conversationId
+        ),
       ]);
 
-      const conversations = extractList(
-        conversationsResponse,
-        'conversations'
-      );
+      const conversations =
+        extractList(
+          conversationsResponse,
+          'conversations'
+        );
 
       const foundConversation =
         conversations.find(
@@ -142,7 +166,8 @@ export function ConversationPage() {
             String(
               item?.id ??
                 item?.conversation_id
-            ) === String(conversationId)
+            ) ===
+            String(conversationId)
         );
 
       console.log(
@@ -170,7 +195,9 @@ export function ConversationPage() {
       );
 
       setMessages(
-        extractMessages(messagesResponse)
+        extractMessages(
+          messagesResponse
+        )
       );
     } catch (err) {
       console.error(
@@ -187,22 +214,99 @@ export function ConversationPage() {
     }
   };
 
+
+  /* ==============================================================
+     LOAD ONLY MESSAGES
+     
+     This is used by the background polling.
+     It does NOT put the whole page into loading state.
+  ============================================================== */
+
+  const refreshMessages =
+    async () => {
+      if (!conversationId) {
+        return;
+      }
+
+      try {
+        const response =
+          await api.getConversationMessages(
+            conversationId
+          );
+
+        const latestMessages =
+          extractMessages(response);
+
+        setMessages(
+          latestMessages
+        );
+      } catch (err) {
+        /*
+         * Do not show a visible error for a
+         * temporary background polling failure.
+         */
+        console.error(
+          'Background message refresh failed:',
+          err
+        );
+      }
+    };
+
+
+  /* ==============================================================
+     INITIAL LOAD + AUTOMATIC MESSAGE REFRESH
+  ============================================================== */
+
   useEffect(() => {
     if (!conversationId) {
       setError(
         'Conversation ID is missing.'
       );
+
       setLoading(false);
+
       return;
     }
 
+    /*
+     * Load the conversation immediately.
+     */
     loadConversation();
+
+    /*
+     * Poll every 2 seconds.
+     *
+     * This means messages sent by the other person
+     * appear automatically without browser refresh.
+     */
+    const intervalId =
+      setInterval(() => {
+        refreshMessages();
+      }, 2000);
+
+    /*
+     * IMPORTANT:
+     *
+     * Stop polling when the user leaves this page
+     * or switches to another conversation.
+     */
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [conversationId]);
 
-  const handleSend = async (event) => {
+
+  /* ==============================================================
+     SEND MESSAGE
+  ============================================================== */
+
+  const handleSend = async (
+    event
+  ) => {
     event?.preventDefault();
 
-    const trimmedText = text.trim();
+    const trimmedText =
+      text.trim();
 
     if (!trimmedText) {
       return;
@@ -212,6 +316,7 @@ export function ConversationPage() {
       setError(
         'Conversation ID is missing.'
       );
+
       return;
     }
 
@@ -233,26 +338,59 @@ export function ConversationPage() {
       /*
        * If backend returns the new message,
        * add it immediately.
-       *
-       * Otherwise reload messages.
        */
       const returnedMessages =
-        extractMessages(response);
-
-      if (returnedMessages.length > 0) {
-        setMessages((current) => [
-          ...current,
-          ...returnedMessages,
-        ]);
-      } else {
-        const refreshed =
-          await api.getConversationMessages(
-            conversationId
-          );
-
-        setMessages(
-          extractMessages(refreshed)
+        extractMessages(
+          response
         );
+
+      if (
+        returnedMessages.length > 0
+      ) {
+        setMessages(
+          (current) => {
+            /*
+             * Avoid duplicate messages if
+             * polling has already received it.
+             */
+            const existingIds =
+              new Set(
+                current.map(
+                  (message, index) =>
+                    String(
+                      getMessageId(
+                        message,
+                        index
+                      )
+                    )
+                )
+              );
+
+            const newMessages =
+              returnedMessages.filter(
+                (message, index) =>
+                  !existingIds.has(
+                    String(
+                      getMessageId(
+                        message,
+                        index
+                      )
+                    )
+                  )
+              );
+
+            return [
+              ...current,
+              ...newMessages,
+            ];
+          }
+        );
+      } else {
+        /*
+         * Backend did not return the new
+         * message, so fetch the latest list.
+         */
+        await refreshMessages();
       }
 
       setText('');
@@ -271,18 +409,18 @@ export function ConversationPage() {
     }
   };
 
-  /*
-   * OTHER PERSON
-   *
-   * We intentionally use the backend's
-   * other_user_name and other_user_id.
-   */
+
+  /* ==============================================================
+     OTHER PERSON
+  ============================================================== */
+
   const personName =
     conversation?.other_user_name ||
     'User';
 
   const personId =
-    conversation?.other_user_id ?? '';
+    conversation?.other_user_id ??
+    '';
 
   const personEmail =
     conversation?.other_user_email ||
@@ -293,28 +431,34 @@ export function ConversationPage() {
     'Jugaad';
 
   const jugaadId =
-    conversation?.jugaad_id ?? '';
+    conversation?.jugaad_id ??
+    '';
 
   const proposalId =
-    conversation?.proposal_id ?? '';
+    conversation?.proposal_id ??
+    '';
 
   const initials =
     getInitials(personName);
 
-  /*
-   * We still try to find the logged-in user,
-   * but message alignment does NOT depend
-   * only on this value.
-   */
+
+  /* ==============================================================
+     CURRENT USER
+  ============================================================== */
+
   let currentUserId = null;
 
   try {
     const storedUser =
-      localStorage.getItem('cj_user');
+      localStorage.getItem(
+        'cj_user'
+      );
 
     if (storedUser) {
       const parsed =
-        JSON.parse(storedUser);
+        JSON.parse(
+          storedUser
+        );
 
       currentUserId =
         parsed?.id ??
@@ -325,6 +469,11 @@ export function ConversationPage() {
   } catch {
     currentUserId = null;
   }
+
+
+  /* ==============================================================
+     LOADING
+  ============================================================== */
 
   if (loading) {
     return (
@@ -342,27 +491,35 @@ export function ConversationPage() {
     );
   }
 
+
+  /* ================================================================
+     PAGE
+  ================================================================ */
+
   return (
     <div className="min-h-screen bg-[#0b0908] px-6 py-12 text-[#f4efe7] md:px-10">
       <div className="mx-auto max-w-[1180px]">
 
-        {/* ========================================================= */}
-        {/* BACK */}
-        {/* ========================================================= */}
+        {/* =========================================================
+            BACK
+        ========================================================= */}
 
         <button
           type="button"
           onClick={() =>
-            navigate('/dashboard/messages')
+            navigate(
+              '/dashboard/messages'
+            )
           }
           className="mb-8 font-technical text-[10px] uppercase tracking-[0.22em] text-[#aaa39a] transition hover:text-white"
         >
           ← All messages
         </button>
 
-        {/* ========================================================= */}
-        {/* HEADER */}
-        {/* ========================================================= */}
+
+        {/* =========================================================
+            HEADER
+        ========================================================= */}
 
         <div className="mb-8 flex items-center gap-4">
 
@@ -382,9 +539,10 @@ export function ConversationPage() {
 
         </div>
 
-        {/* ========================================================= */}
-        {/* ERROR */}
-        {/* ========================================================= */}
+
+        {/* =========================================================
+            ERROR
+        ========================================================= */}
 
         {error && (
           <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
@@ -392,21 +550,22 @@ export function ConversationPage() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* MAIN GRID */}
-        {/* ========================================================= */}
+
+        {/* =========================================================
+            MAIN GRID
+        ========================================================= */}
 
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
 
-          {/* ======================================================= */}
-          {/* CHAT */}
-          {/* ======================================================= */}
+          {/* =======================================================
+              CHAT
+          ======================================================= */}
 
           <section className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.06]">
 
-            {/* ===================================================== */}
-            {/* MESSAGES */}
-            {/* ===================================================== */}
+            {/* =====================================================
+                MESSAGES
+            ===================================================== */}
 
             <div className="min-h-[480px] max-h-[600px] overflow-y-auto p-6">
 
@@ -418,7 +577,10 @@ export function ConversationPage() {
                 <div className="space-y-4">
 
                   {messages.map(
-                    (message, index) => {
+                    (
+                      message,
+                      index
+                    ) => {
 
                       const senderId =
                         getSenderId(
@@ -426,38 +588,32 @@ export function ConversationPage() {
                         );
 
                       /*
-                       * IMPORTANT
+                       * The conversation contains
+                       * exactly two users.
                        *
-                       * This conversation is between
-                       * exactly two people.
+                       * personId = other person.
                        *
-                       * personId = OTHER person's ID.
+                       * Therefore a message from
+                       * the other person is left.
                        *
-                       * Therefore:
-                       *
-                       * senderId === personId
-                       *      => OTHER PERSON
-                       *      => LEFT
-                       *
-                       * senderId !== personId
-                       *      => CURRENT USER
-                       *      => RIGHT
-                       *
-                       * This fixes the issue where
-                       * everything appeared on the left.
+                       * A message from anyone else
+                       * (the current logged-in user)
+                       * is right.
                        */
 
                       const isMine =
                         senderId !== null &&
                         personId !== '' &&
-                        String(senderId) !==
-                          String(personId);
+                        String(
+                          senderId
+                        ) !==
+                          String(
+                            personId
+                          );
 
                       /*
-                       * Fallback:
-                       *
-                       * If sender IDs are unavailable,
-                       * use currentUserId when possible.
+                       * Prefer currentUserId when
+                       * available.
                        */
                       const resolvedIsMine =
                         senderId !== null &&
@@ -493,9 +649,9 @@ export function ConversationPage() {
                           }`}
                         >
 
-                          {/* ================================================= */}
-                          {/* MESSAGE BUBBLE */}
-                          {/* ================================================= */}
+                          {/* ========================================
+                              MESSAGE BUBBLE
+                          ======================================== */}
 
                           <div
                             className={`
@@ -528,6 +684,7 @@ export function ConversationPage() {
                               {messageText}
                             </div>
 
+
                             {/* TIME */}
 
                             {time && (
@@ -556,7 +713,7 @@ export function ConversationPage() {
                                   {time}
                                 </span>
 
-                                {/* READ/SENT MARK FOR OUR MESSAGE */}
+                                {/* READ/SENT */}
 
                                 {resolvedIsMine && (
                                   <span className="font-bold text-[#07110d]/70">
@@ -579,12 +736,15 @@ export function ConversationPage() {
 
             </div>
 
-            {/* ===================================================== */}
-            {/* COMPOSER */}
-            {/* ===================================================== */}
+
+            {/* =====================================================
+                COMPOSER
+            ===================================================== */}
 
             <form
-              onSubmit={handleSend}
+              onSubmit={
+                handleSend
+              }
               className="flex gap-3 border-t border-white/10 p-5"
             >
 
@@ -610,22 +770,26 @@ export function ConversationPage() {
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#62d5b1] text-xl text-[#07110d] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Send message"
               >
-                {sending ? '…' : '➤'}
+                {sending
+                  ? '…'
+                  : '➤'}
               </button>
 
             </form>
 
           </section>
 
-          {/* ======================================================= */}
-          {/* SIDE PANEL */}
-          {/* ======================================================= */}
+
+          {/* =======================================================
+              SIDE PANEL
+          ======================================================= */}
 
           <aside className="h-fit rounded-[22px] border border-white/10 bg-white/[0.04] p-6">
 
             <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-[#62d5b1]">
               ● Connected
             </div>
+
 
             {/* JUGAAD */}
 
@@ -641,7 +805,9 @@ export function ConversationPage() {
 
             </div>
 
+
             <div className="my-7 h-px bg-white/10" />
+
 
             {/* PERSON */}
 
@@ -663,7 +829,9 @@ export function ConversationPage() {
 
             </div>
 
+
             <div className="my-7 h-px bg-white/10" />
+
 
             {/* STATUS */}
 
@@ -684,7 +852,8 @@ export function ConversationPage() {
 
             </div>
 
-            {/* DEBUG INFO HIDDEN */}
+
+            {/* DEBUG INFO */}
 
             <div className="mt-7 hidden text-[10px] text-white/30">
               conversation: {conversationId}
@@ -704,5 +873,6 @@ export function ConversationPage() {
     </div>
   );
 }
+
 
 export default ConversationPage;

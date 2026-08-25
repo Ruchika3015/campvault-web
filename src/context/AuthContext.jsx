@@ -5,7 +5,13 @@ import {
   useState,
   useCallback,
 } from 'react';
+
 import { api } from '@/services/api';
+
+
+/* ================================================================
+   DEMO USER
+================================================================ */
 
 const DEMO_USER = {
   id: 'demo-user',
@@ -21,257 +27,631 @@ const DEMO_USER = {
   avatar: 'DS',
 };
 
-const DEMO_TOKEN_KEY = 'cj_demo_token';
-const DEMO_USER_KEY = 'cj_demo_user';
-const REAL_TOKEN_KEY = 'cj_token';
 
-const AuthContext = createContext({
-  user: null,
-  token: null,
-  isAuthenticated: false,
-  isDemoMode: false,
-  loading: true,
-  login: async () => {},
-  register: async () => {},
-  demoLogin: () => {},
-  logout: () => {},
-});
+/* ================================================================
+   STORAGE KEYS
+================================================================ */
+
+const DEMO_TOKEN_KEY =
+  'cj_demo_token';
+
+const DEMO_USER_KEY =
+  'cj_demo_user';
+
+const REAL_TOKEN_KEY =
+  'cj_token';
+
+
+/* ================================================================
+   AUTH CONTEXT
+================================================================ */
+
+const AuthContext =
+  createContext({
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isDemoMode: false,
+    loading: true,
+
+    login: async () => {},
+
+    register: async () => {},
+
+    demoLogin: () => {},
+
+    logout: () => {},
+  });
+
+
+/* ================================================================
+   useAuth
+================================================================ */
 
 export function useAuth() {
-  return useContext(AuthContext);
+  return useContext(
+    AuthContext
+  );
 }
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  // ================================================================
-  // RESTORE SESSION ON PAGE LOAD
-  // ================================================================
+/* ================================================================
+   AUTH PROVIDER
+================================================================ */
+
+export function AuthProvider({
+  children,
+}) {
+  const [
+    user,
+    setUser,
+  ] = useState(null);
+
+  const [
+    token,
+    setToken,
+  ] = useState(null);
+
+  const [
+    isDemoMode,
+    setIsDemoMode,
+  ] = useState(false);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+
+  /* ==============================================================
+     RESTORE SESSION
+  ============================================================== */
 
   useEffect(() => {
     let mounted = true;
 
-    const restoreSession = async () => {
-      try {
-        // ------------------------------------------------------------
-        // 1. Check REAL login session first
-        // ------------------------------------------------------------
+    const restoreSession =
+      async () => {
+        try {
 
-        const storedToken = localStorage.getItem(REAL_TOKEN_KEY);
+          /*
+           * ======================================================
+           * 1. REAL LOGIN SESSION
+           *
+           * IMPORTANT:
+           * Authentication is now stored in sessionStorage.
+           *
+           * This means:
+           * - refresh keeps the session
+           * - closing the tab removes the session
+           * - opening a fresh tab requires login
+           * ======================================================
+           */
 
-        if (storedToken) {
-          try {
-            const profileResponse = await api.getProfile();
+          const storedToken =
+            sessionStorage.getItem(
+              REAL_TOKEN_KEY
+            );
 
-            if (!mounted) return;
 
-            // Backend returns:
-            // {
-            //   success: true,
-            //   data: user
-            // }
-            const currentUser =
-              profileResponse?.data ||
-              profileResponse?.user ||
-              profileResponse;
+          if (storedToken) {
 
-            setToken(storedToken);
-            setUser(currentUser);
-            setIsDemoMode(false);
-            setLoading(false);
+            try {
 
-            return;
-          } catch (error) {
-            // Token is invalid/expired.
-            // Remove it and continue checking demo session.
-            localStorage.removeItem(REAL_TOKEN_KEY);
+              const profileResponse =
+                await api.getProfile();
 
-            if (mounted) {
-              setToken(null);
-              setUser(null);
-              setIsDemoMode(false);
+              if (!mounted) {
+                return;
+              }
+
+
+              /*
+               * Backend normally returns:
+               *
+               * {
+               *   success: true,
+               *   data: user
+               * }
+               */
+
+              const currentUser =
+                profileResponse?.data ||
+                profileResponse?.user ||
+                profileResponse;
+
+
+              if (!currentUser) {
+                throw new Error(
+                  'User profile was not returned.'
+                );
+              }
+
+
+              setToken(
+                storedToken
+              );
+
+              setUser(
+                currentUser
+              );
+
+              setIsDemoMode(
+                false
+              );
+
+              setLoading(
+                false
+              );
+
+              return;
+
+            } catch (error) {
+
+              /*
+               * Stored token is invalid,
+               * expired, or belongs to an
+               * invalid session.
+               */
+
+              console.error(
+                'Stored authentication session is invalid:',
+                error
+              );
+
+
+              sessionStorage.removeItem(
+                REAL_TOKEN_KEY
+              );
+
+
+              if (mounted) {
+
+                setToken(null);
+
+                setUser(null);
+
+                setIsDemoMode(false);
+              }
             }
           }
-        }
 
-        // ------------------------------------------------------------
-        // 2. Check DEMO session
-        // ------------------------------------------------------------
 
-        const demoToken = localStorage.getItem(DEMO_TOKEN_KEY);
-        const demoUserString = localStorage.getItem(DEMO_USER_KEY);
+          /*
+           * ======================================================
+           * 2. DEMO SESSION
+           * ======================================================
+           */
 
-        if (demoToken && demoUserString) {
-          try {
-            const demoUser = JSON.parse(demoUserString);
+          const demoToken =
+            sessionStorage.getItem(
+              DEMO_TOKEN_KEY
+            );
 
-            if (!mounted) return;
+          const demoUserString =
+            sessionStorage.getItem(
+              DEMO_USER_KEY
+            );
 
-            setToken(demoToken);
-            setUser(demoUser);
-            setIsDemoMode(true);
+
+          if (
+            demoToken &&
+            demoUserString
+          ) {
+
+            try {
+
+              const demoUser =
+                JSON.parse(
+                  demoUserString
+                );
+
+
+              if (!mounted) {
+                return;
+              }
+
+
+              setToken(
+                demoToken
+              );
+
+              setUser(
+                demoUser
+              );
+
+              setIsDemoMode(
+                true
+              );
+
+              setLoading(
+                false
+              );
+
+              return;
+
+            } catch (error) {
+
+              console.error(
+                'Invalid demo session:',
+                error
+              );
+
+
+              sessionStorage.removeItem(
+                DEMO_TOKEN_KEY
+              );
+
+              sessionStorage.removeItem(
+                DEMO_USER_KEY
+              );
+            }
+          }
+
+
+          /*
+           * ======================================================
+           * 3. NO SESSION
+           * ======================================================
+           */
+
+          if (mounted) {
+
+            setToken(null);
+
+            setUser(null);
+
+            setIsDemoMode(false);
+
             setLoading(false);
+          }
 
-            return;
-          } catch {
-            localStorage.removeItem(DEMO_TOKEN_KEY);
-            localStorage.removeItem(DEMO_USER_KEY);
+        } catch (error) {
+
+          console.error(
+            'Failed to restore authentication session:',
+            error
+          );
+
+
+          sessionStorage.removeItem(
+            REAL_TOKEN_KEY
+          );
+
+          sessionStorage.removeItem(
+            DEMO_TOKEN_KEY
+          );
+
+          sessionStorage.removeItem(
+            DEMO_USER_KEY
+          );
+
+
+          if (mounted) {
+
+            setToken(null);
+
+            setUser(null);
+
+            setIsDemoMode(false);
+
+            setLoading(false);
           }
         }
+      };
 
-        // ------------------------------------------------------------
-        // 3. No session
-        // ------------------------------------------------------------
-
-        if (mounted) {
-          setToken(null);
-          setUser(null);
-          setIsDemoMode(false);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Failed to restore authentication session:', error);
-
-        if (mounted) {
-          localStorage.removeItem(REAL_TOKEN_KEY);
-          localStorage.removeItem(DEMO_TOKEN_KEY);
-          localStorage.removeItem(DEMO_USER_KEY);
-
-          setToken(null);
-          setUser(null);
-          setIsDemoMode(false);
-          setLoading(false);
-        }
-      }
-    };
 
     restoreSession();
+
 
     return () => {
       mounted = false;
     };
+
   }, []);
 
-  // ================================================================
-  // REAL LOGIN
-  // ================================================================
 
-  const login = useCallback(async (email, password) => {
-    const data = await api.login({
-      email,
-      password,
-    });
+  /* ==============================================================
+     REAL LOGIN
+  ============================================================== */
 
-    const newToken = data?.token;
-    const newUser = data?.user;
+  const login =
+    useCallback(
+      async (
+        email,
+        password
+      ) => {
 
-    if (!newToken) {
-      throw {
-        status: 500,
-        message: 'Authentication failed. No token received.',
-      };
-    }
+        const data =
+          await api.login({
+            email,
+            password,
+          });
 
-    if (!newUser) {
-      throw {
-        status: 500,
-        message: 'Authentication failed. User information was not received.',
-      };
-    }
 
-    // Remove demo session
-    localStorage.removeItem(DEMO_TOKEN_KEY);
-    localStorage.removeItem(DEMO_USER_KEY);
+        const newToken =
+          data?.token;
 
-    // Save REAL session
-    localStorage.setItem(REAL_TOKEN_KEY, newToken);
+        const newUser =
+          data?.user;
 
-    // Update React state
-    setToken(newToken);
-    setUser(newUser);
-    setIsDemoMode(false);
 
-    return newUser;
-  }, []);
+        /*
+         * Validate token.
+         */
 
-  // ================================================================
-  // REGISTER
-  // ================================================================
+        if (!newToken) {
 
-  const register = useCallback(async (payload) => {
-    const data = await api.register(payload);
+          throw {
+            status: 500,
+            message:
+              'Authentication failed. No token received.',
+          };
+        }
 
-    // Some backends automatically log the user in after registration.
-    // If a token is returned, establish the session.
-    if (data?.token) {
-      localStorage.removeItem(DEMO_TOKEN_KEY);
-      localStorage.removeItem(DEMO_USER_KEY);
 
-      localStorage.setItem(REAL_TOKEN_KEY, data.token);
+        /*
+         * Validate user.
+         */
 
-      setToken(data.token);
-      setUser(data.user || data.data || null);
-      setIsDemoMode(false);
-    }
+        if (!newUser) {
 
-    return data;
-  }, []);
+          throw {
+            status: 500,
+            message:
+              'Authentication failed. User information was not received.',
+          };
+        }
 
-  // ================================================================
-  // DEMO LOGIN
-  // ================================================================
 
-  const demoLogin = useCallback(() => {
-    // Remove any real session before entering demo mode.
-    localStorage.removeItem(REAL_TOKEN_KEY);
+        /*
+         * Remove demo session.
+         */
 
-    const demoToken = `demo-session-${Date.now()}`;
+        sessionStorage.removeItem(
+          DEMO_TOKEN_KEY
+        );
 
-    localStorage.setItem(DEMO_TOKEN_KEY, demoToken);
-    localStorage.setItem(DEMO_USER_KEY, JSON.stringify(DEMO_USER));
+        sessionStorage.removeItem(
+          DEMO_USER_KEY
+        );
 
-    setToken(demoToken);
-    setUser(DEMO_USER);
-    setIsDemoMode(true);
-  }, []);
 
-  // ================================================================
-  // LOGOUT
-  // ================================================================
+        /*
+         * IMPORTANT:
+         *
+         * Store the real authentication
+         * token in sessionStorage.
+         */
 
-  const logout = useCallback(() => {
-    // Remove BOTH real and demo sessions.
-    localStorage.removeItem(REAL_TOKEN_KEY);
-    localStorage.removeItem(DEMO_TOKEN_KEY);
-    localStorage.removeItem(DEMO_USER_KEY);
+        sessionStorage.setItem(
+          REAL_TOKEN_KEY,
+          newToken
+        );
 
-    // Clear React authentication state.
-    setToken(null);
-    setUser(null);
-    setIsDemoMode(false);
-  }, []);
 
-  // ================================================================
-  // CONTEXT VALUE
-  // ================================================================
+        /*
+         * Update React state.
+         */
+
+        setToken(
+          newToken
+        );
+
+        setUser(
+          newUser
+        );
+
+        setIsDemoMode(
+          false
+        );
+
+
+        return newUser;
+      },
+      []
+    );
+
+
+  /* ==============================================================
+     REGISTER
+  ============================================================== */
+
+  const register =
+    useCallback(
+      async (
+        payload
+      ) => {
+
+        const data =
+          await api.register(
+            payload
+          );
+
+
+        /*
+         * Some backends automatically
+         * log the user in after registration.
+         */
+
+        if (data?.token) {
+
+          sessionStorage.removeItem(
+            DEMO_TOKEN_KEY
+          );
+
+          sessionStorage.removeItem(
+            DEMO_USER_KEY
+          );
+
+
+          sessionStorage.setItem(
+            REAL_TOKEN_KEY,
+            data.token
+          );
+
+
+          setToken(
+            data.token
+          );
+
+          setUser(
+            data.user ||
+            data.data ||
+            null
+          );
+
+          setIsDemoMode(
+            false
+          );
+        }
+
+
+        return data;
+      },
+      []
+    );
+
+
+  /* ==============================================================
+     DEMO LOGIN
+  ============================================================== */
+
+  const demoLogin =
+    useCallback(
+      () => {
+
+        /*
+         * Remove real authentication.
+         */
+
+        sessionStorage.removeItem(
+          REAL_TOKEN_KEY
+        );
+
+
+        /*
+         * Create demo session.
+         */
+
+        const demoToken =
+          `demo-session-${Date.now()}`;
+
+
+        sessionStorage.setItem(
+          DEMO_TOKEN_KEY,
+          demoToken
+        );
+
+
+        sessionStorage.setItem(
+          DEMO_USER_KEY,
+          JSON.stringify(
+            DEMO_USER
+          )
+        );
+
+
+        /*
+         * Update state.
+         */
+
+        setToken(
+          demoToken
+        );
+
+        setUser(
+          DEMO_USER
+        );
+
+        setIsDemoMode(
+          true
+        );
+      },
+      []
+    );
+
+
+  /* ==============================================================
+     LOGOUT
+  ============================================================== */
+
+  const logout =
+    useCallback(
+      () => {
+
+        /*
+         * Remove real session.
+         */
+
+        sessionStorage.removeItem(
+          REAL_TOKEN_KEY
+        );
+
+
+        /*
+         * Remove demo session.
+         */
+
+        sessionStorage.removeItem(
+          DEMO_TOKEN_KEY
+        );
+
+        sessionStorage.removeItem(
+          DEMO_USER_KEY
+        );
+
+
+        /*
+         * Clear React state.
+         */
+
+        setToken(
+          null
+        );
+
+        setUser(
+          null
+        );
+
+        setIsDemoMode(
+          false
+        );
+      },
+      []
+    );
+
+
+  /* ==============================================================
+     CONTEXT VALUE
+  ============================================================== */
 
   const value = {
     user,
+
     token,
-    isAuthenticated: Boolean(token),
+
+    isAuthenticated:
+      Boolean(token),
+
     isDemoMode,
+
     loading,
+
     login,
+
     register,
+
     demoLogin,
+
     logout,
   };
 
+
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={value}
+    >
       {children}
     </AuthContext.Provider>
   );

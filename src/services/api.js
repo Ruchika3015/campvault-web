@@ -130,6 +130,81 @@ export const api = {
 
 
   // ================================================================
+  // LINKS & PROFILES
+  // ================================================================
+
+  getLinks: () =>
+    apiRequest('/api/v1/users/links'),
+
+  addLink: (payload) =>
+    apiRequest('/api/v1/users/links', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateLink: (id, payload) =>
+    apiRequest(`/api/v1/users/links/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteLink: (id) =>
+    apiRequest(`/api/v1/users/links/${id}`, {
+      method: 'DELETE',
+    }),
+
+
+  // ================================================================
+  // PROJECTS
+  // ================================================================
+
+  getProjects: () =>
+    apiRequest('/api/v1/users/projects'),
+
+  addProject: (payload) =>
+    apiRequest('/api/v1/users/projects', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateProject: (id, payload) =>
+    apiRequest(`/api/v1/users/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteProject: (id) =>
+    apiRequest(`/api/v1/users/projects/${id}`, {
+      method: 'DELETE',
+    }),
+
+
+  // ================================================================
+  // CERTIFICATIONS & ACHIEVEMENTS
+  // ================================================================
+
+  getCertifications: () =>
+    apiRequest('/api/v1/users/certifications'),
+
+  addCertification: (payload) =>
+    apiRequest('/api/v1/users/certifications', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateCertification: (id, payload) =>
+    apiRequest(`/api/v1/users/certifications/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteCertification: (id) =>
+    apiRequest(`/api/v1/users/certifications/${id}`, {
+      method: 'DELETE',
+    }),
+
+
+  // ================================================================
   // COLLEGES
   // ================================================================
 

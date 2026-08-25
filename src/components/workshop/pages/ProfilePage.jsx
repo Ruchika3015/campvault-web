@@ -121,6 +121,24 @@ export function ProfilePage() {
     level: '',
   });
 
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [editingLinkId, setEditingLinkId] = useState(null);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [linkForm, setLinkForm] = useState({ platform: '', url: '' });
+
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [projectSaving, setProjectSaving] = useState(false);
+  const [projectError, setProjectError] = useState('');
+  const [projectForm, setProjectForm] = useState({ name: '', description: '', technologies: '', github: '', link: '' });
+
+  const [showCertificationForm, setShowCertificationForm] = useState(false);
+  const [editingCertificationId, setEditingCertificationId] = useState(null);
+  const [certificationSaving, setCertificationSaving] = useState(false);
+  const [certificationError, setCertificationError] = useState('');
+  const [certificationForm, setCertificationForm] = useState({ title: '', organization: '', date: '', url: '' });
+
   // ================================================================
   // LOAD PROFILE
   // ================================================================
@@ -174,6 +192,9 @@ export function ProfilePage() {
         api.getProfile(),
         api.getMyJugaads(),
         api.getSkills(),
+        api.getLinks(),
+        api.getProjects(),
+        api.getCertifications(),
       ]);
 
       if (!mounted) return;
@@ -182,6 +203,9 @@ export function ProfilePage() {
         profileResult,
         jugaadsResult,
         skillsResult,
+        linksResult,
+        projectsResult,
+        certificationsResult,
       ] = results;
 
       // ------------------------------------------------------------
@@ -265,10 +289,16 @@ export function ProfilePage() {
         setSkills([]);
       }
 
-      // Backend for these sections is not implemented yet.
-      setLinks([]);
-      setProjects([]);
-      setCertifications([]);
+      const unwrap = (result, key) => {
+        if (result.status !== 'fulfilled') return [];
+        const raw = result.value;
+        const list = raw?.data ?? raw?.[key] ?? (Array.isArray(raw) ? raw : []);
+        return Array.isArray(list) ? list : [];
+      };
+
+      setLinks(unwrap(linksResult, 'links'));
+      setProjects(unwrap(projectsResult, 'projects'));
+      setCertifications(unwrap(certificationsResult, 'certifications'));
 
       setLoading(false);
     };
@@ -647,6 +677,59 @@ export function ProfilePage() {
       );
     }
   };
+
+  // ================================================================
+  // LINKS / PROJECTS / CERTIFICATIONS
+  // ================================================================
+
+  const resetLinkForm = () => { setLinkForm({ platform: '', url: '' }); setEditingLinkId(null); setShowLinkForm(false); setLinkError(''); };
+  const openAddLink = () => { resetLinkForm(); setShowLinkForm(true); };
+  const openEditLink = (x) => { setLinkForm({ platform: x.platform || '', url: x.url || '' }); setEditingLinkId(x.id); setLinkError(''); setShowLinkForm(true); };
+  const handleLinkChange = (e) => setLinkForm((v) => ({ ...v, [e.target.name]: e.target.value }));
+  const handleSaveLink = async (e) => {
+    e.preventDefault(); if (isDemoMode) return; setLinkSaving(true); setLinkError('');
+    try {
+      const payload={platform:linkForm.platform.trim(),url:linkForm.url.trim()};
+      if(!payload.platform||!payload.url) throw new Error('Platform and URL are required.');
+      const result=editingLinkId?await api.updateLink(editingLinkId,payload):await api.addLink(payload);
+      const saved=result?.data||result?.link||result; if(!saved?.id) throw new Error('The server did not return the saved link.');
+      setLinks(v=>editingLinkId?v.map(x=>Number(x.id)===Number(editingLinkId)?saved:x):[saved,...v]); resetLinkForm();
+    } catch(err){setLinkError(err?.message||err?.data?.message||err?.data?.error||'Unable to save link. Please try again.');}
+    finally{setLinkSaving(false);}
+  };
+  const handleDeleteLink = async (id) => { if(isDemoMode||!window.confirm('Are you sure you want to delete this link?')) return; try{await api.deleteLink(id);setLinks(v=>v.filter(x=>Number(x.id)!==Number(id)));}catch(err){setLinkError(err?.message||'Unable to delete link. Please try again.');} };
+
+  const resetProjectForm = () => { setProjectForm({name:'',description:'',technologies:'',github:'',link:''}); setEditingProjectId(null); setShowProjectForm(false); setProjectError(''); };
+  const openAddProject = () => { resetProjectForm(); setShowProjectForm(true); };
+  const openEditProject = (x) => { setProjectForm({name:x.name||'',description:x.description||'',technologies:Array.isArray(x.technologies)?x.technologies.join(', '):(x.technologies||''),github:x.github||'',link:x.link||''}); setEditingProjectId(x.id); setProjectError(''); setShowProjectForm(true); };
+  const handleProjectChange = (e) => setProjectForm(v=>({...v,[e.target.name]:e.target.value}));
+  const handleSaveProject = async (e) => {
+    e.preventDefault(); if(isDemoMode)return; setProjectSaving(true);setProjectError('');
+    try{
+      const payload={name:projectForm.name.trim(),description:projectForm.description.trim(),technologies:projectForm.technologies.split(',').map(x=>x.trim()).filter(Boolean),github:projectForm.github.trim(),link:projectForm.link.trim()};
+      if(!payload.name)throw new Error('Project name is required.');
+      const result=editingProjectId?await api.updateProject(editingProjectId,payload):await api.addProject(payload);
+      const saved=result?.data||result?.project||result;if(!saved?.id)throw new Error('The server did not return the saved project.');
+      setProjects(v=>editingProjectId?v.map(x=>Number(x.id)===Number(editingProjectId)?saved:x):[saved,...v]);resetProjectForm();
+    }catch(err){setProjectError(err?.message||err?.data?.message||err?.data?.error||'Unable to save project. Please try again.');}finally{setProjectSaving(false);}
+  };
+  const handleDeleteProject = async (id) => {if(isDemoMode||!window.confirm('Are you sure you want to delete this project?'))return;try{await api.deleteProject(id);setProjects(v=>v.filter(x=>Number(x.id)!==Number(id)));}catch(err){setProjectError(err?.message||'Unable to delete project. Please try again.');}};
+
+  const resetCertificationForm = () => {setCertificationForm({title:'',organization:'',date:'',url:''});setEditingCertificationId(null);setShowCertificationForm(false);setCertificationError('');};
+  const openAddCertification = () => {resetCertificationForm();setShowCertificationForm(true);};
+  const openEditCertification = (x) => {setCertificationForm({title:x.title||'',organization:x.organization||'',date:x.date||'',url:x.url||x.link||''});setEditingCertificationId(x.id);setCertificationError('');setShowCertificationForm(true);};
+  const handleCertificationChange = (e) => setCertificationForm(v=>({...v,[e.target.name]:e.target.value}));
+  const handleSaveCertification = async (e) => {
+    e.preventDefault();if(isDemoMode)return;setCertificationSaving(true);setCertificationError('');
+    try{
+      const payload={title:certificationForm.title.trim(),organization:certificationForm.organization.trim(),date:certificationForm.date.trim(),url:certificationForm.url.trim()};
+      if(!payload.title||!payload.organization)throw new Error('Title and organization are required.');
+      const result=editingCertificationId?await api.updateCertification(editingCertificationId,payload):await api.addCertification(payload);
+      const saved=result?.data||result?.certification||result;if(!saved?.id)throw new Error('The server did not return the saved certification.');
+      setCertifications(v=>editingCertificationId?v.map(x=>Number(x.id)===Number(editingCertificationId)?saved:x):[saved,...v]);resetCertificationForm();
+    }catch(err){setCertificationError(err?.message||err?.data?.message||err?.data?.error||'Unable to save certification. Please try again.');}finally{setCertificationSaving(false);}
+  };
+  const handleDeleteCertification = async (id) => {if(isDemoMode||!window.confirm('Are you sure you want to delete this certification?'))return;try{await api.deleteCertification(id);setCertifications(v=>v.filter(x=>Number(x.id)!==Number(id)));}catch(err){setCertificationError(err?.message||'Unable to delete certification. Please try again.');}};
 
   // ================================================================
   // RENDER
@@ -1152,210 +1235,51 @@ export function ProfilePage() {
         </section>
 
 
-        {/* ============================================================
-            LINKS
-        ============================================================ */}
-
+        {/* LINKS */}
         <section className="surface-panel rounded-2xl p-5">
-          <SectionHeader
-            icon={<Link2 size={13} />}
-            label="LINKS & PROFILES"
-          />
-
-          {links.length > 0 ? (
-            <div className="space-y-2">
-              {links.map((link) => {
-                const Icon =
-                  LINK_ICONS[
-                    link.platform
-                  ] || Link2;
-
-                return (
-                  <div
-                    key={link.id}
-                    className="flex items-center gap-3 surface-metal rounded-lg px-3 py-2.5"
-                  >
-                    <Icon
-                      size={14}
-                      className="text-amber shrink-0"
-                    />
-
-                    <span className="font-mono text-[10px] text-ink-1 w-24 shrink-0">
-                      {link.platform}
-                    </span>
-
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-[9px] text-mint truncate flex-1 flex items-center gap-1"
-                    >
-                      {link.url}
-
-                      <ExternalLink size={9} />
-                    </a>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState text="No links added yet." />
-          )}
-
-          {!isDemoMode && (
-            <p className="font-mono text-[8px] text-ink-3 mt-4">
-              Profile links can be added once backend profile editing support is available.
-            </p>
-          )}
+          <SectionHeader icon={<Link2 size={13} />} label="LINKS & PROFILES" />
+          {!isDemoMode && <button type="button" onClick={openAddLink} className="machine-control mb-3" style={{padding:'5px 8px'}}><Plus size={11}/> ADD</button>}
+          {linkError && <p className="font-mono text-[9px] text-coral mb-3">{linkError}</p>}
+          {showLinkForm && !isDemoMode && <form onSubmit={handleSaveLink} className="surface-metal rounded-xl p-4 mb-4 grid gap-3">
+            <ProfileInput id="link-platform" label="PLATFORM" name="platform" value={linkForm.platform} onChange={handleLinkChange} placeholder="GitHub" required />
+            <ProfileInput id="link-url" label="URL" name="url" type="url" value={linkForm.url} onChange={handleLinkChange} placeholder="https://..." required />
+            <div className="flex gap-2"><button type="submit" disabled={linkSaving} className="machine-control">{linkSaving?'SAVING...':editingLinkId?'UPDATE LINK':'SAVE LINK'}</button><button type="button" onClick={resetLinkForm} className="machine-control machine-control--ghost">CANCEL</button></div>
+          </form>}
+          {links.length ? <div className="space-y-2">{links.map(link=>{const Icon=LINK_ICONS[link.platform]||Link2;return <div key={link.id} className="flex items-center gap-3 surface-metal rounded-lg px-3 py-2.5"><Icon size={14} className="text-amber"/><span className="font-mono text-[10px] w-24 shrink-0">{link.platform}</span><a href={link.url} target="_blank" rel="noopener noreferrer" className="font-mono text-[9px] text-mint truncate flex-1">{link.url}</a>{!isDemoMode&&<div className="flex gap-1"><button type="button" onClick={()=>openEditLink(link)} className="text-ink-3 hover:text-amber"><Pencil size={11}/></button><button type="button" onClick={()=>handleDeleteLink(link.id)} className="text-ink-3 hover:text-coral"><Trash2 size={11}/></button></div>}</div>})}</div> : <EmptyState text="No links added yet."/>}
         </section>
 
 
-        {/* ============================================================
-            PROJECTS
-        ============================================================ */}
-
+        {/* PROJECTS */}
         <section className="surface-panel rounded-2xl p-5">
-          <SectionHeader
-            icon={<Briefcase size={13} />}
-            label="MY PROJECTS"
-          />
-
-          {projects.length > 0 ? (
-            <div className="space-y-3">
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  className="surface-metal rounded-xl p-4"
-                >
-                  <p className="font-display text-sm">
-                    {project.name}
-                  </p>
-
-                  {project.description && (
-                    <p className="font-mono text-[10px] text-ink-2 mt-2">
-                      {project.description}
-                    </p>
-                  )}
-
-                  {Array.isArray(
-                    project.technologies
-                  ) && (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {project.technologies.map(
-                        (technology) => (
-                          <span
-                            key={technology}
-                            className="font-technical text-[7px] px-2 py-1 rounded bg-bg-2 text-ink-2 border border-metal-1"
-                          >
-                            {technology}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 mt-3">
-                    {project.github && (
-                      <a
-                        href={project.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 font-mono text-[9px] text-mint"
-                      >
-                        <Github size={11} />
-                        GitHub
-                      </a>
-                    )}
-
-                    {project.link && (
-                      <a
-                        href={project.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 font-mono text-[9px] text-amber"
-                      >
-                        <Globe size={11} />
-                        Live
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState text="No projects added yet." />
-          )}
+          <SectionHeader icon={<Briefcase size={13} />} label="MY PROJECTS" />
+          {!isDemoMode && <button type="button" onClick={openAddProject} className="machine-control mb-3" style={{padding:'5px 8px'}}><Plus size={11}/> ADD</button>}
+          {projectError && <p className="font-mono text-[9px] text-coral mb-3">{projectError}</p>}
+          {showProjectForm&&!isDemoMode&&<form onSubmit={handleSaveProject} className="surface-metal rounded-xl p-4 mb-4 grid gap-3">
+            <ProfileInput id="project-name" label="PROJECT NAME" name="name" value={projectForm.name} onChange={handleProjectChange} required />
+            <div><label htmlFor="project-description" className="font-technical text-[8px] text-ink-3">DESCRIPTION</label><textarea id="project-description" name="description" value={projectForm.description} onChange={handleProjectChange} rows={3} className="w-full mt-2 rounded-lg bg-bg-2 border border-metal-1 px-3 py-3 font-mono text-xs text-ink-0 outline-none focus:border-amber resize-none"/></div>
+            <ProfileInput id="project-technologies" label="TECHNOLOGIES (comma separated)" name="technologies" value={projectForm.technologies} onChange={handleProjectChange} placeholder="React, Node.js, PostgreSQL" />
+            <ProfileInput id="project-github" label="GITHUB URL" name="github" type="url" value={projectForm.github} onChange={handleProjectChange} />
+            <ProfileInput id="project-link" label="LIVE PROJECT URL" name="link" type="url" value={projectForm.link} onChange={handleProjectChange} />
+            <div className="flex gap-2"><button type="submit" disabled={projectSaving} className="machine-control">{projectSaving?'SAVING...':editingProjectId?'UPDATE PROJECT':'SAVE PROJECT'}</button><button type="button" onClick={resetProjectForm} className="machine-control machine-control--ghost">CANCEL</button></div>
+          </form>}
+          {projects.length?<div className="space-y-3">{projects.map(project=><div key={project.id} className="surface-metal rounded-xl p-4"><div className="flex gap-3"><div className="flex-1"><p className="font-display text-sm">{project.name}</p>{project.description&&<p className="font-mono text-[10px] text-ink-2 mt-2">{project.description}</p>}{Array.isArray(project.technologies)&&project.technologies.length>0&&<div className="flex flex-wrap gap-1.5 mt-3">{project.technologies.map((t,i)=><span key={`${t}-${i}`} className="font-technical text-[7px] px-2 py-1 rounded bg-bg-2 text-ink-2 border border-metal-1">{t}</span>)}</div>}<div className="flex gap-3 mt-3">{project.github&&<a href={project.github} target="_blank" rel="noopener noreferrer" className="font-mono text-[9px] text-mint"><Github size={11} className="inline mr-1"/>GitHub</a>}{project.link&&<a href={project.link} target="_blank" rel="noopener noreferrer" className="font-mono text-[9px] text-amber"><Globe size={11} className="inline mr-1"/>Live</a>}</div></div>{!isDemoMode&&<div className="flex gap-1"><button type="button" onClick={()=>openEditProject(project)} className="text-ink-3 hover:text-amber"><Pencil size={11}/></button><button type="button" onClick={()=>handleDeleteProject(project.id)} className="text-ink-3 hover:text-coral"><Trash2 size={11}/></button></div>}</div></div>)}</div>:<EmptyState text="No projects added yet."/>}
         </section>
 
 
-        {/* ============================================================
-            CERTIFICATIONS
-        ============================================================ */}
-
+        {/* CERTIFICATIONS */}
         <section className="surface-panel rounded-2xl p-5">
-          <SectionHeader
-            icon={<Award size={13} />}
-            label="CERTIFICATIONS & ACHIEVEMENTS"
-          />
-
-          {certifications.length > 0 ? (
-            <div className="space-y-2">
-              {certifications.map(
-                (certificate) => (
-                  <div
-                    key={certificate.id}
-                    className="surface-metal rounded-xl p-3 flex items-start gap-3"
-                  >
-                    <span className="grid place-items-center w-8 h-8 rounded-lg bg-amber/10 text-amber shrink-0">
-                      <GraduationCap size={14} />
-                    </span>
-
-                    <div>
-                      <p className="font-display text-sm">
-                        {certificate.title}
-                      </p>
-
-                      <p className="font-mono text-[9px] text-ink-3 mt-1">
-                        {certificate.organization}
-                        {certificate.date
-                          ? ` · ${certificate.date}`
-                          : ''}
-                      </p>
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          ) : (
-            <EmptyState text="No certifications added yet." />
-          )}
-
-          {isDemoMode &&
-            mockAchievements
-              .filter(
-                (achievement) =>
-                  achievement.unlocked
-              )
-              .map((achievement) => (
-                <div
-                  key={achievement.id}
-                  className="surface-metal rounded-xl p-3 flex items-center gap-3 mt-2"
-                >
-                  <span className="text-lg">
-                    {achievement.emoji}
-                  </span>
-
-                  <div>
-                    <p className="font-technical text-[9px] text-ink-0">
-                      {achievement.title}
-                    </p>
-
-                    <p className="font-mono text-[8px] text-ink-3">
-                      {achievement.desc}
-                    </p>
-                  </div>
-                </div>
-              ))}
+          <SectionHeader icon={<Award size={13} />} label="CERTIFICATIONS & ACHIEVEMENTS" />
+          {!isDemoMode && <button type="button" onClick={openAddCertification} className="machine-control mb-3" style={{padding:'5px 8px'}}><Plus size={11}/> ADD</button>}
+          {certificationError && <p className="font-mono text-[9px] text-coral mb-3">{certificationError}</p>}
+          {showCertificationForm&&!isDemoMode&&<form onSubmit={handleSaveCertification} className="surface-metal rounded-xl p-4 mb-4 grid gap-3">
+            <ProfileInput id="certificate-title" label="TITLE" name="title" value={certificationForm.title} onChange={handleCertificationChange} required />
+            <ProfileInput id="certificate-organization" label="ORGANIZATION" name="organization" value={certificationForm.organization} onChange={handleCertificationChange} required />
+            <ProfileInput id="certificate-date" label="DATE" name="date" value={certificationForm.date} onChange={handleCertificationChange} placeholder="August 2026" />
+            <ProfileInput id="certificate-url" label="VERIFICATION URL" name="url" type="url" value={certificationForm.url} onChange={handleCertificationChange} />
+            <div className="flex gap-2"><button type="submit" disabled={certificationSaving} className="machine-control">{certificationSaving?'SAVING...':editingCertificationId?'UPDATE CERTIFICATION':'SAVE CERTIFICATION'}</button><button type="button" onClick={resetCertificationForm} className="machine-control machine-control--ghost">CANCEL</button></div>
+          </form>}
+          {certifications.length?<div className="space-y-2">{certifications.map(c=><div key={c.id} className="surface-metal rounded-xl p-3 flex items-start gap-3"><span className="grid place-items-center w-8 h-8 rounded-lg bg-amber/10 text-amber"><GraduationCap size={14}/></span><div className="flex-1"><p className="font-display text-sm">{c.title}</p><p className="font-mono text-[9px] text-ink-3 mt-1">{c.organization}{c.date?` · ${c.date}`:''}</p>{(c.url||c.link)&&<a href={c.url||c.link} target="_blank" rel="noopener noreferrer" className="font-mono text-[8px] text-mint mt-2 inline-block">Verify</a>}</div>{!isDemoMode&&<div className="flex gap-1"><button type="button" onClick={()=>openEditCertification(c)} className="text-ink-3 hover:text-amber"><Pencil size={11}/></button><button type="button" onClick={()=>handleDeleteCertification(c.id)} className="text-ink-3 hover:text-coral"><Trash2 size={11}/></button></div>}</div>)}</div>:<EmptyState text="No certifications added yet."/>}
+          {isDemoMode&&mockAchievements.filter(a=>a.unlocked).map(a=><div key={a.id} className="surface-metal rounded-xl p-3 flex items-center gap-3 mt-2"><span>{a.emoji}</span><div><p className="font-technical text-[9px]">{a.title}</p><p className="font-mono text-[8px] text-ink-3">{a.desc}</p></div></div>)}
         </section>
       </div>
 

@@ -76,6 +76,7 @@ export async function apiRequest(path, options = {}) {
   return data;
 }
 
+
 export const api = {
   // ================================================================
   // AUTH / USERS
@@ -96,17 +97,37 @@ export const api = {
   getProfile: () =>
     apiRequest('/api/v1/users/profile'),
 
-  /**
-   * Update the currently authenticated user's profile.
-   *
-   * Backend:
-   * PUT /api/v1/users/profile
-   */
   updateProfile: (payload) =>
     apiRequest('/api/v1/users/profile', {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+
+
+  // ================================================================
+  // SKILLS
+  // ================================================================
+
+  getSkills: () =>
+    apiRequest('/api/v1/users/skills'),
+
+  addSkill: (payload) =>
+    apiRequest('/api/v1/users/skills', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateSkill: (id, payload) =>
+    apiRequest(`/api/v1/users/skills/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteSkill: (id) =>
+    apiRequest(`/api/v1/users/skills/${id}`, {
+      method: 'DELETE',
+    }),
+
 
   // ================================================================
   // COLLEGES
@@ -114,6 +135,7 @@ export const api = {
 
   getColleges: () =>
     apiRequest('/api/v1/colleges'),
+
 
   // ================================================================
   // JUGAADS
@@ -145,6 +167,7 @@ export const api = {
       method: 'DELETE',
     }),
 
+
   // ================================================================
   // INTEREST
   // ================================================================
@@ -161,6 +184,7 @@ export const api = {
       body: JSON.stringify({}),
     }),
 
+
   // ================================================================
   // JUGAAD-SPECIFIC PROPOSALS
   // ================================================================
@@ -173,6 +197,7 @@ export const api = {
 
   getProposalsForJugaad: (jugaadId) =>
     apiRequest(`/api/v1/jugaads/${jugaadId}/proposals`),
+
 
   // ================================================================
   // PROPOSALS
@@ -211,6 +236,7 @@ export const api = {
   getCounterOffers: (proposalId) =>
     apiRequest(`/api/v1/proposals/${proposalId}/counter-offers`),
 
+
   // ================================================================
   // CONVERSATIONS / MESSAGES
   // ================================================================
@@ -223,21 +249,6 @@ export const api = {
       `/api/v1/conversations/${conversationId}/messages`
     ),
 
-  /*
-   * IMPORTANT:
-   *
-   * Backend expects:
-   *
-   * {
-   *   content: "hello"
-   * }
-   *
-   * NOT:
-   *
-   * {
-   *   text: "hello"
-   * }
-   */
   sendMessage: (conversationId, text) =>
     apiRequest(
       `/api/v1/conversations/${conversationId}/messages`,
@@ -248,6 +259,7 @@ export const api = {
         }),
       }
     ),
+
 
   // ================================================================
   // NOTIFICATIONS

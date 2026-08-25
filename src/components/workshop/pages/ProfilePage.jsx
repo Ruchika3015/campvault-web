@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -38,6 +37,10 @@ import {
   ExternalLink,
   GraduationCap,
   Code as Codeforces,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 const LINK_ICONS = {
@@ -103,6 +106,25 @@ export function ProfilePage() {
     isDemoMode ? mockProfileCertifications : []
   );
 
+  // ================================================================
+  // SKILL FORM STATE
+  // ================================================================
+
+  const [showSkillForm, setShowSkillForm] = useState(false);
+  const [editingSkillId, setEditingSkillId] = useState(null);
+  const [skillSaving, setSkillSaving] = useState(false);
+  const [skillError, setSkillError] = useState('');
+
+  const [skillForm, setSkillForm] = useState({
+    name: '',
+    category: '',
+    level: '',
+  });
+
+  // ================================================================
+  // LOAD PROFILE
+  // ================================================================
+
   useEffect(() => {
     if (isDemoMode) {
       const demoProfile = {
@@ -151,11 +173,20 @@ export function ProfilePage() {
       const results = await Promise.allSettled([
         api.getProfile(),
         api.getMyJugaads(),
+        api.getSkills(),
       ]);
 
       if (!mounted) return;
 
-      const [profileResult, jugaadsResult] = results;
+      const [
+        profileResult,
+        jugaadsResult,
+        skillsResult,
+      ] = results;
+
+      // ------------------------------------------------------------
+      // PROFILE
+      // ------------------------------------------------------------
 
       if (profileResult.status === 'fulfilled') {
         const raw = profileResult.value;
@@ -194,6 +225,10 @@ export function ProfilePage() {
         });
       }
 
+      // ------------------------------------------------------------
+      // JUGAADS
+      // ------------------------------------------------------------
+
       if (jugaadsResult.status === 'fulfilled') {
         const raw = jugaadsResult.value;
 
@@ -209,8 +244,28 @@ export function ProfilePage() {
         setMyJugaads([]);
       }
 
-      // Backend APIs for these sections are not currently confirmed.
-      setSkills([]);
+      // ------------------------------------------------------------
+      // SKILLS
+      // ------------------------------------------------------------
+
+      if (skillsResult.status === 'fulfilled') {
+        const raw = skillsResult.value;
+
+        const skillList =
+          raw?.data ??
+          raw?.skills ??
+          (Array.isArray(raw) ? raw : []);
+
+        setSkills(
+          Array.isArray(skillList)
+            ? skillList
+            : []
+        );
+      } else {
+        setSkills([]);
+      }
+
+      // Backend for these sections is not implemented yet.
       setLinks([]);
       setProjects([]);
       setCertifications([]);
@@ -228,6 +283,10 @@ export function ProfilePage() {
     isAuthenticated,
     authUser,
   ]);
+
+  // ================================================================
+  // PROFILE HELPERS
+  // ================================================================
 
   const avatar =
     profile?.name
@@ -296,6 +355,10 @@ export function ProfilePage() {
   const bio =
     profile?.bio ??
     '';
+
+  // ================================================================
+  // PROFILE EDIT
+  // ================================================================
 
   const handleEditChange = (event) => {
     const { name, value } = event.target;
@@ -423,6 +486,171 @@ export function ProfilePage() {
       setSaving(false);
     }
   };
+
+  // ================================================================
+  // SKILL FUNCTIONS
+  // ================================================================
+
+  const resetSkillForm = () => {
+    setSkillForm({
+      name: '',
+      category: '',
+      level: '',
+    });
+
+    setEditingSkillId(null);
+    setShowSkillForm(false);
+    setSkillError('');
+  };
+
+  const openAddSkill = () => {
+    setSkillForm({
+      name: '',
+      category: '',
+      level: '',
+    });
+
+    setEditingSkillId(null);
+    setSkillError('');
+    setShowSkillForm(true);
+  };
+
+  const openEditSkill = (skill) => {
+    setSkillForm({
+      name: skill.name || '',
+      category: skill.category || '',
+      level: skill.level || '',
+    });
+
+    setEditingSkillId(skill.id);
+    setSkillError('');
+    setShowSkillForm(true);
+  };
+
+  const handleSkillChange = (event) => {
+    const { name, value } = event.target;
+
+    setSkillForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+  };
+
+  const handleSaveSkill = async (event) => {
+    event.preventDefault();
+
+    if (isDemoMode) {
+      return;
+    }
+
+    setSkillSaving(true);
+    setSkillError('');
+
+    try {
+      const payload = {
+        name: skillForm.name.trim(),
+        category: skillForm.category.trim(),
+        level: skillForm.level.trim(),
+      };
+
+      if (!payload.name) {
+        throw new Error(
+          'Skill name is required.'
+        );
+      }
+
+      let result;
+
+      if (editingSkillId) {
+        result =
+          await api.updateSkill(
+            editingSkillId,
+            payload
+          );
+      } else {
+        result =
+          await api.addSkill(payload);
+      }
+
+      const savedSkill =
+        result?.data ||
+        result?.skill ||
+        result;
+
+      if (!savedSkill?.id) {
+        throw new Error(
+          'The server did not return the saved skill.'
+        );
+      }
+
+      if (editingSkillId) {
+        setSkills((current) =>
+          current.map((skill) =>
+            Number(skill.id) ===
+            Number(editingSkillId)
+              ? savedSkill
+              : skill
+          )
+        );
+      } else {
+        setSkills((current) => [
+          savedSkill,
+          ...current,
+        ]);
+      }
+
+      resetSkillForm();
+    } catch (error) {
+      setSkillError(
+        error?.message ||
+          error?.data?.message ||
+          error?.data?.error ||
+          'Unable to save skill. Please try again.'
+      );
+    } finally {
+      setSkillSaving(false);
+    }
+  };
+
+  const handleDeleteSkill = async (skillId) => {
+    if (isDemoMode) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        'Are you sure you want to delete this skill?'
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSkillError('');
+
+    try {
+      await api.deleteSkill(skillId);
+
+      setSkills((current) =>
+        current.filter(
+          (skill) =>
+            Number(skill.id) !==
+            Number(skillId)
+        )
+      );
+    } catch (error) {
+      setSkillError(
+        error?.message ||
+          error?.data?.message ||
+          error?.data?.error ||
+          'Unable to delete skill. Please try again.'
+      );
+    }
+  };
+
+  // ================================================================
+  // RENDER
+  // ================================================================
 
   return (
     <div>
@@ -731,12 +959,130 @@ export function ProfilePage() {
       </section>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Skills */}
+
+        {/* ============================================================
+            SKILLS
+        ============================================================ */}
+
         <section className="surface-panel rounded-2xl p-5">
-          <SectionHeader
-            icon={<User size={13} />}
-            label="SKILLS"
-          />
+          <div className="flex items-center gap-2 mb-4">
+            <span
+              style={{
+                color: 'var(--amber)',
+              }}
+            >
+              <User size={13} />
+            </span>
+
+            <span className="font-technical text-[9px] text-ink-0">
+              SKILLS
+            </span>
+
+            <span className="h-px flex-1 bg-metal-1/30" />
+
+            {!isDemoMode && (
+              <button
+                type="button"
+                onClick={openAddSkill}
+                className="machine-control"
+                style={{
+                  padding: '5px 8px',
+                }}
+              >
+                <Plus size={11} />
+                ADD
+              </button>
+            )}
+          </div>
+
+          {skillError && (
+            <div className="mb-3 surface-metal rounded-lg p-3">
+              <p className="font-mono text-[9px] text-coral">
+                {skillError}
+              </p>
+            </div>
+          )}
+
+          {showSkillForm && !isDemoMode && (
+            <form
+              onSubmit={handleSaveSkill}
+              className="surface-metal rounded-xl p-4 mb-4"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-technical text-[9px] text-amber">
+                  {editingSkillId
+                    ? 'EDIT SKILL'
+                    : 'ADD SKILL'}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={resetSkillForm}
+                  disabled={skillSaving}
+                  className="text-ink-3 hover:text-ink-0"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="grid gap-3">
+                <ProfileInput
+                  id="skill-name"
+                  label="SKILL NAME"
+                  name="name"
+                  value={skillForm.name}
+                  onChange={handleSkillChange}
+                  placeholder="e.g. React"
+                  required
+                  maxLength={100}
+                />
+
+                <ProfileInput
+                  id="skill-category"
+                  label="CATEGORY"
+                  name="category"
+                  value={skillForm.category}
+                  onChange={handleSkillChange}
+                  placeholder="e.g. Frontend"
+                  maxLength={50}
+                />
+
+                <ProfileInput
+                  id="skill-level"
+                  label="LEVEL"
+                  name="level"
+                  value={skillForm.level}
+                  onChange={handleSkillChange}
+                  placeholder="e.g. Intermediate"
+                  maxLength={50}
+                />
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={skillSaving}
+                    className="machine-control disabled:opacity-50"
+                  >
+                    <span className="ctrl-led" />
+                    {skillSaving
+                      ? 'SAVING...'
+                      : editingSkillId
+                        ? 'UPDATE SKILL'
+                        : 'SAVE SKILL'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetSkillForm}
+                    disabled={skillSaving}
+                    className="machine-control machine-control--ghost disabled:opacity-50"
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
 
           {skills.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -768,6 +1114,34 @@ export function ProfilePage() {
                         {skill.level}
                       </span>
                     )}
+
+                    {!isDemoMode && (
+                      <div className="flex items-center gap-1 ml-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openEditSkill(skill)
+                          }
+                          className="text-ink-3 hover:text-amber"
+                          title="Edit skill"
+                        >
+                          <Pencil size={11} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDeleteSkill(
+                              skill.id
+                            )
+                          }
+                          className="text-ink-3 hover:text-coral"
+                          title="Delete skill"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -777,7 +1151,11 @@ export function ProfilePage() {
           )}
         </section>
 
-        {/* Links */}
+
+        {/* ============================================================
+            LINKS
+        ============================================================ */}
+
         <section className="surface-panel rounded-2xl p-5">
           <SectionHeader
             icon={<Link2 size={13} />}
@@ -831,7 +1209,11 @@ export function ProfilePage() {
           )}
         </section>
 
-        {/* Projects */}
+
+        {/* ============================================================
+            PROJECTS
+        ============================================================ */}
+
         <section className="surface-panel rounded-2xl p-5">
           <SectionHeader
             icon={<Briefcase size={13} />}
@@ -905,7 +1287,11 @@ export function ProfilePage() {
           )}
         </section>
 
-        {/* Certifications */}
+
+        {/* ============================================================
+            CERTIFICATIONS
+        ============================================================ */}
+
         <section className="surface-panel rounded-2xl p-5">
           <SectionHeader
             icon={<Award size={13} />}
@@ -973,7 +1359,11 @@ export function ProfilePage() {
         </section>
       </div>
 
-      {/* Earnings */}
+
+      {/* ================================================================
+          EARNINGS
+      ================================================================ */}
+
       <section className="mt-6 surface-wood rounded-2xl p-5">
         <SectionHeader
           icon={<Wallet size={13} />}
@@ -1038,6 +1428,7 @@ export function ProfilePage() {
         )}
       </section>
 
+
       <div className="mt-8 flex justify-center">
         <Link
           to="/dashboard"
@@ -1050,6 +1441,11 @@ export function ProfilePage() {
     </div>
   );
 }
+
+
+// ================================================================
+// PROFILE INPUT
+// ================================================================
 
 function ProfileInput({
   id,
@@ -1082,6 +1478,11 @@ function ProfileInput({
   );
 }
 
+
+// ================================================================
+// SECTION HEADER
+// ================================================================
+
 function SectionHeader({
   icon,
   label,
@@ -1105,6 +1506,11 @@ function SectionHeader({
     </div>
   );
 }
+
+
+// ================================================================
+// STAT BLOCK
+// ================================================================
 
 function StatBlock({
   label,
@@ -1139,6 +1545,11 @@ function StatBlock({
     </div>
   );
 }
+
+
+// ================================================================
+// EMPTY STATE
+// ================================================================
 
 function EmptyState({ text }) {
   return (

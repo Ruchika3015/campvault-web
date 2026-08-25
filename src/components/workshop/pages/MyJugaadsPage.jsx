@@ -772,32 +772,122 @@ function Detail({
    * Avoid duplicates where the same student
    * already exists in interestedStudents.
    */
-  const mergedStudents = [
-    ...directStudents,
-  ];
+  const mergedStudents = [];
 
-  proposalStudents.forEach((proposalStudent) => {
-    const alreadyExists =
-      mergedStudents.some((student) => {
-        const studentId =
-          student?.id ??
-          student?.userId ??
-          student?.user_id;
+  // Merge direct interested students with their matching
+  // proposals. This is important because the same student
+  // can exist in both arrays. If we keep only the direct
+  // student object, the proposal status (accepted/rejected)
+  // is lost and the action buttons appear again.
+  directStudents.forEach((student) => {
+    const studentId =
+      student?.id ??
+      student?.userId ??
+      student?.user_id;
 
+    const matchingProposal = proposalStudents.find(
+      (proposalStudent) => {
         const proposalStudentId =
           proposalStudent?.id;
 
         if (
-          studentId != null &&
-          proposalStudentId != null
+          studentId == null ||
+          proposalStudentId == null
         ) {
-          return (
-            String(studentId) ===
-            String(proposalStudentId)
-          );
+          return false;
         }
 
-        return false;
+        return (
+          String(studentId) ===
+          String(proposalStudentId)
+        );
+      }
+    );
+
+    if (matchingProposal) {
+      mergedStudents.push({
+        ...student,
+        ...matchingProposal,
+
+        id:
+          student.id ??
+          matchingProposal.id,
+
+        name:
+          student.name ??
+          matchingProposal.name,
+
+        fullName:
+          student.fullName ??
+          matchingProposal.fullName,
+
+        username:
+          student.username ??
+          matchingProposal.username,
+
+        initials:
+          student.initials ??
+          matchingProposal.initials,
+
+        skills:
+          Array.isArray(student.skills) &&
+          student.skills.length > 0
+            ? student.skills
+            : matchingProposal.skills,
+
+        rating:
+          student.rating ??
+          matchingProposal.rating,
+
+        message:
+          student.message ||
+          matchingProposal.message,
+
+        // Keep the real proposal information.
+        proposalId:
+          matchingProposal.proposalId,
+
+        proposal:
+          matchingProposal.proposal,
+
+        status:
+          matchingProposal.status,
+
+        proposalStatus:
+          matchingProposal.status,
+
+        conversationId:
+          matchingProposal.conversationId,
+      });
+    } else {
+      mergedStudents.push(student);
+    }
+  });
+
+  // Add proposal students that are not already present
+  // in the direct interested-student list.
+  proposalStudents.forEach((proposalStudent) => {
+    const proposalStudentId =
+      proposalStudent?.id;
+
+    const alreadyExists =
+      mergedStudents.some((student) => {
+        const existingStudentId =
+          student?.id ??
+          student?.userId ??
+          student?.user_id;
+
+        if (
+          existingStudentId == null ||
+          proposalStudentId == null
+        ) {
+          return false;
+        }
+
+        return (
+          String(existingStudentId) ===
+          String(proposalStudentId)
+        );
       });
 
     if (!alreadyExists) {

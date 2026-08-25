@@ -237,7 +237,7 @@ export function MyJugaadsPage() {
   } = useAuth();
 
   const {
-    proposals = [],
+    receivedProposals = [],
     acceptProposal,
     rejectProposal,
     counterProposal,
@@ -398,8 +398,8 @@ export function MyJugaadsPage() {
      * which otherwise fails with strict ===.
      */
     const itemProposals =
-      Array.isArray(proposals)
-        ? proposals.filter((p) => {
+      Array.isArray(receivedProposals)
+        ? receivedProposals.filter((p) => {
             const proposalJugaadId =
               getProposalJugaadId(p);
 
@@ -540,8 +540,8 @@ export function MyJugaadsPage() {
         <div className="grid lg:grid-cols-2 gap-3">
           {items.map((item) => {
             const itemProposals =
-              Array.isArray(proposals)
-                ? proposals.filter((p) => {
+              Array.isArray(receivedProposals)
+                ? receivedProposals.filter((p) => {
                     const proposalJugaadId =
                       getProposalJugaadId(p);
 

@@ -19,17 +19,10 @@ export async function apiRequest(
   path,
   options = {}
 ) {
-  /*
-   * IMPORTANT:
-   *
-   * AuthContext now stores cj_token in sessionStorage.
-   * Therefore API requests MUST also read it from sessionStorage.
-   */
   const token =
     sessionStorage.getItem(
       'cj_token'
     );
-
 
   const isFormData =
     typeof FormData !== 'undefined' &&
@@ -137,10 +130,9 @@ export async function apiRequest(
 
 export const api = {
 
-
-  // ================================================================
-  // AUTH / USERS
-  // ================================================================
+  /* ================================================================
+     AUTH / USERS
+  ================================================================ */
 
   register: (
     payload
@@ -149,7 +141,6 @@ export const api = {
       '/api/v1/users/register',
       {
         method: 'POST',
-
         body:
           JSON.stringify(
             payload
@@ -165,7 +156,6 @@ export const api = {
       '/api/v1/users/login',
       {
         method: 'POST',
-
         body:
           JSON.stringify(
             payload
@@ -180,9 +170,24 @@ export const api = {
     ),
 
 
-  // ================================================================
-  // COLLEGES
-  // ================================================================
+  updateProfile: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/profile',
+      {
+        method: 'PUT',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  /* ================================================================
+     COLLEGES
+  ================================================================ */
 
   getColleges: () =>
     apiRequest(
@@ -190,9 +195,9 @@ export const api = {
     ),
 
 
-  // ================================================================
-  // JUGAADS
-  // ================================================================
+  /* ================================================================
+     JUGAADS
+  ================================================================ */
 
   createJugaad: (
     payload
@@ -201,7 +206,6 @@ export const api = {
       '/api/v1/jugaads',
       {
         method: 'POST',
-
         body:
           JSON.stringify(
             payload
@@ -238,7 +242,6 @@ export const api = {
       `/api/v1/jugaads/${id}`,
       {
         method: 'PUT',
-
         body:
           JSON.stringify(
             payload
@@ -258,9 +261,9 @@ export const api = {
     ),
 
 
-  // ================================================================
-  // INTEREST
-  // ================================================================
+  /* ================================================================
+     INTEREST
+  ================================================================ */
 
   expressInterest: (
     jugaadId
@@ -269,7 +272,6 @@ export const api = {
       `/api/v1/jugaads/${jugaadId}/interested`,
       {
         method: 'POST',
-
         body:
           JSON.stringify({}),
       }
@@ -283,16 +285,15 @@ export const api = {
       `/api/v1/jugaads/${jugaadId}/not-interested`,
       {
         method: 'POST',
-
         body:
           JSON.stringify({}),
       }
     ),
 
 
-  // ================================================================
-  // JUGAAD-SPECIFIC PROPOSALS
-  // ================================================================
+  /* ================================================================
+     JUGAAD-SPECIFIC PROPOSALS
+  ================================================================ */
 
   submitProposal: (
     jugaadId,
@@ -302,7 +303,6 @@ export const api = {
       `/api/v1/jugaads/${jugaadId}/proposals`,
       {
         method: 'POST',
-
         body:
           JSON.stringify(
             payload
@@ -319,9 +319,9 @@ export const api = {
     ),
 
 
-  // ================================================================
-  // PROPOSALS
-  // ================================================================
+  /* ================================================================
+     PROPOSALS
+  ================================================================ */
 
   getMyProposals: () =>
     apiRequest(
@@ -342,7 +342,6 @@ export const api = {
       `/api/v1/proposals/${proposalId}/accept`,
       {
         method: 'PUT',
-
         body:
           JSON.stringify({}),
       }
@@ -356,7 +355,6 @@ export const api = {
       `/api/v1/proposals/${proposalId}/reject`,
       {
         method: 'PUT',
-
         body:
           JSON.stringify({}),
       }
@@ -370,7 +368,6 @@ export const api = {
       `/api/v1/proposals/${proposalId}/withdraw`,
       {
         method: 'PUT',
-
         body:
           JSON.stringify({}),
       }
@@ -385,7 +382,6 @@ export const api = {
       `/api/v1/proposals/${proposalId}/counter-offer`,
       {
         method: 'POST',
-
         body:
           JSON.stringify(
             payload
@@ -402,9 +398,217 @@ export const api = {
     ),
 
 
-  // ================================================================
-  // CONVERSATIONS / MESSAGES
-  // ================================================================
+  /* ================================================================
+     SKILLS
+  ================================================================ */
+
+  getSkills: () =>
+    apiRequest(
+      '/api/v1/users/skills'
+    ),
+
+
+  addSkill: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/skills',
+      {
+        method: 'POST',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  updateSkill: (
+    id,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/skills/${id}`,
+      {
+        method: 'PUT',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  deleteSkill: (
+    id
+  ) =>
+    apiRequest(
+      `/api/v1/users/skills/${id}`,
+      {
+        method: 'DELETE',
+      }
+    ),
+
+
+  /* ================================================================
+     LINKS & PROFILES
+  ================================================================ */
+
+  getLinks: () =>
+    apiRequest(
+      '/api/v1/users/links'
+    ),
+
+
+  addLink: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/links',
+      {
+        method: 'POST',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  updateLink: (
+    id,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/links/${id}`,
+      {
+        method: 'PUT',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  deleteLink: (
+    id
+  ) =>
+    apiRequest(
+      `/api/v1/users/links/${id}`,
+      {
+        method: 'DELETE',
+      }
+    ),
+
+
+  /* ================================================================
+     PROJECTS
+  ================================================================ */
+
+  getProjects: () =>
+    apiRequest(
+      '/api/v1/users/projects'
+    ),
+
+
+  addProject: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/projects',
+      {
+        method: 'POST',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  updateProject: (
+    id,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/projects/${id}`,
+      {
+        method: 'PUT',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  deleteProject: (
+    id
+  ) =>
+    apiRequest(
+      `/api/v1/users/projects/${id}`,
+      {
+        method: 'DELETE',
+      }
+    ),
+
+
+  /* ================================================================
+     CERTIFICATIONS
+  ================================================================ */
+
+  getCertifications: () =>
+    apiRequest(
+      '/api/v1/users/certifications'
+    ),
+
+
+  addCertification: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/certifications',
+      {
+        method: 'POST',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  updateCertification: (
+    id,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/certifications/${id}`,
+      {
+        method: 'PUT',
+        body:
+          JSON.stringify(
+            payload
+          ),
+      }
+    ),
+
+
+  deleteCertification: (
+    id
+  ) =>
+    apiRequest(
+      `/api/v1/users/certifications/${id}`,
+      {
+        method: 'DELETE',
+      }
+    ),
+
+
+  /* ================================================================
+     CONVERSATIONS / MESSAGES
+  ================================================================ */
 
   getConversations: () =>
     apiRequest(
@@ -428,7 +632,6 @@ export const api = {
       `/api/v1/conversations/${conversationId}/messages`,
       {
         method: 'POST',
-
         body:
           JSON.stringify({
             content: text,
@@ -444,16 +647,15 @@ export const api = {
       `/api/v1/conversations/${conversationId}/read`,
       {
         method: 'PUT',
-
         body:
           JSON.stringify({}),
       }
     ),
 
 
-  // ================================================================
-  // NOTIFICATIONS
-  // ================================================================
+  /* ================================================================
+     NOTIFICATIONS
+  ================================================================ */
 
   getNotifications: () =>
     apiRequest(
@@ -466,7 +668,6 @@ export const api = {
       '/api/v1/notifications/read-all',
       {
         method: 'PUT',
-
         body:
           JSON.stringify({}),
       }
@@ -480,7 +681,6 @@ export const api = {
       `/api/v1/notifications/${id}/read`,
       {
         method: 'PUT',
-
         body:
           JSON.stringify({}),
       }

@@ -8,6 +8,7 @@ import {
 } from '@/data/jugaadMockData';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
+
 import {
   ClipboardList,
   ArrowLeft,
@@ -20,6 +21,7 @@ import {
   Clock,
   Tag,
 } from 'lucide-react';
+
 import { useProposals } from '@/context/ProposalContext';
 import { CounterOfferModal } from '@/components/workshop/pages/CounterOfferModal';
 import { ConfirmActionModal } from '@/components/workshop/pages/ConfirmActionModal';
@@ -53,14 +55,6 @@ const PROPOSAL_STATUS = {
 
 /*
  * Backend conversation IDs are PostgreSQL bigint values.
- *
- * Therefore:
- *
- *   "1"       -> valid
- *   "25"      -> valid
- *   "conv-1"  -> INVALID
- *   "conv1"   -> INVALID
- *
  * Never manufacture a conversation ID on the frontend.
  */
 function getValidConversationId(source) {
@@ -76,10 +70,7 @@ function getValidConversationId(source) {
     source.conversation?.conversation_id ??
     null;
 
-  if (
-    rawId === null ||
-    rawId === undefined
-  ) {
+  if (rawId === null || rawId === undefined) {
     return null;
   }
 
@@ -90,6 +81,153 @@ function getValidConversationId(source) {
   }
 
   return value;
+}
+
+/*
+ * Get Jugaad ID from a proposal regardless of backend naming.
+ */
+function getProposalJugaadId(proposal) {
+  return (
+    proposal?.jugaadId ??
+    proposal?.jugaad_id ??
+    proposal?.jugaad?.id ??
+    proposal?.jugaad?.jugaadId ??
+    null
+  );
+}
+
+/*
+ * Convert a proposal into the same structure used by
+ * interestedStudents.
+ *
+ * This is the important part of the fix:
+ *
+ * INTERESTED / BARGAIN
+ *        ↓
+ * proposal
+ *        ↓
+ * converted student request
+ *        ↓
+ * MY JUGAADS → INTERESTED STUDENTS
+ */
+function proposalToStudentRequest(proposal) {
+  if (!proposal) {
+    return null;
+  }
+
+  const helper = proposal.helper || proposal.student || proposal.user || {};
+
+  const requestType =
+    proposal.requestType ||
+    proposal.request_type ||
+    (proposal.proposedPrice != null ||
+    proposal.proposed_price != null ||
+    proposal.amount != null
+      ? 'bargain'
+      : 'interested');
+
+  const proposedAmount =
+    proposal.proposedPrice ??
+    proposal.proposed_price ??
+    proposal.amount ??
+    proposal.proposedAmount ??
+    0;
+
+  return {
+    id:
+      proposal.helperId ??
+      proposal.helper_id ??
+      helper.id ??
+      proposal.userId ??
+      proposal.user_id ??
+      `proposal-${proposal.id}`,
+
+    proposalId: proposal.id,
+
+    name:
+      helper.name ||
+      helper.fullName ||
+      helper.username ||
+      proposal.helperName ||
+      proposal.helper_name ||
+      proposal.studentName ||
+      proposal.student_name ||
+      'Student',
+
+    fullName:
+      helper.fullName ||
+      helper.name ||
+      proposal.helperName ||
+      proposal.helper_name ||
+      'Student',
+
+    username: helper.username,
+
+    initials:
+      helper.initials ||
+      helper.avatarInitials ||
+      proposal.initials ||
+      getInitials(
+        helper.name ||
+          helper.fullName ||
+          proposal.helperName ||
+          proposal.helper_name ||
+          'Student'
+      ),
+
+    skills:
+      Array.isArray(proposal.skills)
+        ? proposal.skills
+        : Array.isArray(helper.skills)
+          ? helper.skills
+          : [],
+
+    rating:
+      proposal.rating ??
+      helper.rating ??
+      helper.averageRating ??
+      0,
+
+    message:
+      proposal.explanation ||
+      proposal.message ||
+      proposal.proposalMessage ||
+      proposal.proposal_message ||
+      '',
+
+    requestType,
+
+    proposedAmount,
+
+    status: proposal.status || 'pending',
+
+    conversationId:
+      proposal.conversationId ??
+      proposal.conversation_id ??
+      null,
+
+    proposal,
+  };
+}
+
+function getInitials(name) {
+  if (!name) {
+    return 'U';
+  }
+
+  const parts = String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return (
+    parts[0][0] +
+    parts[parts.length - 1][0]
+  ).toUpperCase();
 }
 
 export function MyJugaadsPage() {
@@ -105,81 +243,64 @@ export function MyJugaadsPage() {
     counterProposal,
   } = useProposals();
 
-  const [jugaadsList, setJugaadsList] =
-    useState(
-      isDemoMode
-        ? mockMyPostedJugaads
-        : []
-    );
+  const [jugaadsList, setJugaadsList] = useState(
+    isDemoMode ? mockMyPostedJugaads : []
+  );
 
-  const [loading, setLoading] =
-    useState(!isDemoMode);
+  const [loading, setLoading] = useState(!isDemoMode);
 
-  const [selected, setSelected] =
-    useState(null);
+  const [selected, setSelected] = useState(null);
 
-  const [status, setStatus] =
-    useState({});
+  const [status, setStatus] = useState({});
 
-  const [counterTarget, setCounterTarget] =
-    useState(null);
+  const [counterTarget, setCounterTarget] = useState(null);
 
-  const [confirmAction, setConfirmAction] =
-    useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
 
-  const fetchMyJugaads =
-    useCallback(async () => {
-      if (isDemoMode) {
-        setJugaadsList(
-          mockMyPostedJugaads
-        );
+  const fetchMyJugaads = useCallback(async () => {
+    if (isDemoMode) {
+      setJugaadsList(mockMyPostedJugaads);
+      setLoading(false);
+      return;
+    }
 
-        setLoading(false);
-        return;
-      }
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
 
-      if (!isAuthenticated) {
-        setLoading(false);
-        return;
-      }
+    setLoading(true);
 
-      setLoading(true);
+    try {
+      const data = await api.getMyJugaads();
 
-      try {
-        const data =
-          await api.getMyJugaads();
+      const list =
+        data?.jugaads ||
+        data?.data ||
+        (Array.isArray(data) ? data : []);
 
-        const list =
-          data?.jugaads ||
-          data?.data ||
-          (Array.isArray(data)
-            ? data
-            : []);
+      setJugaadsList(
+        Array.isArray(list) ? list : []
+      );
+    } catch (error) {
+      console.error(
+        'Failed to load my jugaads:',
+        error
+      );
 
-        setJugaadsList(
-          Array.isArray(list)
-            ? list
-            : []
-        );
-      } catch (error) {
-        console.error(
-          'Failed to load my jugaads:',
-          error
-        );
-
-        setJugaadsList([]);
-      } finally {
-        setLoading(false);
-      }
-    }, [
-      isDemoMode,
-      isAuthenticated,
-    ]);
+      setJugaadsList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [isDemoMode, isAuthenticated]);
 
   useEffect(() => {
     fetchMyJugaads();
   }, [fetchMyJugaads]);
 
+  /*
+   * Update Jugaad status.
+   */
   const handleUpdateStatus = async (
     itemId,
     newStatus
@@ -194,10 +315,6 @@ export function MyJugaadsPage() {
     }
 
     try {
-      /*
-       * Keep this only if your api.js contains
-       * updateJugaadStatus().
-       */
       if (
         typeof api.updateJugaadStatus ===
         'function'
@@ -217,6 +334,9 @@ export function MyJugaadsPage() {
     }
   };
 
+  /*
+   * Normalize posted Jugaads.
+   */
   const items = (
     Array.isArray(jugaadsList)
       ? jugaadsList
@@ -231,6 +351,7 @@ export function MyJugaadsPage() {
 
     interestedStudents:
       x.interestedStudents ||
+      x.interested_students ||
       x.requests ||
       [],
   }));
@@ -253,32 +374,48 @@ export function MyJugaadsPage() {
     );
   }
 
+  /*
+   * Detail page.
+   */
   if (selected) {
     const item =
       items.find(
-        (x) => x.id === selected
+        (x) => String(x.id) === String(selected)
       ) || items[0];
 
     if (!item) {
       return null;
     }
 
+    /*
+     * IMPORTANT FIX:
+     *
+     * Convert IDs to strings before comparing.
+     *
+     * This handles:
+     * 123 === "123"
+     *
+     * which otherwise fails with strict ===.
+     */
     const itemProposals =
       Array.isArray(proposals)
-        ? proposals.filter(
-            (p) =>
-              p.jugaadId === item.id ||
-              p.jugaad_id === item.id
-          )
+        ? proposals.filter((p) => {
+            const proposalJugaadId =
+              getProposalJugaadId(p);
+
+            return (
+              proposalJugaadId !== null &&
+              String(proposalJugaadId) ===
+                String(item.id)
+            );
+          })
         : [];
 
     return (
       <Detail
         item={item}
         proposals={itemProposals}
-        onBack={() =>
-          setSelected(null)
-        }
+        onBack={() => setSelected(null)}
         onStatus={(newStatus) =>
           handleUpdateStatus(
             item.id,
@@ -301,9 +438,7 @@ export function MyJugaadsPage() {
           setCounterTarget(proposal)
         }
         confirmAction={confirmAction}
-        setConfirmAction={
-          setConfirmAction
-        }
+        setConfirmAction={setConfirmAction}
         onConfirmAction={async () => {
           if (!confirmAction) {
             return;
@@ -385,10 +520,9 @@ export function MyJugaadsPage() {
           </p>
 
           <p className="font-mono text-xs text-ink-2 mt-2 max-w-sm mx-auto">
-            You haven't posted any tasks
-            yet. Drop a task into the
-            exchange to get help from campus
-            students.
+            You haven't posted any tasks yet.
+            Drop a task into the exchange to
+            get help from campus students.
           </p>
 
           <Link
@@ -407,16 +541,39 @@ export function MyJugaadsPage() {
           {items.map((item) => {
             const itemProposals =
               Array.isArray(proposals)
-                ? proposals.filter(
-                    (p) =>
-                      p.jugaadId === item.id ||
-                      p.jugaad_id === item.id
-                  )
+                ? proposals.filter((p) => {
+                    const proposalJugaadId =
+                      getProposalJugaadId(p);
+
+                    return (
+                      proposalJugaadId !== null &&
+                      String(proposalJugaadId) ===
+                        String(item.id)
+                    );
+                  })
                 : [];
 
             const statusConfig =
               JUGAAD_STATUS[item.status] ||
               JUGAAD_STATUS.open;
+
+            const directRequests =
+              Array.isArray(
+                item.interestedStudents
+              )
+                ? item.interestedStudents
+                : [];
+
+            /*
+             * Total requests includes:
+             *
+             * direct interested students
+             * +
+             * proposals/bargains
+             */
+            const requestCount =
+              directRequests.length +
+              itemProposals.length;
 
             return (
               <button
@@ -464,14 +621,10 @@ export function MyJugaadsPage() {
                   </span>
 
                   <span className="font-mono text-[9px] text-ink-3">
-                    {(item.interestedStudents
-                      ?.length || 0) +
-                      itemProposals.length}{' '}
-                    requests
+                    {requestCount} requests
                   </span>
 
-                  {itemProposals.length >
-                    0 && (
+                  {itemProposals.length > 0 && (
                     <span className="font-technical text-[7px] text-amber px-1.5 py-0.5 rounded bg-amber/10">
                       {itemProposals.length}{' '}
                       PROPOSALS
@@ -578,6 +731,68 @@ function Detail({
       acceptedStudent
     );
 
+  /*
+   * Direct requests from backend.
+   */
+  const directStudents = Array.isArray(
+    item?.interestedStudents
+  )
+    ? item.interestedStudents
+    : [];
+
+  /*
+   * Convert proposals to student requests.
+   *
+   * This makes INTERESTED and BARGAIN
+   * appear in the same section.
+   */
+  const proposalStudents = Array.isArray(
+    proposals
+  )
+    ? proposals
+        .map(proposalToStudentRequest)
+        .filter(Boolean)
+    : [];
+
+  /*
+   * Merge direct requests and proposals.
+   *
+   * Avoid duplicates where the same student
+   * already exists in interestedStudents.
+   */
+  const mergedStudents = [
+    ...directStudents,
+  ];
+
+  proposalStudents.forEach((proposalStudent) => {
+    const alreadyExists =
+      mergedStudents.some((student) => {
+        const studentId =
+          student?.id ??
+          student?.userId ??
+          student?.user_id;
+
+        const proposalStudentId =
+          proposalStudent?.id;
+
+        if (
+          studentId != null &&
+          proposalStudentId != null
+        ) {
+          return (
+            String(studentId) ===
+            String(proposalStudentId)
+          );
+        }
+
+        return false;
+      });
+
+    if (!alreadyExists) {
+      mergedStudents.push(proposalStudent);
+    }
+  });
+
   return (
     <div>
       <section className="pt-12 pb-6">
@@ -614,8 +829,7 @@ function Detail({
               >
                 {JUGAAD_STATUS[
                   item.status
-                ]?.label ||
-                  item.status}
+                ]?.label || item.status}
               </span>
             </div>
 
@@ -731,6 +945,16 @@ function Detail({
             </div>
           )}
 
+          {/* 
+           * IMPORTANT:
+           *
+           * This section now uses mergedStudents,
+           * not only item.interestedStudents.
+           *
+           * Therefore:
+           * INTERESTED → appears here
+           * BARGAIN → appears here
+           */}
           <div className="surface-metal-brushed rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <p className="font-technical text-[9px]">
@@ -738,24 +962,27 @@ function Detail({
               </p>
 
               <span className="font-mono text-[8px] text-ink-3">
-                {item.interestedStudents
-                  ?.length || 0}{' '}
+                {mergedStudents.length}{' '}
                 requests
               </span>
             </div>
 
             <div className="space-y-3">
-              {(item.interestedStudents
-                ?.length || 0) === 0 ? (
+              {mergedStudents.length ===
+              0 ? (
                 <p className="font-mono text-[9px] text-ink-3 py-2">
-                  No direct student
-                  requests yet.
+                  No direct student requests
+                  yet.
                 </p>
               ) : (
-                item.interestedStudents.map(
-                  (student) => (
+                mergedStudents.map(
+                  (student, index) => (
                     <StudentRequest
-                      key={student.id}
+                      key={
+                        student?.proposalId ||
+                        student?.id ||
+                        index
+                      }
                       student={student}
                       assigned={
                         acceptedStudent?.id ===
@@ -778,8 +1005,7 @@ function Detail({
 
                 <span className="font-mono text-[10px]">
                   Assigned to{' '}
-                  {acceptedStudent.name}{' '}
-                  · ₹
+                  {acceptedStudent.name} · ₹
                   {
                     acceptedStudent.agreedAmount
                   }
@@ -846,18 +1072,8 @@ function ProposalDetailCard({
     status === 'withdrawn';
 
   /*
-   * IMPORTANT:
-   *
-   * NEVER do:
-   *
-   * const conversationId =
-   *   `conv-${proposal.id}`;
-   *
-   * That creates a fake ID and causes:
-   *
-   * invalid input syntax for type bigint
-   *
-   * We only use the ID returned by the backend.
+   * Only use the real conversation ID
+   * returned by the backend.
    */
   const conversationId =
     getValidConversationId(
@@ -972,27 +1188,21 @@ function ProposalDetailCard({
         )}
 
       <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
-        {/* ACCEPTED + REAL BACKEND CONVERSATION */}
         {isAccepted &&
           conversationId && (
             <Link
               to={`/dashboard/messages/${conversationId}`}
               className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
             >
-              <MessageSquare
-                size={12}
-              />
+              <MessageSquare size={12} />
               MESSAGE
             </Link>
           )}
 
-        {/* Accepted but backend did not return conversation */}
         {isAccepted &&
           !conversationId && (
             <span className="flex items-center gap-1 px-3 py-2 rounded-lg bg-bg-2 text-ink-3 font-technical text-[8px]">
-              <MessageSquare
-                size={12}
-              />
+              <MessageSquare size={12} />
               CONVERSATION UNAVAILABLE
             </span>
           )}
@@ -1024,9 +1234,7 @@ function ProposalDetailCard({
                 onClick={onCounter}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px]"
               >
-                <HandCoins
-                  size={12}
-                />
+                <HandCoins size={12} />
                 COUNTER
               </button>
             </>
@@ -1047,20 +1255,51 @@ function StudentRequest({
     ? student.skills
     : [];
 
+  const isBargain =
+    student?.requestType ===
+      'bargain' ||
+    student?.request_type ===
+      'bargain' ||
+    student?.proposal?.proposedPrice !=
+      null ||
+    student?.proposal?.proposed_price !=
+      null;
+
+  const proposedAmount =
+    student?.proposedAmount ??
+    student?.proposed_amount ??
+    student?.proposal?.proposedPrice ??
+    student?.proposal?.proposed_price ??
+    student?.proposal?.amount ??
+    0;
+
   return (
     <div className="surface-panel rounded-xl p-4">
       <div className="flex items-start gap-3">
         <span className="grid place-items-center w-9 h-9 rounded-full bg-amber text-bg-0 font-display text-[9px] shrink-0">
-          {student?.initials || 'U'}
+          {student?.initials ||
+            getInitials(
+              student?.name ||
+                student?.fullName ||
+                student?.username
+            )}
         </span>
 
         <div className="flex-1 min-w-0">
-          <p className="font-display text-sm">
-            {student?.name ||
-              student?.fullName ||
-              student?.username ||
-              'Student'}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-display text-sm">
+              {student?.name ||
+                student?.fullName ||
+                student?.username ||
+                'Student'}
+            </p>
+
+            {isBargain && (
+              <span className="font-technical text-[7px] text-amber px-1.5 py-0.5 rounded bg-amber/10">
+                BARGAIN
+              </span>
+            )}
+          </div>
 
           <p className="font-mono text-[8px] text-ink-3 mt-1">
             {skills.length > 0
@@ -1077,9 +1316,8 @@ function StudentRequest({
         </div>
 
         <span className="font-technical text-[7px] text-amber">
-          {student?.requestType ===
-          'bargain'
-            ? `OFFER ₹${student?.proposedAmount || 0}`
+          {isBargain
+            ? `OFFER ₹${proposedAmount}`
             : 'INTERESTED'}
         </span>
       </div>
@@ -1102,15 +1340,12 @@ function StudentRequest({
             REJECT
           </button>
 
-          {student?.requestType ===
-            'bargain' && (
+          {isBargain && (
             <button
               type="button"
               className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px]"
             >
-              <HandCoins
-                size={12}
-              />
+              <HandCoins size={12} />
               COUNTER
             </button>
           )}

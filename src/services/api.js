@@ -10,8 +10,12 @@ const BASE_URL =
  * - Supports FormData requests
  * - Normalizes backend errors
  */
-export async function apiRequest(path, options = {}) {
-  const token = localStorage.getItem('cj_token');
+export async function apiRequest(
+  path,
+  options = {}
+) {
+  const token =
+    localStorage.getItem('cj_token');
 
   const isFormData =
     typeof FormData !== 'undefined' &&
@@ -20,14 +24,16 @@ export async function apiRequest(path, options = {}) {
   const headers = {
     ...(token
       ? {
-          Authorization: `Bearer ${token}`,
+          Authorization:
+            `Bearer ${token}`,
         }
       : {}),
 
     ...(isFormData
       ? {}
       : {
-          'Content-Type': 'application/json',
+          'Content-Type':
+            'application/json',
         }),
 
     ...(options.headers || {}),
@@ -56,7 +62,8 @@ export async function apiRequest(path, options = {}) {
   let data = null;
 
   try {
-    data = await response.json();
+    data =
+      await response.json();
   } catch {
     data = null;
   }
@@ -70,7 +77,8 @@ export async function apiRequest(path, options = {}) {
         : 'Something went wrong on the exchange. Please try again.');
 
     throw {
-      status: response.status,
+      status:
+        response.status,
       message,
       data,
     };
@@ -81,6 +89,7 @@ export async function apiRequest(path, options = {}) {
 
 
 export const api = {
+
   // ================================================================
   // AUTH / USERS
   // ================================================================
@@ -90,7 +99,9 @@ export const api = {
       '/api/v1/users/register',
       {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          payload
+        ),
       }
     ),
 
@@ -99,166 +110,15 @@ export const api = {
       '/api/v1/users/login',
       {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          payload
+        ),
       }
     ),
 
   getProfile: () =>
     apiRequest(
       '/api/v1/users/profile'
-    ),
-
-  updateProfile: (payload) =>
-    apiRequest(
-      '/api/v1/users/profile',
-      {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-
-  // ================================================================
-  // SKILLS
-  // ================================================================
-
-  getSkills: () =>
-    apiRequest(
-      '/api/v1/users/skills'
-    ),
-
-  addSkill: (payload) =>
-    apiRequest(
-      '/api/v1/users/skills',
-      {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  updateSkill: (id, payload) =>
-    apiRequest(
-      `/api/v1/users/skills/${id}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  deleteSkill: (id) =>
-    apiRequest(
-      `/api/v1/users/skills/${id}`,
-      {
-        method: 'DELETE',
-      }
-    ),
-
-
-  // ================================================================
-  // LINKS & PROFILES
-  // ================================================================
-
-  getLinks: () =>
-    apiRequest(
-      '/api/v1/users/links'
-    ),
-
-  addLink: (payload) =>
-    apiRequest(
-      '/api/v1/users/links',
-      {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  updateLink: (id, payload) =>
-    apiRequest(
-      `/api/v1/users/links/${id}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  deleteLink: (id) =>
-    apiRequest(
-      `/api/v1/users/links/${id}`,
-      {
-        method: 'DELETE',
-      }
-    ),
-
-
-  // ================================================================
-  // PROJECTS
-  // ================================================================
-
-  getProjects: () =>
-    apiRequest(
-      '/api/v1/users/projects'
-    ),
-
-  addProject: (payload) =>
-    apiRequest(
-      '/api/v1/users/projects',
-      {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  updateProject: (id, payload) =>
-    apiRequest(
-      `/api/v1/users/projects/${id}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  deleteProject: (id) =>
-    apiRequest(
-      `/api/v1/users/projects/${id}`,
-      {
-        method: 'DELETE',
-      }
-    ),
-
-
-  // ================================================================
-  // CERTIFICATIONS & ACHIEVEMENTS
-  // ================================================================
-
-  getCertifications: () =>
-    apiRequest(
-      '/api/v1/users/certifications'
-    ),
-
-  addCertification: (payload) =>
-    apiRequest(
-      '/api/v1/users/certifications',
-      {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  updateCertification: (id, payload) =>
-    apiRequest(
-      `/api/v1/users/certifications/${id}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      }
-    ),
-
-  deleteCertification: (id) =>
-    apiRequest(
-      `/api/v1/users/certifications/${id}`,
-      {
-        method: 'DELETE',
-      }
     ),
 
 
@@ -281,7 +141,9 @@ export const api = {
       '/api/v1/jugaads',
       {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          payload
+        ),
       }
     ),
 
@@ -300,12 +162,17 @@ export const api = {
       `/api/v1/jugaads/${id}`
     ),
 
-  updateJugaad: (id, payload) =>
+  updateJugaad: (
+    id,
+    payload
+  ) =>
     apiRequest(
       `/api/v1/jugaads/${id}`,
       {
         method: 'PUT',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          payload
+        ),
       }
     ),
 
@@ -323,17 +190,13 @@ export const api = {
   // ================================================================
 
   expressInterest: (
-    jugaadId,
-    payload = {}
+    jugaadId
   ) =>
     apiRequest(
       `/api/v1/jugaads/${jugaadId}/interested`,
       {
         method: 'POST',
-
-        body: JSON.stringify(
-          payload
-        ),
+        body: JSON.stringify({}),
       }
     ),
 
@@ -460,6 +323,9 @@ export const api = {
       `/api/v1/conversations/${conversationId}/messages`
     ),
 
+  /*
+   * Send a message.
+   */
   sendMessage: (
     conversationId,
     text
@@ -471,6 +337,21 @@ export const api = {
         body: JSON.stringify({
           content: text,
         }),
+      }
+    ),
+
+  /*
+   * Mark all messages sent by the
+   * other participant as read.
+   */
+  markConversationAsRead: (
+    conversationId
+  ) =>
+    apiRequest(
+      `/api/v1/conversations/${conversationId}/read`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({}),
       }
     ),
 

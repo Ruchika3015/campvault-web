@@ -1,5 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import {
+  useEffect,
+  useState,
+} from 'react';
+
+import {
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
 
 import { api } from '@/services/api';
 
@@ -9,7 +16,8 @@ import { api } from '@/services/api';
 ================================================================ */
 
 function getInitials(name) {
-  const value = String(name || '').trim();
+  const value =
+    String(name || '').trim();
 
   if (!value) {
     return 'U';
@@ -20,26 +28,43 @@ function getInitials(name) {
     .filter(Boolean)
     .slice(0, 2)
     .map((part) =>
-      part.charAt(0).toUpperCase()
+      part
+        .charAt(0)
+        .toUpperCase()
     )
     .join('');
 }
 
 
-function extractList(response, key) {
+function extractList(
+  response,
+  key
+) {
   if (Array.isArray(response)) {
     return response;
   }
 
-  if (Array.isArray(response?.[key])) {
+  if (
+    Array.isArray(
+      response?.[key]
+    )
+  ) {
     return response[key];
   }
 
-  if (Array.isArray(response?.data)) {
+  if (
+    Array.isArray(
+      response?.data
+    )
+  ) {
     return response.data;
   }
 
-  if (Array.isArray(response?.data?.[key])) {
+  if (
+    Array.isArray(
+      response?.data?.[key]
+    )
+  ) {
     return response.data[key];
   }
 
@@ -47,12 +72,19 @@ function extractList(response, key) {
 }
 
 
-function extractMessages(response) {
-  return extractList(response, 'messages');
+function extractMessages(
+  response
+) {
+  return extractList(
+    response,
+    'messages'
+  );
 }
 
 
-function getMessageText(message) {
+function getMessageText(
+  message
+) {
   return (
     message?.text ||
     message?.message ||
@@ -62,7 +94,9 @@ function getMessageText(message) {
 }
 
 
-function getSenderId(message) {
+function getSenderId(
+  message
+) {
   return (
     message?.sender_id ??
     message?.senderId ??
@@ -75,7 +109,10 @@ function getSenderId(message) {
 }
 
 
-function getMessageId(message, index) {
+function getMessageId(
+  message,
+  index
+) {
   return (
     message?.id ??
     message?.message_id ??
@@ -84,7 +121,9 @@ function getMessageId(message, index) {
 }
 
 
-function getMessageTime(message) {
+function getMessageTime(
+  message
+) {
   const value =
     message?.created_at ||
     message?.createdAt ||
@@ -96,7 +135,9 @@ function getMessageTime(message) {
   }
 
   try {
-    return new Date(value).toLocaleTimeString(
+    return new Date(
+      value
+    ).toLocaleTimeString(
       [],
       {
         hour: '2-digit',
@@ -114,112 +155,111 @@ function getMessageTime(message) {
 ================================================================ */
 
 export function ConversationPage() {
-  const { conversationId } = useParams();
-  const navigate = useNavigate();
+  const {
+    conversationId,
+  } = useParams();
 
-  const [conversation, setConversation] =
-    useState(null);
+  const navigate =
+    useNavigate();
 
-  const [messages, setMessages] =
-    useState([]);
+  const [
+    conversation,
+    setConversation,
+  ] = useState(null);
 
-  const [text, setText] = useState('');
+  const [
+    messages,
+    setMessages,
+  ] = useState([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    text,
+    setText,
+  ] = useState('');
 
-  const [sending, setSending] =
-    useState(false);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [error, setError] =
-    useState('');
+  const [
+    sending,
+    setSending,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState('');
 
 
   /* ==============================================================
      LOAD CONVERSATION
   ============================================================== */
 
-  const loadConversation = async () => {
-    try {
-      setLoading(true);
-      setError('');
+  const loadConversation =
+    async () => {
+      try {
+        setLoading(true);
+        setError('');
 
-      const [
-        conversationsResponse,
-        messagesResponse,
-      ] = await Promise.all([
-        api.getConversations(),
-        api.getConversationMessages(
-          conversationId
-        ),
-      ]);
-
-      const conversations =
-        extractList(
+        const [
           conversationsResponse,
-          'conversations'
+          messagesResponse,
+        ] = await Promise.all([
+          api.getConversations(),
+
+          api.getConversationMessages(
+            conversationId
+          ),
+        ]);
+
+        const conversations =
+          extractList(
+            conversationsResponse,
+            'conversations'
+          );
+
+        const foundConversation =
+          conversations.find(
+            (item) =>
+              String(
+                item?.id ??
+                  item?.conversation_id
+              ) ===
+              String(
+                conversationId
+              )
+          );
+
+        setConversation(
+          foundConversation ||
+            null
         );
 
-      const foundConversation =
-        conversations.find(
-          (item) =>
-            String(
-              item?.id ??
-                item?.conversation_id
-            ) ===
-            String(conversationId)
+        setMessages(
+          extractMessages(
+            messagesResponse
+          )
+        );
+      } catch (err) {
+        console.error(
+          'Failed to load conversation:',
+          err
         );
 
-      console.log(
-        'CONVERSATION ID:',
-        conversationId
-      );
-
-      console.log(
-        'ALL CONVERSATIONS:',
-        conversations
-      );
-
-      console.log(
-        'SELECTED CONVERSATION:',
-        foundConversation
-      );
-
-      console.log(
-        'MESSAGES:',
-        messagesResponse
-      );
-
-      setConversation(
-        foundConversation || null
-      );
-
-      setMessages(
-        extractMessages(
-          messagesResponse
-        )
-      );
-    } catch (err) {
-      console.error(
-        'Failed to load conversation:',
-        err
-      );
-
-      setError(
-        err?.message ||
-          'Unable to load this conversation.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        setError(
+          err?.message ||
+            'Unable to load this conversation.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
 
   /* ==============================================================
-     LOAD ONLY MESSAGES
-     
-     This is used by the background polling.
-     It does NOT put the whole page into loading state.
+     REFRESH MESSAGES ONLY
   ============================================================== */
 
   const refreshMessages =
@@ -235,16 +275,14 @@ export function ConversationPage() {
           );
 
         const latestMessages =
-          extractMessages(response);
+          extractMessages(
+            response
+          );
 
         setMessages(
           latestMessages
         );
       } catch (err) {
-        /*
-         * Do not show a visible error for a
-         * temporary background polling failure.
-         */
         console.error(
           'Background message refresh failed:',
           err
@@ -254,7 +292,37 @@ export function ConversationPage() {
 
 
   /* ==============================================================
-     INITIAL LOAD + AUTOMATIC MESSAGE REFRESH
+     MARK MESSAGES AS READ
+  ============================================================== */
+
+  const markMessagesAsRead =
+    async () => {
+      if (!conversationId) {
+        return;
+      }
+
+      try {
+        await api.markConversationAsRead(
+          conversationId
+        );
+
+        /*
+         * Refresh immediately after marking
+         * messages as read so the sender/receiver
+         * has the newest read_at values.
+         */
+        await refreshMessages();
+      } catch (err) {
+        console.error(
+          'Failed to mark messages as read:',
+          err
+        );
+      }
+    };
+
+
+  /* ==============================================================
+     INITIAL LOAD + READ + AUTO REFRESH
   ============================================================== */
 
   useEffect(() => {
@@ -269,145 +337,144 @@ export function ConversationPage() {
     }
 
     /*
-     * Load the conversation immediately.
+     * Load conversation.
      */
     loadConversation();
 
     /*
-     * Poll every 2 seconds.
-     *
-     * This means messages sent by the other person
-     * appear automatically without browser refresh.
+     * Mark messages as read when
+     * this conversation is opened.
      */
-    const intervalId =
-      setInterval(() => {
-        refreshMessages();
-      }, 2000);
+    markMessagesAsRead();
 
     /*
-     * IMPORTANT:
+     * Poll every 2 seconds.
      *
-     * Stop polling when the user leaves this page
-     * or switches to another conversation.
+     * New messages appear automatically.
+     */
+    const intervalId =
+      setInterval(
+        async () => {
+          await refreshMessages();
+        },
+        2000
+      );
+
+    /*
+     * Stop polling when leaving
+     * the conversation.
      */
     return () => {
-      clearInterval(intervalId);
+      clearInterval(
+        intervalId
+      );
     };
-  }, [conversationId]);
+  }, [
+    conversationId,
+  ]);
 
 
   /* ==============================================================
      SEND MESSAGE
   ============================================================== */
 
-  const handleSend = async (
-    event
-  ) => {
-    event?.preventDefault();
+  const handleSend =
+    async (event) => {
+      event?.preventDefault();
 
-    const trimmedText =
-      text.trim();
+      const trimmedText =
+        text.trim();
 
-    if (!trimmedText) {
-      return;
-    }
-
-    if (!conversationId) {
-      setError(
-        'Conversation ID is missing.'
-      );
-
-      return;
-    }
-
-    try {
-      setSending(true);
-      setError('');
-
-      const response =
-        await api.sendMessage(
-          conversationId,
-          trimmedText
-        );
-
-      console.log(
-        'MESSAGE SENT:',
-        response
-      );
-
-      /*
-       * If backend returns the new message,
-       * add it immediately.
-       */
-      const returnedMessages =
-        extractMessages(
-          response
-        );
-
-      if (
-        returnedMessages.length > 0
-      ) {
-        setMessages(
-          (current) => {
-            /*
-             * Avoid duplicate messages if
-             * polling has already received it.
-             */
-            const existingIds =
-              new Set(
-                current.map(
-                  (message, index) =>
-                    String(
-                      getMessageId(
-                        message,
-                        index
-                      )
-                    )
-                )
-              );
-
-            const newMessages =
-              returnedMessages.filter(
-                (message, index) =>
-                  !existingIds.has(
-                    String(
-                      getMessageId(
-                        message,
-                        index
-                      )
-                    )
-                  )
-              );
-
-            return [
-              ...current,
-              ...newMessages,
-            ];
-          }
-        );
-      } else {
-        /*
-         * Backend did not return the new
-         * message, so fetch the latest list.
-         */
-        await refreshMessages();
+      if (!trimmedText) {
+        return;
       }
 
-      setText('');
-    } catch (err) {
-      console.error(
-        'Failed to send message:',
-        err
-      );
+      if (!conversationId) {
+        setError(
+          'Conversation ID is missing.'
+        );
 
-      setError(
-        err?.message ||
-          'Message could not be sent. Please try again.'
-      );
-    } finally {
-      setSending(false);
-    }
-  };
+        return;
+      }
+
+      try {
+        setSending(true);
+        setError('');
+
+        const response =
+          await api.sendMessage(
+            conversationId,
+            trimmedText
+          );
+
+        const returnedMessages =
+          extractMessages(
+            response
+          );
+
+        if (
+          returnedMessages.length >
+          0
+        ) {
+          setMessages(
+            (current) => {
+              const existingIds =
+                new Set(
+                  current.map(
+                    (
+                      message,
+                      index
+                    ) =>
+                      String(
+                        getMessageId(
+                          message,
+                          index
+                        )
+                      )
+                  )
+                );
+
+              const newMessages =
+                returnedMessages.filter(
+                  (
+                    message,
+                    index
+                  ) =>
+                    !existingIds.has(
+                      String(
+                        getMessageId(
+                          message,
+                          index
+                        )
+                      )
+                    )
+                );
+
+              return [
+                ...current,
+                ...newMessages,
+              ];
+            }
+          );
+        } else {
+          await refreshMessages();
+        }
+
+        setText('');
+      } catch (err) {
+        console.error(
+          'Failed to send message:',
+          err
+        );
+
+        setError(
+          err?.message ||
+            'Message could not be sent. Please try again.'
+        );
+      } finally {
+        setSending(false);
+      }
+    };
 
 
   /* ==============================================================
@@ -439,14 +506,17 @@ export function ConversationPage() {
     '';
 
   const initials =
-    getInitials(personName);
+    getInitials(
+      personName
+    );
 
 
   /* ==============================================================
      CURRENT USER
   ============================================================== */
 
-  let currentUserId = null;
+  let currentUserId =
+    null;
 
   try {
     const storedUser =
@@ -467,7 +537,8 @@ export function ConversationPage() {
         null;
     }
   } catch {
-    currentUserId = null;
+    currentUserId =
+      null;
   }
 
 
@@ -479,6 +550,7 @@ export function ConversationPage() {
     return (
       <div className="min-h-screen bg-[#0b0908] px-6 py-16 text-[#f4efe7]">
         <div className="mx-auto max-w-[1180px]">
+
           <div className="font-technical text-[10px] uppercase tracking-[0.28em] text-[#7fe0c0]">
             LOADING CONVERSATION
           </div>
@@ -486,6 +558,7 @@ export function ConversationPage() {
           <div className="mt-6 text-4xl font-black uppercase">
             Messages.
           </div>
+
         </div>
       </div>
     );
@@ -528,6 +601,7 @@ export function ConversationPage() {
           </div>
 
           <div className="min-w-0">
+
             <h1 className="truncate text-3xl font-black uppercase tracking-[-0.03em]">
               {personName}
             </h1>
@@ -535,6 +609,7 @@ export function ConversationPage() {
             <p className="mt-1 truncate text-sm text-[#aaa39a]">
               {jugaadTitle}
             </p>
+
           </div>
 
         </div>
@@ -588,17 +663,8 @@ export function ConversationPage() {
                         );
 
                       /*
-                       * The conversation contains
-                       * exactly two users.
-                       *
-                       * personId = other person.
-                       *
-                       * Therefore a message from
-                       * the other person is left.
-                       *
-                       * A message from anyone else
-                       * (the current logged-in user)
-                       * is right.
+                       * personId is the other
+                       * participant.
                        */
 
                       const isMine =
@@ -612,9 +678,10 @@ export function ConversationPage() {
                           );
 
                       /*
-                       * Prefer currentUserId when
-                       * available.
+                       * Prefer logged-in user ID
+                       * when available.
                        */
+
                       const resolvedIsMine =
                         senderId !== null &&
                         currentUserId !== null
@@ -634,6 +701,24 @@ export function ConversationPage() {
                       const time =
                         getMessageTime(
                           message
+                        );
+
+                      /*
+                       * READ STATUS
+                       *
+                       * For our messages:
+                       *
+                       * read_at == null
+                       *       → grey ✓✓
+                       *
+                       * read_at exists
+                       *       → blue ✓✓
+                       */
+
+                      const isRead =
+                        Boolean(
+                          message?.read_at ||
+                          message?.readAt
                         );
 
                       return (
@@ -678,16 +763,19 @@ export function ConversationPage() {
                             `}
                           >
 
-                            {/* MESSAGE TEXT */}
+                            {/* MESSAGE */}
 
                             <div className="break-words text-sm leading-6">
                               {messageText}
                             </div>
 
 
-                            {/* TIME */}
+                            {/* TIME + TICKS */}
 
-                            {time && (
+                            {(
+                              time ||
+                              resolvedIsMine
+                            ) && (
                               <div
                                 className={`
                                   mt-1
@@ -709,14 +797,29 @@ export function ConversationPage() {
                                 `}
                               >
 
-                                <span>
-                                  {time}
-                                </span>
+                                {time && (
+                                  <span>
+                                    {time}
+                                  </span>
+                                )}
 
-                                {/* READ/SENT */}
+                                {/* ==================================
+                                    READ RECEIPT
+                                ================================== */}
 
                                 {resolvedIsMine && (
-                                  <span className="font-bold text-[#07110d]/70">
+                                  <span
+                                    className={
+                                      isRead
+                                        ? 'font-bold text-[#1685ff]'
+                                        : 'font-bold text-[#07110d]/60'
+                                    }
+                                    title={
+                                      isRead
+                                        ? 'Read'
+                                        : 'Sent'
+                                    }
+                                  >
                                     ✓✓
                                   </span>
                                 )}
@@ -873,6 +976,5 @@ export function ConversationPage() {
     </div>
   );
 }
-
 
 export default ConversationPage;

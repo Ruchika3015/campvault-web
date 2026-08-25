@@ -68,6 +68,49 @@ function extractList(response, keys = []) {
 }
 
 /*
+ * Extract a single conversation from an API response.
+ *
+ * Accept endpoints commonly return the newly-created conversation
+ * inside:
+ *   { conversation: {...} }
+ *   { data: { conversation: {...} } }
+ *   { data: {...conversation fields...} }
+ */
+function extractConversation(response) {
+  if (!response || typeof response !== 'object') {
+    return null;
+  }
+
+  const candidates = [
+    response?.conversation,
+    response?.data?.conversation,
+    response?.result?.conversation,
+    response?.data,
+    response?.result,
+  ];
+
+  for (const candidate of candidates) {
+    if (
+      candidate &&
+      typeof candidate === 'object' &&
+      !Array.isArray(candidate)
+    ) {
+      const id =
+        candidate.id ??
+        candidate.conversationId ??
+        candidate.conversation_id ??
+        candidate._id;
+
+      if (id !== undefined && id !== null && id !== '') {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+/*
  * Convert a user object into a safe display object.
  */
 function normalizeUser(user) {
@@ -326,6 +369,37 @@ function normalizeConversation(conversation, currentUser) {
 
     id: String(id),
 
+    // Keep all possible relationship IDs so pages can reliably
+    // connect an accepted proposal to its conversation.
+    proposalId:
+      conversation.proposalId ??
+      conversation.proposal_id ??
+      conversation.proposal?.id ??
+      null,
+
+    jugaadId:
+      conversation.jugaadId ??
+      conversation.jugaad_id ??
+      conversation.jugaad?.id ??
+      conversation.proposal?.jugaadId ??
+      conversation.proposal?.jugaad_id ??
+      conversation.proposal?.jugaad?.id ??
+      null,
+
+    helperId:
+      conversation.helperId ??
+      conversation.helper_id ??
+      conversation.helper?.id ??
+      null,
+
+    posterId:
+      conversation.posterId ??
+      conversation.poster_id ??
+      conversation.poster?.id ??
+      conversation.jugaad?.posterId ??
+      conversation.jugaad?.poster_id ??
+      null,
+
     otherUser:
       otherUser || {
         id: null,
@@ -446,6 +520,10 @@ export function ProposalProvider({ children }) {
 
         console.log(
           'RAW CONVERSATIONS FROM BACKEND:',
+          conversationsResult.value
+        );
+        console.log(
+          'RAW CONVERSATION LIST:',
           rawConversations
         );
 
@@ -464,9 +542,28 @@ export function ProposalProvider({ children }) {
           normalizedConversations
         );
 
-        setConversations(
-          normalizedConversations
-        );
+        /*
+         * Do not accidentally erase a conversation that was
+         * just created by acceptProposal when the conversations
+         * endpoint returns a different response shape.
+         */
+        setConversations((current) => {
+          const merged = [...normalizedConversations];
+
+          current.forEach((existing) => {
+            const exists = merged.some(
+              (conversation) =>
+                String(conversation.id) ===
+                String(existing.id)
+            );
+
+            if (!exists) {
+              merged.push(existing);
+            }
+          });
+
+          return merged;
+        });
       }
     } catch (error) {
       console.error(
@@ -727,6 +824,56 @@ export function ProposalProvider({ children }) {
           proposalId
         );
 
+      /*
+       * Some backends return the newly-created conversation
+       * directly from the accept endpoint. Save it immediately
+       * so the UI can show MESSAGE without waiting for another
+       * endpoint to expose it.
+       */
+      const acceptedConversation =
+        extractConversation(response);
+
+      if (acceptedConversation) {
+        const normalizedConversation =
+          normalizeConversation(
+            acceptedConversation,
+            currentUser
+          );
+
+        if (normalizedConversation) {
+          console.log(
+            'CONVERSATION CREATED BY ACCEPT:',
+            normalizedConversation
+          );
+
+          setConversations((current) => {
+            const exists = current.some(
+              (conversation) =>
+                String(conversation.id) ===
+                String(normalizedConversation.id)
+            );
+
+            if (exists) {
+              return current.map(
+                (conversation) =>
+                  String(conversation.id) ===
+                  String(normalizedConversation.id)
+                    ? {
+                        ...conversation,
+                        ...normalizedConversation,
+                      }
+                    : conversation
+              );
+            }
+
+            return [
+              ...current,
+              normalizedConversation,
+            ];
+          });
+        }
+      }
+
       await refreshData();
 
       return response;
@@ -734,6 +881,7 @@ export function ProposalProvider({ children }) {
     [
       isDemoMode,
       refreshData,
+      currentUser,
     ]
   );
 

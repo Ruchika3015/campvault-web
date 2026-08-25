@@ -1,7 +1,17 @@
 import { Link } from 'react-router-dom';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import { useAuth } from '@/context/AuthContext';
-import { LED, Rivet } from '@/components/primitives/Details';
+import {
+  LED,
+  Rivet,
+} from '@/components/primitives/Details';
+
 import { api } from '@/services/api';
 
 import {
@@ -16,10 +26,9 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+
 /* ================================================================
    UI HELPERS
-   These are only presentation helpers.
-   Dashboard DATA comes from the backend.
 ================================================================ */
 
 const CATEGORY_COLORS = {
@@ -35,6 +44,7 @@ const CATEGORY_COLORS = {
   Other: 'amber',
 };
 
+
 const JUGAAD_STATUS_COLORS = {
   open: 'mint',
   assigned: 'amber',
@@ -44,7 +54,11 @@ const JUGAAD_STATUS_COLORS = {
   closed: 'coral',
 };
 
-function getList(response, possibleKeys = []) {
+
+function getList(
+  response,
+  possibleKeys = []
+) {
   if (Array.isArray(response)) {
     return response;
   }
@@ -62,9 +76,14 @@ function getList(response, possibleKeys = []) {
   return [];
 }
 
+
 function getId(item) {
-  return item?.id ?? item?._id;
+  return (
+    item?.id ??
+    item?._id
+  );
 }
+
 
 function getAmount(item) {
   return (
@@ -76,8 +95,11 @@ function getAmount(item) {
   );
 }
 
+
 function getName(user) {
-  if (!user) return 'Student';
+  if (!user) {
+    return 'Student';
+  }
 
   if (typeof user === 'string') {
     return user;
@@ -92,8 +114,11 @@ function getName(user) {
   );
 }
 
+
 function formatRelativeTime(value) {
-  if (!value) return '';
+  if (!value) {
+    return '';
+  }
 
   const date = new Date(value);
 
@@ -101,33 +126,50 @@ function formatRelativeTime(value) {
     return '';
   }
 
-  const diff = Date.now() - date.getTime();
+  const diff =
+    Date.now() -
+    date.getTime();
 
-  const seconds = Math.floor(diff / 1000);
+  const seconds =
+    Math.floor(
+      diff / 1000
+    );
 
   if (seconds < 60) {
     return 'just now';
   }
 
-  const minutes = Math.floor(seconds / 60);
+  const minutes =
+    Math.floor(
+      seconds / 60
+    );
 
   if (minutes < 60) {
     return `${minutes}m ago`;
   }
 
-  const hours = Math.floor(minutes / 60);
+  const hours =
+    Math.floor(
+      minutes / 60
+    );
 
   if (hours < 24) {
     return `${hours}h ago`;
   }
 
-  const days = Math.floor(hours / 24);
+  const days =
+    Math.floor(
+      hours / 24
+    );
 
   if (days < 30) {
     return `${days}d ago`;
   }
 
-  const months = Math.floor(days / 30);
+  const months =
+    Math.floor(
+      days / 30
+    );
 
   if (months < 12) {
     return `${months}mo ago`;
@@ -136,22 +178,36 @@ function formatRelativeTime(value) {
   return `${Math.floor(months / 12)}y ago`;
 }
 
+
 function formatDeadline(value) {
-  if (!value) return '';
-
-  const deadline = new Date(value);
-
-  if (Number.isNaN(deadline.getTime())) {
+  if (!value) {
     return '';
   }
 
-  const diff = deadline.getTime() - Date.now();
+  const deadline =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      deadline.getTime()
+    )
+  ) {
+    return '';
+  }
+
+  const diff =
+    deadline.getTime() -
+    Date.now();
 
   if (diff <= 0) {
     return 'DEADLINE PASSED';
   }
 
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  const days =
+    Math.ceil(
+      diff /
+        (1000 * 60 * 60 * 24)
+    );
 
   if (days === 1) {
     return '1 DAY LEFT';
@@ -160,13 +216,59 @@ function formatDeadline(value) {
   return `${days} DAYS LEFT`;
 }
 
-function getCategoryColor(category) {
-  return CATEGORY_COLORS[category] || 'amber';
+
+function getCategoryColor(
+  category
+) {
+  return (
+    CATEGORY_COLORS[category] ||
+    'amber'
+  );
 }
 
-function getStatusColor(status) {
-  return JUGAAD_STATUS_COLORS[status] || 'amber';
+
+function getStatusColor(
+  status
+) {
+  return (
+    JUGAAD_STATUS_COLORS[status] ||
+    'amber'
+  );
 }
+
+
+/* ================================================================
+   ROLE LABEL
+================================================================ */
+
+function getRoleLabel(user) {
+  const role =
+    String(
+      user?.role ||
+      'student'
+    )
+      .trim()
+      .toLowerCase();
+
+  switch (role) {
+    case 'operator':
+      return 'OPERATOR // ACTIVE';
+
+    case 'admin':
+      return 'ADMIN // ACTIVE';
+
+    case 'moderator':
+      return 'MODERATOR // ACTIVE';
+
+    case 'helper':
+      return 'HELPER // ACTIVE';
+
+    case 'student':
+    default:
+      return 'STUDENT // ACTIVE';
+  }
+}
+
 
 /* ================================================================
    DASHBOARD
@@ -178,193 +280,317 @@ export function DashboardHome() {
     isAuthenticated,
   } = useAuth();
 
-  const name = user?.name?.split(' ')[0] || 'there';
+  const name =
+    user?.name
+      ?.split(' ')[0] ||
+    'there';
 
-  const [discoveryFeed, setDiscoveryFeed] = useState([]);
-  const [myPostedJugaads, setMyPostedJugaads] = useState([]);
-  const [myRequests, setMyRequests] = useState([]);
-  const [receivedProposals, setReceivedProposals] = useState([]);
-  const [dashboardNotifications, setDashboardNotifications] = useState([]);
-  const [conversations, setConversations] = useState([]);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [
+    discoveryFeed,
+    setDiscoveryFeed,
+  ] = useState([]);
+
+  const [
+    myPostedJugaads,
+    setMyPostedJugaads,
+  ] = useState([]);
+
+  const [
+    myRequests,
+    setMyRequests,
+  ] = useState([]);
+
+  const [
+    receivedProposals,
+    setReceivedProposals,
+  ] = useState([]);
+
+  const [
+    dashboardNotifications,
+    setDashboardNotifications,
+  ] = useState([]);
+
+  const [
+    conversations,
+    setConversations,
+  ] = useState([]);
+
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState('');
+
 
   /* ================================================================
      LOAD EVERYTHING FROM BACKEND
   ================================================================= */
 
-  const loadDashboard = useCallback(async () => {
-    if (!isAuthenticated) {
-      setLoading(false);
-      return;
-    }
-
-    setError('');
-
-    try {
-      const results = await Promise.allSettled([
-        api.getDiscoveryFeed(),
-        api.getMyJugaads(),
-        api.getMyProposals(),
-        api.getReceivedProposals(),
-        api.getNotifications(),
-        api.getConversations(),
-      ]);
-
-      const [
-        discoveryResult,
-        myJugaadsResult,
-        myRequestsResult,
-        receivedProposalsResult,
-        notificationsResult,
-        conversationsResult,
-      ] = results;
-
-      /* ------------------------------------------------------------
-         DISCOVERY
-      ------------------------------------------------------------ */
-
-      if (discoveryResult.status === 'fulfilled') {
-        const list = getList(discoveryResult.value, [
-          'jugaads',
-          'results',
-          'items',
-        ]);
-
-        setDiscoveryFeed(list);
-      } else {
-        setDiscoveryFeed([]);
-        console.error(
-          'Failed to load discovery feed:',
-          discoveryResult.reason
-        );
+  const loadDashboard =
+    useCallback(async () => {
+      if (!isAuthenticated) {
+        setLoading(false);
+        return;
       }
 
-      /* ------------------------------------------------------------
-         MY JUGAADS
-      ------------------------------------------------------------ */
+      setError('');
 
-      if (myJugaadsResult.status === 'fulfilled') {
-        const list = getList(myJugaadsResult.value, [
-          'jugaads',
-          'results',
-          'items',
-        ]);
+      try {
+        const results =
+          await Promise.allSettled([
+            api.getDiscoveryFeed(),
+            api.getMyJugaads(),
+            api.getMyProposals(),
+            api.getReceivedProposals(),
+            api.getNotifications(),
+            api.getConversations(),
+          ]);
 
-        setMyPostedJugaads(list);
-      } else {
-        setMyPostedJugaads([]);
+        const [
+          discoveryResult,
+          myJugaadsResult,
+          myRequestsResult,
+          receivedProposalsResult,
+          notificationsResult,
+          conversationsResult,
+        ] = results;
+
+
+        /* ------------------------------------------------------------
+           DISCOVERY
+        ------------------------------------------------------------ */
+
+        if (
+          discoveryResult.status ===
+          'fulfilled'
+        ) {
+          const list =
+            getList(
+              discoveryResult.value,
+              [
+                'jugaads',
+                'results',
+                'items',
+              ]
+            );
+
+          setDiscoveryFeed(
+            list
+          );
+        } else {
+          setDiscoveryFeed([]);
+
+          console.error(
+            'Failed to load discovery feed:',
+            discoveryResult.reason
+          );
+        }
+
+
+        /* ------------------------------------------------------------
+           MY JUGAADS
+        ------------------------------------------------------------ */
+
+        if (
+          myJugaadsResult.status ===
+          'fulfilled'
+        ) {
+          const list =
+            getList(
+              myJugaadsResult.value,
+              [
+                'jugaads',
+                'results',
+                'items',
+              ]
+            );
+
+          setMyPostedJugaads(
+            list
+          );
+        } else {
+          setMyPostedJugaads([]);
+
+          console.error(
+            'Failed to load my Jugaads:',
+            myJugaadsResult.reason
+          );
+        }
+
+
+        /* ------------------------------------------------------------
+           MY PROPOSALS / REQUESTS
+        ------------------------------------------------------------ */
+
+        if (
+          myRequestsResult.status ===
+          'fulfilled'
+        ) {
+          const list =
+            getList(
+              myRequestsResult.value,
+              [
+                'proposals',
+                'requests',
+                'results',
+                'items',
+              ]
+            );
+
+          setMyRequests(
+            list
+          );
+        } else {
+          setMyRequests([]);
+
+          console.error(
+            'Failed to load my proposals:',
+            myRequestsResult.reason
+          );
+        }
+
+
+        /* ------------------------------------------------------------
+           RECEIVED PROPOSALS
+        ------------------------------------------------------------ */
+
+        if (
+          receivedProposalsResult.status ===
+          'fulfilled'
+        ) {
+          const list =
+            getList(
+              receivedProposalsResult.value,
+              [
+                'proposals',
+                'requests',
+                'results',
+                'items',
+              ]
+            );
+
+          setReceivedProposals(
+            list
+          );
+        } else {
+          setReceivedProposals([]);
+
+          console.error(
+            'Failed to load received proposals:',
+            receivedProposalsResult.reason
+          );
+        }
+
+
+        /* ------------------------------------------------------------
+           NOTIFICATIONS
+        ------------------------------------------------------------ */
+
+        if (
+          notificationsResult.status ===
+          'fulfilled'
+        ) {
+          const list =
+            getList(
+              notificationsResult.value,
+              [
+                'notifications',
+                'results',
+                'items',
+              ]
+            );
+
+          setDashboardNotifications(
+            list
+          );
+        } else {
+          setDashboardNotifications([]);
+
+          console.error(
+            'Failed to load notifications:',
+            notificationsResult.reason
+          );
+        }
+
+
+        /* ------------------------------------------------------------
+           CONVERSATIONS
+        ------------------------------------------------------------ */
+
+        if (
+          conversationsResult.status ===
+          'fulfilled'
+        ) {
+          const list =
+            getList(
+              conversationsResult.value,
+              [
+                'conversations',
+                'results',
+                'items',
+              ]
+            );
+
+          setConversations(
+            list
+          );
+        } else {
+          setConversations([]);
+
+          console.error(
+            'Failed to load conversations:',
+            conversationsResult.reason
+          );
+        }
+
+
+        /*
+         * Show workspace error only when
+         * every request has failed.
+         */
+        const allFailed =
+          results.every(
+            (result) =>
+              result.status ===
+              'rejected'
+          );
+
+        if (allFailed) {
+          setError(
+            'Unable to load your workspace. Please check that the backend is running.'
+          );
+        }
+
+      } catch (err) {
         console.error(
-          'Failed to load my Jugaads:',
-          myJugaadsResult.reason
+          'Dashboard loading error:',
+          err
         );
-      }
 
-      /* ------------------------------------------------------------
-         MY PROPOSALS / REQUESTS
-      ------------------------------------------------------------ */
-
-      if (myRequestsResult.status === 'fulfilled') {
-        const list = getList(myRequestsResult.value, [
-          'proposals',
-          'requests',
-          'results',
-          'items',
-        ]);
-
-        setMyRequests(list);
-      } else {
-        setMyRequests([]);
-        console.error(
-          'Failed to load my proposals:',
-          myRequestsResult.reason
-        );
-      }
-
-      /* ------------------------------------------------------------
-         RECEIVED PROPOSALS
-      ------------------------------------------------------------ */
-
-      if (receivedProposalsResult.status === 'fulfilled') {
-        const list = getList(receivedProposalsResult.value, [
-          'proposals',
-          'requests',
-          'results',
-          'items',
-        ]);
-
-        setReceivedProposals(list);
-      } else {
-        setReceivedProposals([]);
-        console.error(
-          'Failed to load received proposals:',
-          receivedProposalsResult.reason
-        );
-      }
-
-      /* ------------------------------------------------------------
-         NOTIFICATIONS
-      ------------------------------------------------------------ */
-
-      if (notificationsResult.status === 'fulfilled') {
-        const list = getList(notificationsResult.value, [
-          'notifications',
-          'results',
-          'items',
-        ]);
-
-        setDashboardNotifications(list);
-      } else {
-        setDashboardNotifications([]);
-        console.error(
-          'Failed to load notifications:',
-          notificationsResult.reason
-        );
-      }
-
-      /* ------------------------------------------------------------
-         CONVERSATIONS
-      ------------------------------------------------------------ */
-
-      if (conversationsResult.status === 'fulfilled') {
-        const list = getList(conversationsResult.value, [
-          'conversations',
-          'results',
-          'items',
-        ]);
-
-        setConversations(list);
-      } else {
-        setConversations([]);
-        console.error(
-          'Failed to load conversations:',
-          conversationsResult.reason
-        );
-      }
-
-      const allFailed = results.every(
-        (result) => result.status === 'rejected'
-      );
-
-      if (allFailed) {
         setError(
-          'Unable to load your workspace. Please check that the backend is running.'
+          err?.message ||
+            'Unable to load your workspace. Please try again.'
         );
-      }
-    } catch (err) {
-      console.error('Dashboard loading error:', err);
 
-      setError(
-        err?.message ||
-          'Unable to load your workspace. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [isAuthenticated]);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }, [
+      isAuthenticated,
+    ]);
+
 
   /* ================================================================
      INITIAL LOAD
@@ -372,18 +598,25 @@ export function DashboardHome() {
 
   useEffect(() => {
     loadDashboard();
-  }, [loadDashboard]);
+  }, [
+    loadDashboard,
+  ]);
+
 
   /* ================================================================
      REFRESH WHEN USER RETURNS TO TAB
   ================================================================= */
 
   useEffect(() => {
-    const handleFocus = () => {
-      if (document.visibilityState === 'visible') {
-        loadDashboard();
-      }
-    };
+    const handleFocus =
+      () => {
+        if (
+          document.visibilityState ===
+          'visible'
+        ) {
+          loadDashboard();
+        }
+      };
 
     document.addEventListener(
       'visibilitychange',
@@ -396,62 +629,96 @@ export function DashboardHome() {
         handleFocus
       );
     };
-  }, [loadDashboard]);
+  }, [
+    loadDashboard,
+  ]);
+
 
   /* ================================================================
      REFRESH BUTTON
   ================================================================= */
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadDashboard();
-  };
+  const handleRefresh =
+    async () => {
+      setRefreshing(true);
+
+      await loadDashboard();
+    };
+
 
   /* ================================================================
      DERIVED DATA
   ================================================================= */
 
-  const activeJugaads = useMemo(
-    () =>
-      myPostedJugaads.filter(
-        (item) =>
-          !['completed', 'cancelled', 'closed'].includes(
-            item.status
-          )
-      ),
-    [myPostedJugaads]
-  );
+  const activeJugaads =
+    useMemo(
+      () =>
+        myPostedJugaads.filter(
+          (item) =>
+            ![
+              'completed',
+              'cancelled',
+              'closed',
+            ].includes(
+              item.status
+            )
+        ),
+      [
+        myPostedJugaads,
+      ]
+    );
 
-  const activeCollaborations = useMemo(
-    () =>
-      myRequests.filter((proposal) =>
-        ['accepted', 'assigned', 'in_progress'].includes(
-          proposal.status
-        )
-      ),
-    [myRequests]
-  );
 
-  const unreadMessages = useMemo(
-    () =>
-      conversations.filter(
-        (conversation) =>
-          conversation.unread ||
-          conversation.has_unread ||
-          Number(conversation.unread_count) > 0
-      ).length,
-    [conversations]
-  );
+  const activeCollaborations =
+    useMemo(
+      () =>
+        myRequests.filter(
+          (proposal) =>
+            [
+              'accepted',
+              'assigned',
+              'in_progress',
+            ].includes(
+              proposal.status
+            )
+        ),
+      [
+        myRequests,
+      ]
+    );
 
-  const unreadNotifications = useMemo(
-    () =>
-      dashboardNotifications.filter(
-        (notification) =>
-          !notification.read &&
-          notification.is_read !== true
-      ),
-    [dashboardNotifications]
-  );
+
+  const unreadMessages =
+    useMemo(
+      () =>
+        conversations.filter(
+          (conversation) =>
+            conversation.unread ||
+            conversation.has_unread ||
+            Number(
+              conversation.unread_count
+            ) > 0
+        ).length,
+      [
+        conversations,
+      ]
+    );
+
+
+  const unreadNotifications =
+    useMemo(
+      () =>
+        dashboardNotifications.filter(
+          (notification) =>
+            !notification.read &&
+            notification.is_read !==
+              true
+        ),
+      [
+        dashboardNotifications,
+      ]
+    );
+
 
   const stats = [
     [
@@ -460,30 +727,35 @@ export function DashboardHome() {
       Search,
       'amber',
     ],
+
     [
       'MY ACTIVE JUGAADS',
       activeJugaads.length,
       ClipboardList,
       'coral',
     ],
+
     [
       'REQUESTS RECEIVED',
       receivedProposals.length,
       Bell,
       'amber',
     ],
+
     [
       'MY REQUESTS',
       myRequests.length,
       Send,
       'mint',
     ],
+
     [
       'COLLABORATIONS',
       activeCollaborations.length,
       BriefcaseBusiness,
       'mint',
     ],
+
     [
       'UNREAD MESSAGES',
       unreadMessages,
@@ -492,6 +764,7 @@ export function DashboardHome() {
     ],
   ];
 
+
   const recentActiveJugaads =
     activeJugaads.slice(0, 3);
 
@@ -499,7 +772,11 @@ export function DashboardHome() {
     discoveryFeed.slice(0, 3);
 
   const recentNotifications =
-    dashboardNotifications.slice(0, 3);
+    dashboardNotifications.slice(
+      0,
+      3
+    );
+
 
   /* ================================================================
      UI
@@ -507,13 +784,17 @@ export function DashboardHome() {
 
   return (
     <div>
+
       {/* ============================================================
           HEADER
       ============================================================ */}
 
       <section className="pt-12 sm:pt-16 pb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+
         <div>
+
           <div className="flex items-center gap-3 mb-4 flex-wrap">
+
             <LED
               color="mint"
               pulse
@@ -529,9 +810,12 @@ export function DashboardHome() {
             <span className="font-technical text-[9px] text-mint">
               STATUS // ONLINE
             </span>
+
           </div>
 
+
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl tracking-tight">
+
             <span className="block">
               WELCOME,
             </span>
@@ -539,19 +823,31 @@ export function DashboardHome() {
             <span className="block text-amber">
               {name.toUpperCase()}.
             </span>
+
           </h1>
+
 
           <p className="mt-4 max-w-xl text-sm text-ink-2 leading-relaxed">
             Find the next opportunity, post something
             you need solved, and make something useful
             with people on campus.
           </p>
+
         </div>
+
+
+        {/* ==========================================================
+            WORKSPACE CARD
+        ========================================================== */}
 
         <div
           className="surface-wood rounded-xl p-4 min-w-[230px] relative"
-          style={{ transform: 'rotate(1deg)' }}
+          style={{
+            transform:
+              'rotate(1deg)',
+          }}
         >
+
           <Rivet
             size={6}
             className="absolute top-1.5 left-1.5"
@@ -562,25 +858,36 @@ export function DashboardHome() {
             className="absolute top-1.5 right-1.5"
           />
 
+
           <div className="flex items-center gap-2 mb-2">
+
             <span className="grid place-items-center w-8 h-8 rounded-full bg-amber text-bg-0 font-display text-[10px]">
               {user?.name
                 ?.slice(0, 2)
-                .toUpperCase() || 'U'}
+                .toUpperCase() ||
+                'U'}
             </span>
 
+
             <div>
+
               <p className="font-mono text-[10px] text-paper">
-                {user?.name || 'Your workspace'}
+                {user?.name ||
+                  'Your workspace'}
               </p>
+
 
               <p className="font-technical text-[7px] text-paper/70">
-                OPERATOR // ACTIVE
+                {getRoleLabel(user)}
               </p>
+
             </div>
+
           </div>
 
+
           <div className="flex items-center gap-2">
+
             <LED
               color="mint"
               pulse
@@ -590,9 +897,13 @@ export function DashboardHome() {
             <span className="font-mono text-[8px] text-paper/80">
               The room is yours.
             </span>
+
           </div>
+
         </div>
+
       </section>
+
 
       {/* ============================================================
           ERROR
@@ -600,10 +911,13 @@ export function DashboardHome() {
 
       {error && (
         <div className="surface-panel rounded-xl p-4 mb-6 border border-coral/30">
+
           <div className="flex items-center justify-between gap-4">
+
             <p className="font-mono text-[9px] text-coral">
               {error}
             </p>
+
 
             <button
               type="button"
@@ -611,6 +925,7 @@ export function DashboardHome() {
               className="machine-control machine-control--ghost"
               disabled={refreshing}
             >
+
               <RefreshCw
                 size={12}
                 className={
@@ -621,16 +936,21 @@ export function DashboardHome() {
               />
 
               RETRY
+
             </button>
+
           </div>
+
         </div>
       )}
+
 
       {/* ============================================================
           MAIN ACTIONS
       ============================================================ */}
 
       <section className="grid md:grid-cols-2 gap-4 mb-8">
+
         <Link
           to="/dashboard/find-jugaad"
           className="surface-metal-brushed rounded-2xl p-6 group hover:border-amber/50 transition-all"
@@ -639,7 +959,9 @@ export function DashboardHome() {
               '1px solid rgba(214,138,60,.25)',
           }}
         >
+
           <div className="flex items-start justify-between">
+
             <span className="grid place-items-center w-12 h-12 rounded-xl bg-amber/10 text-amber">
               <Search size={23} />
             </span>
@@ -648,22 +970,28 @@ export function DashboardHome() {
               className="text-ink-3 group-hover:text-amber group-hover:translate-x-1 transition-all"
               size={18}
             />
+
           </div>
+
 
           <p className="font-display text-2xl mt-6">
             FIND A JUGAAD
           </p>
 
+
           <p className="font-mono text-[10px] text-ink-2 mt-2">
             Opportunities selected for your skills.
           </p>
+
 
           <p className="font-technical text-[8px] text-amber mt-5">
             {loading
               ? 'LOADING...'
               : `${discoveryFeed.length} OPEN OPPORTUNITIES →`}
           </p>
+
         </Link>
+
 
         <Link
           to="/dashboard/post-jugaad"
@@ -673,7 +1001,9 @@ export function DashboardHome() {
               '1px solid rgba(93,184,154,.25)',
           }}
         >
+
           <div className="flex items-start justify-between">
+
             <span className="grid place-items-center w-12 h-12 rounded-xl bg-mint/10 text-mint">
               <Plus size={23} />
             </span>
@@ -682,69 +1012,99 @@ export function DashboardHome() {
               className="text-ink-3 group-hover:text-mint group-hover:translate-x-1 transition-all"
               size={18}
             />
+
           </div>
+
 
           <p className="font-display text-2xl mt-6">
             POST A JUGAAD
           </p>
 
+
           <p className="font-mono text-[10px] text-ink-2 mt-2">
             Ask the campus to help you get it done.
           </p>
 
+
           <p className="font-technical text-[8px] text-mint mt-5">
             CREATE AN OPPORTUNITY →
           </p>
+
         </Link>
+
       </section>
+
 
       {/* ============================================================
           STATS
       ============================================================ */}
 
       <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-8">
+
         {stats.map(
-          ([label, value, Icon, color]) => (
+          ([
+            label,
+            value,
+            Icon,
+            color,
+          ]) => (
+
             <div
               key={label}
               className="surface-panel rounded-xl p-3"
             >
+
               <div className="flex justify-between items-start">
+
                 <Icon
                   size={14}
                   className={`text-${color}`}
                 />
 
+
                 <span
                   className="font-display text-2xl"
                   style={{
-                    color: `var(--${color})`,
+                    color:
+                      `var(--${color})`,
                   }}
                 >
-                  {loading ? '—' : value}
+                  {loading
+                    ? '—'
+                    : value}
                 </span>
+
               </div>
+
 
               <p className="font-technical text-[7px] text-ink-3 mt-3">
                 {label}
               </p>
+
             </div>
+
           )
         )}
+
       </section>
+
 
       {/* ============================================================
           CONTENT
       ============================================================ */}
 
       <section className="grid lg:grid-cols-[1.35fr_.65fr] gap-6">
-        {/* ----------------------------------------------------------
+
+        {/* ==========================================================
             RECOMMENDED
-        ---------------------------------------------------------- */}
+        ========================================================== */}
 
         <div className="surface-panel rounded-2xl p-5">
+
           <div className="flex items-center justify-between mb-4">
+
             <div>
+
               <p className="font-technical text-[9px] text-ink-0">
                 RECOMMENDED FOR YOU
               </p>
@@ -752,7 +1112,9 @@ export function DashboardHome() {
               <p className="font-mono text-[9px] text-ink-3 mt-1">
                 Fresh opportunities from the campus.
               </p>
+
             </div>
+
 
             <Link
               to="/dashboard/find-jugaad"
@@ -760,12 +1122,20 @@ export function DashboardHome() {
             >
               VIEW ALL →
             </Link>
+
           </div>
 
+
           <div className="space-y-2.5">
+
             {loading ? (
-              <EmptyState text="Loading opportunities..." />
+
+              <EmptyState
+                text="Loading opportunities..."
+              />
+
             ) : recommendedJugaads.length > 0 ? (
+
               recommendedJugaads.map(
                 (item) => (
                   <OpportunityRow
@@ -774,26 +1144,38 @@ export function DashboardHome() {
                   />
                 )
               )
+
             ) : (
-              <EmptyState text="No Jugaads available right now." />
+
+              <EmptyState
+                text="No Jugaads available right now."
+              />
+
             )}
+
           </div>
+
         </div>
 
-        {/* ----------------------------------------------------------
+
+        {/* ==========================================================
             RIGHT COLUMN
-        ---------------------------------------------------------- */}
+        ========================================================== */}
 
         <div className="space-y-4">
-          {/* --------------------------------------------------------
+
+          {/* ========================================================
               MY ACTIVE JUGAADS
-          -------------------------------------------------------- */}
+          ======================================================== */}
 
           <div className="surface-wood rounded-2xl p-5">
+
             <div className="flex items-center justify-between mb-4">
+
               <p className="font-technical text-[9px] text-paper/90">
                 MY ACTIVE JUGAADS
               </p>
+
 
               <Link
                 to="/dashboard/my-jugaads"
@@ -801,13 +1183,18 @@ export function DashboardHome() {
               >
                 VIEW →
               </Link>
+
             </div>
 
+
             {loading ? (
+
               <p className="font-mono text-[9px] text-paper/60">
                 Loading your Jugaads...
               </p>
+
             ) : recentActiveJugaads.length > 0 ? (
+
               recentActiveJugaads.map(
                 (item) => (
                   <Link
@@ -815,62 +1202,92 @@ export function DashboardHome() {
                     key={getId(item)}
                     className="flex items-center gap-2.5 py-2 border-b border-paper/10 last:border-0"
                   >
+
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{
-                        background: `var(--${getStatusColor(
-                          item.status
-                        )})`,
+                        background:
+                          `var(--${getStatusColor(
+                            item.status
+                          )})`,
                       }}
                     />
+
 
                     <span className="font-editorial text-sm text-paper flex-1 truncate">
                       {item.title ||
                         'Untitled Jugaad'}
                     </span>
 
+
                     <span className="font-mono text-[8px] text-paper/50">
-                      ₹{getAmount(item)}
+                      ₹
+                      {getAmount(item)}
                     </span>
+
                   </Link>
                 )
               )
+
             ) : (
+
               <p className="font-mono text-[9px] text-paper/60">
                 You haven't posted any active Jugaads yet.
               </p>
+
             )}
+
           </div>
 
-          {/* --------------------------------------------------------
+
+          {/* ========================================================
               RECENT ACTIVITY
-          -------------------------------------------------------- */}
+          ======================================================== */}
 
           <div className="surface-panel rounded-2xl p-5">
+
             <div className="flex justify-between mb-3">
+
               <div>
+
                 <p className="font-technical text-[9px]">
                   RECENT ACTIVITY
                 </p>
 
-                {unreadNotifications.length > 0 && (
+
+                {unreadNotifications.length >
+                  0 && (
                   <p className="font-mono text-[7px] text-amber mt-1">
-                    {unreadNotifications.length} UNREAD
+                    {
+                      unreadNotifications.length
+                    }{' '}
+                    UNREAD
                   </p>
                 )}
+
               </div>
+
 
               <Bell
                 size={13}
                 className="text-amber"
               />
+
             </div>
 
+
             {loading ? (
-              <EmptyState text="Loading activity..." />
-            ) : recentNotifications.length > 0 ? (
+
+              <EmptyState
+                text="Loading activity..."
+              />
+
+            ) : recentNotifications.length >
+              0 ? (
+
               recentNotifications.map(
                 (notification) => {
+
                   const id =
                     notification.id ??
                     notification._id;
@@ -890,6 +1307,7 @@ export function DashboardHome() {
                     notification.conversationId ??
                     notification.conversation_id;
 
+
                   return (
                     <Link
                       key={id}
@@ -900,15 +1318,19 @@ export function DashboardHome() {
                       }
                       className="flex gap-2 py-2 border-b border-metal-1/40 last:border-0"
                     >
+
                       <span>
                         {notification.emoji ||
                           '•'}
                       </span>
 
+
                       <div className="min-w-0">
+
                         <p className="font-mono text-[9px] text-ink-1 leading-snug">
                           {message}
                         </p>
+
 
                         {timestamp && (
                           <p className="font-mono text-[7px] text-ink-3 mt-1">
@@ -917,31 +1339,46 @@ export function DashboardHome() {
                             )}
                           </p>
                         )}
+
                       </div>
+
                     </Link>
                   );
                 }
               )
+
             ) : (
-              <EmptyState text="No recent activity yet." />
+
+              <EmptyState
+                text="No recent activity yet."
+              />
+
             )}
+
           </div>
+
         </div>
+
       </section>
+
 
       {/* ============================================================
           REQUEST / MESSAGE LINKS
       ============================================================ */}
 
       <section className="mt-6 flex justify-center gap-3 flex-wrap">
+
         <Link
           to="/dashboard/my-requests"
           className="machine-control machine-control--ghost"
         >
           <span className="ctrl-led" />
 
-          MY REQUESTS ({myRequests.length})
+          MY REQUESTS (
+          {myRequests.length}
+          )
         </Link>
+
 
         <Link
           to="/dashboard/requests"
@@ -950,8 +1387,10 @@ export function DashboardHome() {
           <span className="ctrl-led" />
 
           REQUESTS RECEIVED (
-          {receivedProposals.length})
+          {receivedProposals.length}
+          )
         </Link>
+
 
         <Link
           to="/dashboard/messages"
@@ -959,8 +1398,11 @@ export function DashboardHome() {
         >
           <span className="ctrl-led" />
 
-          MESSAGES ({conversations.length})
+          MESSAGES (
+          {conversations.length}
+          )
         </Link>
+
 
         <button
           type="button"
@@ -968,6 +1410,7 @@ export function DashboardHome() {
           disabled={refreshing}
           className="machine-control machine-control--ghost"
         >
+
           <RefreshCw
             size={12}
             className={
@@ -978,37 +1421,55 @@ export function DashboardHome() {
           />
 
           REFRESH
+
         </button>
+
       </section>
+
     </div>
   );
 }
+
 
 /* ================================================================
    OPPORTUNITY ROW
 ================================================================ */
 
-function OpportunityRow({ item }) {
+function OpportunityRow({
+  item,
+}) {
   const categoryColor =
-    getCategoryColor(item.category);
+    getCategoryColor(
+      item.category
+    );
+
 
   const skill =
     item.skillRequired ??
     item.required_skill ??
-    (Array.isArray(item.required_skills)
-      ? item.required_skills.join(', ')
-      : item.required_skills) ??
+    (
+      Array.isArray(
+        item.required_skills
+      )
+        ? item.required_skills.join(
+            ', '
+          )
+        : item.required_skills
+    ) ??
     'General';
+
 
   const poster =
     item.poster ??
     item.owner ??
     item.user;
 
+
   const posterName =
     item.poster_name ??
     item.posterName ??
     getName(poster);
+
 
   const postedAt =
     item.postedAt ??
@@ -1016,7 +1477,10 @@ function OpportunityRow({ item }) {
     item.created_at ??
     item.createdAt;
 
-  const amount = getAmount(item);
+
+  const amount =
+    getAmount(item);
+
 
   return (
     <Link
@@ -1027,40 +1491,54 @@ function OpportunityRow({ item }) {
           '1px solid var(--metal-1)',
       }}
     >
+
       <span
         className="grid place-items-center w-10 h-10 rounded-lg shrink-0"
         style={{
-          background: `color-mix(in srgb, var(--${categoryColor}) 15%, transparent)`,
-          color: `var(--${categoryColor})`,
+          background:
+            `color-mix(in srgb, var(--${categoryColor}) 15%, transparent)`,
+          color:
+            `var(--${categoryColor})`,
         }}
       >
+
         <span className="font-display text-sm">
           {item.category
             ?.slice(0, 1)
-            .toUpperCase() || 'J'}
+            .toUpperCase() ||
+            'J'}
         </span>
+
       </span>
 
+
       <div className="min-w-0 flex-1">
+
         <p className="font-editorial text-sm text-ink-0 truncate">
           {item.title ||
             'Untitled Jugaad'}
         </p>
 
+
         <p className="font-mono text-[8px] text-ink-3 mt-1 truncate">
           {skill} · {posterName}
+
           {postedAt
             ? ` · ${formatRelativeTime(
                 postedAt
               )}`
             : ''}
         </p>
+
       </div>
 
+
       <div className="text-right shrink-0">
+
         <p className="font-display text-sm text-amber">
           ₹{amount}
         </p>
+
 
         {item.deadline && (
           <p className="font-mono text-[8px] text-coral">
@@ -1069,21 +1547,28 @@ function OpportunityRow({ item }) {
             )}
           </p>
         )}
+
       </div>
+
     </Link>
   );
 }
+
 
 /* ================================================================
    EMPTY STATE
 ================================================================ */
 
-function EmptyState({ text }) {
+function EmptyState({
+  text,
+}) {
   return (
     <div className="rounded-xl surface-metal p-4">
+
       <p className="font-mono text-[9px] text-ink-3">
         {text}
       </p>
+
     </div>
   );
 }

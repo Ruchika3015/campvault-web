@@ -237,12 +237,10 @@ export function MyJugaadsPage() {
   } = useAuth();
 
   const {
-    receivedProposals = [],
+    proposals = [],
     acceptProposal,
     rejectProposal,
     counterProposal,
-    refreshData,
-    conversations,
   } = useProposals();
 
   const [jugaadsList, setJugaadsList] = useState(
@@ -267,7 +265,6 @@ export function MyJugaadsPage() {
     }
 
     if (!isAuthenticated) {
-      setJugaadsList([]);
       setLoading(false);
       return;
     }
@@ -275,25 +272,19 @@ export function MyJugaadsPage() {
     setLoading(true);
 
     try {
-      const [jugaadsResult] = await Promise.all([
-        api.getMyJugaads(),
-        refreshData(),
-      ]);
+      const data = await api.getMyJugaads();
 
       const list =
-        jugaadsResult?.jugaads ||
-        jugaadsResult?.data?.jugaads ||
-        jugaadsResult?.data ||
-        (Array.isArray(jugaadsResult)
-          ? jugaadsResult
-          : []);
+        data?.jugaads ||
+        data?.data ||
+        (Array.isArray(data) ? data : []);
 
       setJugaadsList(
         Array.isArray(list) ? list : []
       );
     } catch (error) {
       console.error(
-        'Failed to load my jugaads/proposals:',
+        'Failed to load my jugaads:',
         error
       );
 
@@ -301,11 +292,7 @@ export function MyJugaadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    isDemoMode,
-    isAuthenticated,
-    refreshData,
-  ]);
+  }, [isDemoMode, isAuthenticated]);
 
   useEffect(() => {
     fetchMyJugaads();
@@ -411,8 +398,8 @@ export function MyJugaadsPage() {
      * which otherwise fails with strict ===.
      */
     const itemProposals =
-      Array.isArray(receivedProposals)
-        ? receivedProposals.filter((p) => {
+      Array.isArray(proposals)
+        ? proposals.filter((p) => {
             const proposalJugaadId =
               getProposalJugaadId(p);
 
@@ -428,7 +415,6 @@ export function MyJugaadsPage() {
       <Detail
         item={item}
         proposals={itemProposals}
-        conversations={conversations}
         onBack={() => setSelected(null)}
         onStatus={(newStatus) =>
           handleUpdateStatus(
@@ -554,8 +540,8 @@ export function MyJugaadsPage() {
         <div className="grid lg:grid-cols-2 gap-3">
           {items.map((item) => {
             const itemProposals =
-              Array.isArray(receivedProposals)
-                ? receivedProposals.filter((p) => {
+              Array.isArray(proposals)
+                ? proposals.filter((p) => {
                     const proposalJugaadId =
                       getProposalJugaadId(p);
 
@@ -728,7 +714,6 @@ function Header({
 function Detail({
   item,
   proposals,
-  conversations,
   onBack,
   onStatus,
   onAcceptProposal,
@@ -767,46 +752,6 @@ function Detail({
     ? proposals
         .map(proposalToStudentRequest)
         .filter(Boolean)
-        .map((student) => {
-          const proposalId =
-            student?.proposalId ??
-            student?.proposal?.id;
-
-          const matchingConversation =
-            Array.isArray(conversations)
-              ? conversations.find((conversation) => {
-                  const conversationProposalId =
-                    conversation?.proposal_id ??
-                    conversation?.proposalId ??
-                    conversation?.proposal?.id;
-
-                  return (
-                    proposalId != null &&
-                    conversationProposalId != null &&
-                    String(proposalId) ===
-                      String(conversationProposalId)
-                  );
-                })
-              : null;
-
-          const conversationId =
-            getValidConversationId(
-              matchingConversation
-            );
-
-          if (!conversationId) {
-            return student;
-          }
-
-          return {
-            ...student,
-            conversationId,
-            proposal: {
-              ...student.proposal,
-              conversationId,
-            },
-          };
-        })
     : [];
 
   /*
@@ -815,122 +760,32 @@ function Detail({
    * Avoid duplicates where the same student
    * already exists in interestedStudents.
    */
-  const mergedStudents = [];
+  const mergedStudents = [
+    ...directStudents,
+  ];
 
-  // Merge direct interested students with their matching
-  // proposals. This is important because the same student
-  // can exist in both arrays. If we keep only the direct
-  // student object, the proposal status (accepted/rejected)
-  // is lost and the action buttons appear again.
-  directStudents.forEach((student) => {
-    const studentId =
-      student?.id ??
-      student?.userId ??
-      student?.user_id;
-
-    const matchingProposal = proposalStudents.find(
-      (proposalStudent) => {
-        const proposalStudentId =
-          proposalStudent?.id;
-
-        if (
-          studentId == null ||
-          proposalStudentId == null
-        ) {
-          return false;
-        }
-
-        return (
-          String(studentId) ===
-          String(proposalStudentId)
-        );
-      }
-    );
-
-    if (matchingProposal) {
-      mergedStudents.push({
-        ...student,
-        ...matchingProposal,
-
-        id:
-          student.id ??
-          matchingProposal.id,
-
-        name:
-          student.name ??
-          matchingProposal.name,
-
-        fullName:
-          student.fullName ??
-          matchingProposal.fullName,
-
-        username:
-          student.username ??
-          matchingProposal.username,
-
-        initials:
-          student.initials ??
-          matchingProposal.initials,
-
-        skills:
-          Array.isArray(student.skills) &&
-          student.skills.length > 0
-            ? student.skills
-            : matchingProposal.skills,
-
-        rating:
-          student.rating ??
-          matchingProposal.rating,
-
-        message:
-          student.message ||
-          matchingProposal.message,
-
-        // Keep the real proposal information.
-        proposalId:
-          matchingProposal.proposalId,
-
-        proposal:
-          matchingProposal.proposal,
-
-        status:
-          matchingProposal.status,
-
-        proposalStatus:
-          matchingProposal.status,
-
-        conversationId:
-          matchingProposal.conversationId,
-      });
-    } else {
-      mergedStudents.push(student);
-    }
-  });
-
-  // Add proposal students that are not already present
-  // in the direct interested-student list.
   proposalStudents.forEach((proposalStudent) => {
-    const proposalStudentId =
-      proposalStudent?.id;
-
     const alreadyExists =
       mergedStudents.some((student) => {
-        const existingStudentId =
+        const studentId =
           student?.id ??
           student?.userId ??
           student?.user_id;
 
+        const proposalStudentId =
+          proposalStudent?.id;
+
         if (
-          existingStudentId == null ||
-          proposalStudentId == null
+          studentId != null &&
+          proposalStudentId != null
         ) {
-          return false;
+          return (
+            String(studentId) ===
+            String(proposalStudentId)
+          );
         }
 
-        return (
-          String(existingStudentId) ===
-          String(proposalStudentId)
-        );
+        return false;
       });
 
     if (!alreadyExists) {
@@ -1130,17 +985,13 @@ function Detail({
                       }
                       student={student}
                       assigned={
-                        acceptedStudent?.id != null &&
-                        student?.id != null &&
-                        String(acceptedStudent.id) ===
-                          String(student.id)
+                        acceptedStudent?.id ===
+                        student.id
                       }
                       locked={
                         !!acceptedStudent &&
-                        acceptedStudent?.id != null &&
-                        student?.id != null &&
-                        String(acceptedStudent.id) !==
-                          String(student.id)
+                        acceptedStudent.id !==
+                          student.id
                       }
                       onAccept={() => {
                         const proposal = proposals.find(
@@ -1453,40 +1304,11 @@ function StudentRequest({
     ? student.skills
     : [];
 
-  // Always use the real proposal status returned by the backend.
-  // This prevents ACCEPT / REJECT / COUNTER from appearing again
-  // after a proposal has already been accepted.
-  const proposalStatus =
-    student?.proposal?.status ||
-    student?.proposalStatus ||
-    student?.proposal_status ||
-    student?.status ||
-    'pending';
-
-  const isAccepted =
-    String(proposalStatus).toLowerCase() === 'accepted';
-
-  const isRejected =
-    String(proposalStatus).toLowerCase() === 'rejected';
-
-  const isWithdrawn =
-    String(proposalStatus).toLowerCase() === 'withdrawn';
-
-  // A proposal whose backend status is accepted is assigned
-  // even if acceptedStudent has not refreshed yet.
-  const isAssigned = Boolean(assigned) || isAccepted;
-
-  const conversationId = getValidConversationId(
-    student?.proposal || student
-  );
-
   const isBargain =
     student?.requestType === 'bargain' ||
     student?.request_type === 'bargain' ||
     student?.proposal?.proposedPrice != null ||
-    student?.proposal?.proposed_price != null ||
-    student?.proposedAmount != null ||
-    student?.proposed_amount != null;
+    student?.proposal?.proposed_price != null;
 
   const proposedAmount =
     student?.proposedAmount ??
@@ -1496,9 +1318,7 @@ function StudentRequest({
     student?.proposal?.amount ??
     0;
 
-  const hasProposal =
-    student?.proposalId != null ||
-    student?.proposal?.id != null;
+  const hasProposal = student?.proposalId != null;
 
   return (
     <div className="surface-panel rounded-xl p-4">
@@ -1527,18 +1347,6 @@ function StudentRequest({
                 BARGAIN
               </span>
             )}
-
-            {isAccepted && (
-              <span className="font-technical text-[7px] text-mint px-1.5 py-0.5 rounded bg-mint/10">
-                ACCEPTED
-              </span>
-            )}
-
-            {isRejected && (
-              <span className="font-technical text-[7px] text-coral px-1.5 py-0.5 rounded bg-coral/10">
-                REJECTED
-              </span>
-            )}
           </div>
 
           <p className="font-mono text-[8px] text-ink-3 mt-1">
@@ -1562,65 +1370,41 @@ function StudentRequest({
         </span>
       </div>
 
-      {/* ACCEPTED PROPOSAL → MESSAGE */}
-      {isAccepted && (
+      {!assigned && !locked && (
         <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
-          {conversationId ? (
-            <Link
-              to={`/dashboard/messages/${conversationId}`}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
+          <button
+            type="button"
+            onClick={onAccept}
+            disabled={!hasProposal}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Check size={12} />
+            ACCEPT
+          </button>
+
+          <button
+            type="button"
+            onClick={onReject}
+            disabled={!hasProposal}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <X size={12} />
+            REJECT
+          </button>
+
+          {isBargain && (
+            <button
+              type="button"
+              onClick={onCounter}
+              disabled={!hasProposal}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px] hover:bg-amber/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <MessageSquare size={12} />
-              MESSAGE
-            </Link>
-          ) : (
-            <span className="flex items-center gap-1 px-3 py-2 rounded-lg bg-bg-2 text-ink-3 font-technical text-[8px]">
-              <MessageSquare size={12} />
-              CONVERSATION UNAVAILABLE
-            </span>
+              <HandCoins size={12} />
+              COUNTER
+            </button>
           )}
         </div>
       )}
-
-      {/* PENDING PROPOSAL → ACCEPT / REJECT / COUNTER */}
-      {!isAssigned &&
-        !locked &&
-        !isRejected &&
-        !isWithdrawn && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
-            <button
-              type="button"
-              onClick={onAccept}
-              disabled={!hasProposal}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Check size={12} />
-              ACCEPT
-            </button>
-
-            <button
-              type="button"
-              onClick={onReject}
-              disabled={!hasProposal}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <X size={12} />
-              REJECT
-            </button>
-
-            {isBargain && (
-              <button
-                type="button"
-                onClick={onCounter}
-                disabled={!hasProposal}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px] hover:bg-amber/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <HandCoins size={12} />
-                COUNTER
-              </button>
-            )}
-          </div>
-        )}
     </div>
   );
 }

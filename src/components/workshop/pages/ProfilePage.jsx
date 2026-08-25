@@ -191,10 +191,18 @@ export function ProfilePage() {
       const results = await Promise.allSettled([
         api.getProfile(),
         api.getMyJugaads(),
-        api.getSkills(),
-        api.getLinks(),
-        api.getProjects(),
-        api.getCertifications(),
+        typeof api.getSkills === 'function'
+          ? api.getSkills()
+          : Promise.resolve({ data: [] }),
+        typeof api.getLinks === 'function'
+          ? api.getLinks()
+          : Promise.resolve({ data: [] }),
+        typeof api.getProjects === 'function'
+          ? api.getProjects()
+          : Promise.resolve({ data: [] }),
+        typeof api.getCertifications === 'function'
+          ? api.getCertifications()
+          : Promise.resolve({ data: [] }),
       ]);
 
       if (!mounted) return;

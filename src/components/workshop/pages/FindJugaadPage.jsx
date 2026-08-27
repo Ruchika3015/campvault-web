@@ -1,4 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
+
 import { LED } from '@/components/primitives/Details';
 
 import {
@@ -26,9 +31,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useProposals } from '@/context/ProposalContext';
 
 
-/* =========================================================
-   SAFETY HELPERS
-   ========================================================= */
+// ================================================================
+// SAFETY / NORMALIZATION
+// ================================================================
 
 function normalizeItem(raw) {
   if (!raw || typeof raw !== 'object') {
@@ -36,14 +41,58 @@ function normalizeItem(raw) {
   }
 
   const poster =
-    raw.poster && typeof raw.poster === 'object'
+    raw.poster &&
+    typeof raw.poster === 'object'
       ? raw.poster
       : null;
 
   const creator =
-    raw.creator && typeof raw.creator === 'object'
+    raw.creator &&
+    typeof raw.creator === 'object'
       ? raw.creator
       : null;
+
+  /*
+   * IMPORTANT:
+   * poster_name is the name of the person who CREATED/POSTED
+   * this Jugaad.
+   *
+   * It must NOT use the logged-in user's name.
+   */
+  const posterName =
+    raw.poster_name ??
+    raw.posterName ??
+    poster?.name ??
+    creator?.name ??
+    raw.creator_name ??
+    raw.creatorName ??
+    null;
+
+  const posterId =
+    raw.poster_id ??
+    raw.posterId ??
+    poster?.id ??
+    creator?.id ??
+    raw.creator_id ??
+    raw.creatorId ??
+    null;
+
+  const posterEmail =
+    raw.poster_email ??
+    raw.posterEmail ??
+    poster?.email ??
+    creator?.email ??
+    raw.creator_email ??
+    raw.creatorEmail ??
+    null;
+
+  const posterRating =
+    raw.poster_rating ??
+    raw.posterRating ??
+    poster?.rating ??
+    creator?.rating ??
+    raw.rating ??
+    null;
 
   return {
     ...raw,
@@ -52,7 +101,9 @@ function normalizeItem(raw) {
       raw.id ??
       raw.jugaadId ??
       raw.jugaad_id ??
-      `jugaad-${Math.random().toString(36).slice(2)}`,
+      `jugaad-${Math.random()
+        .toString(36)
+        .slice(2)}`,
 
     title:
       typeof raw.title === 'string'
@@ -74,7 +125,11 @@ function normalizeItem(raw) {
         ? raw.skillRequired
         : typeof raw.skill_required === 'string'
           ? raw.skill_required
-          : 'General',
+          : Array.isArray(
+                raw.required_skills
+            )
+            ? raw.required_skills.join(', ')
+            : 'General',
 
     amount:
       raw.amount ??
@@ -100,7 +155,33 @@ function normalizeItem(raw) {
       raw.match_percentage ??
       null,
 
-    poster,
+    /*
+     * Store the ACTUAL POSTER.
+     */
+    posterName,
+    posterId,
+    posterEmail,
+    posterRating,
+
+    poster:
+      poster || posterName
+        ? {
+            ...(poster || {}),
+            id:
+              poster?.id ??
+              posterId,
+            name:
+              poster?.name ??
+              posterName,
+            email:
+              poster?.email ??
+              posterEmail,
+            rating:
+              poster?.rating ??
+              posterRating,
+          }
+        : null,
+
     creator,
   };
 }
@@ -153,11 +234,12 @@ function safeTimeAgo(date) {
 }
 
 
-/* =========================================================
-   MAIN PAGE
-   ========================================================= */
+// ================================================================
+// MAIN PAGE
+// ================================================================
 
 export function FindJugaadPage() {
+
   const {
     user,
     isDemoMode,
@@ -171,89 +253,145 @@ export function FindJugaadPage() {
   } = useProposals();
 
 
-  const [feedItems, setFeedItems] = useState(() => {
-    if (!isDemoMode) {
-      return [];
-    }
+  const [feedItems, setFeedItems] =
+    useState(() => {
 
-    return normalizeFeed(mockDiscoveryFeed);
-  });
+      if (!isDemoMode) {
+        return [];
+      }
 
-  const [loading, setLoading] = useState(!isDemoMode);
-
-  const [hidden, setHidden] = useState([]);
-
-  const [bargain, setBargain] = useState(null);
-
-  /*
-   * This stores the Jugaad selected by INTERESTED.
-   */
-  const [proposalItem, setProposalItem] = useState(null);
-
-  const [undo, setUndo] = useState(null);
-
-  const [query, setQuery] = useState('');
-
-  const [category, setCategory] = useState('ALL');
-
-
-  /* =======================================================
-     LOAD FEED
-     ======================================================= */
-
-  const fetchFeed = useCallback(async () => {
-    if (isDemoMode) {
-      setFeedItems(
-        normalizeFeed(mockDiscoveryFeed)
+      return normalizeFeed(
+        mockDiscoveryFeed
       );
+    });
 
-      setLoading(false);
 
-      return;
-    }
+  const [loading, setLoading] =
+    useState(!isDemoMode);
 
-    if (!isAuthenticated) {
-      setFeedItems([]);
 
-      setLoading(false);
+  const [hidden, setHidden] =
+    useState([]);
 
-      return;
-    }
 
-    setLoading(true);
+  const [bargain, setBargain] =
+    useState(null);
 
-    try {
-      const data =
-        await api.getDiscoveryFeed();
 
-      const list =
-        normalizeFeed(data);
+  const [proposalItem, setProposalItem] =
+    useState(null);
 
-      setFeedItems(list);
-    } catch (error) {
-      console.error(
-        'Failed to load Jugaad feed:',
-        error
-      );
 
-      setFeedItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    isDemoMode,
-    isAuthenticated,
-  ]);
+  const [undo, setUndo] =
+    useState(null);
+
+
+  const [query, setQuery] =
+    useState('');
+
+
+  const [category, setCategory] =
+    useState('ALL');
+
+
+  // ================================================================
+  // LOAD DISCOVERY FEED
+  // ================================================================
+
+  const fetchFeed = useCallback(
+    async () => {
+
+      if (isDemoMode) {
+
+        setFeedItems(
+          normalizeFeed(
+            mockDiscoveryFeed
+          )
+        );
+
+        setLoading(false);
+
+        return;
+      }
+
+
+      if (!isAuthenticated) {
+
+        setFeedItems([]);
+
+        setLoading(false);
+
+        return;
+      }
+
+
+      setLoading(true);
+
+
+      try {
+
+        const response =
+          await api.getDiscoveryFeed();
+
+
+        console.log(
+          'DISCOVERY FEED RESPONSE:',
+          response
+        );
+
+
+        const normalized =
+          normalizeFeed(
+            response
+          );
+
+
+        console.log(
+          'NORMALIZED DISCOVERY FEED:',
+          normalized
+        );
+
+
+        setFeedItems(
+          normalized
+        );
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load Jugaad feed:',
+          error
+        );
+
+        setFeedItems([]);
+
+      } finally {
+
+        setLoading(false);
+      }
+
+    },
+    [
+      isDemoMode,
+      isAuthenticated,
+    ]
+  );
 
 
   useEffect(() => {
+
     fetchFeed();
+
   }, [fetchFeed]);
 
 
-  /* =======================================================
-     CURRENT USER / HELPER
-     ======================================================= */
+  // ================================================================
+  // CURRENT LOGGED-IN USER
+  //
+  // ONLY used as the HELPER when sending a proposal.
+  //
+  // It is NOT used as the poster displayed on cards.
+  // ================================================================
 
   const helper = user
     ? {
@@ -275,6 +413,7 @@ export function FindJugaadPage() {
             .slice(0, 2)
             .toUpperCase(),
       }
+
     : {
         id: 'guest',
         name: 'Guest',
@@ -282,54 +421,74 @@ export function FindJugaadPage() {
       };
 
 
-  /* =======================================================
-     FILTERING
-     ======================================================= */
+  // ================================================================
+  // FILTERING
+  // ================================================================
 
   const visible =
-    feedItems.filter((item) => {
-      if (!item) {
-        return false;
+    feedItems.filter(
+      (item) => {
+
+        if (!item) {
+          return false;
+        }
+
+
+        if (
+          item.id !== undefined &&
+          hidden.includes(item.id)
+        ) {
+          return false;
+        }
+
+
+        const search =
+          query
+            .trim()
+            .toLowerCase();
+
+
+        const matchesQuery =
+          !search ||
+          String(
+            item.title ?? ''
+          )
+            .toLowerCase()
+            .includes(search) ||
+
+          String(
+            item.skillRequired ?? ''
+          )
+            .toLowerCase()
+            .includes(search) ||
+
+          String(
+            item.description ?? ''
+          )
+            .toLowerCase()
+            .includes(search);
+
+
+        const matchesCategory =
+          category === 'ALL' ||
+          item.category ===
+            category;
+
+
+        return (
+          matchesQuery &&
+          matchesCategory
+        );
       }
-
-      if (
-        item.id !== undefined &&
-        hidden.includes(item.id)
-      ) {
-        return false;
-      }
-
-      const search =
-        query.trim().toLowerCase();
-
-      const matchesQuery =
-        !search ||
-        String(item.title ?? '')
-          .toLowerCase()
-          .includes(search) ||
-        String(item.skillRequired ?? '')
-          .toLowerCase()
-          .includes(search) ||
-        String(item.description ?? '')
-          .toLowerCase()
-          .includes(search);
-
-      const matchesCategory =
-        category === 'ALL' ||
-        item.category === category;
-
-      return (
-        matchesQuery &&
-        matchesCategory
-      );
-    });
+    );
 
 
-  /* =======================================================
-     HIDE OPPORTUNITY
-     ======================================================= */
+  // ================================================================
+  // HIDE OPPORTUNITY
+  // ================================================================
 
   const hide = async (id) => {
+
     if (
       id === undefined ||
       id === null
@@ -337,23 +496,37 @@ export function FindJugaadPage() {
       return;
     }
 
-    setHidden((current) => {
-      if (current.includes(id)) {
-        return current;
-      }
 
-      return [
-        ...current,
-        id,
-      ];
-    });
+    setHidden(
+      (current) => {
+
+        if (
+          current.includes(id)
+        ) {
+          return current;
+        }
+
+        return [
+          ...current,
+          id,
+        ];
+      }
+    );
+
 
     setUndo(id);
 
+
     if (!isDemoMode) {
+
       try {
-        await api.markNotInterested(id);
+
+        await api.markNotInterested(
+          id
+        );
+
       } catch (error) {
+
         console.error(
           'Failed to mark not interested:',
           error
@@ -361,126 +534,161 @@ export function FindJugaadPage() {
       }
     }
 
-    setTimeout(() => {
-      setUndo((current) =>
-        current === id
-          ? null
-          : current
-      );
-    }, 5000);
+
+    setTimeout(
+      () => {
+
+        setUndo(
+          (current) =>
+            current === id
+              ? null
+              : current
+        );
+
+      },
+      5000
+    );
   };
 
 
-  /* =======================================================
-     SEND PROPOSAL
-     ======================================================= */
+  // ================================================================
+  // SEND PROPOSAL
+  // ================================================================
 
-  const handleSendProposal = async (
-    payload
-  ) => {
-    try {
-      console.log(
-        'FIND JUGAAD - sending proposal:',
-        payload
-      );
+  const handleSendProposal =
+    async (payload) => {
 
-      await sendProposal({
-        ...payload,
-        helper,
-      });
+      try {
 
-      console.log(
-        'FIND JUGAAD - proposal sent successfully'
-      );
+        console.log(
+          'FIND JUGAAD - sending proposal:',
+          payload
+        );
 
-      await fetchFeed();
 
-      if (refreshData) {
-        await refreshData();
+        await sendProposal({
+          ...payload,
+          helper,
+        });
+
+
+        console.log(
+          'FIND JUGAAD - proposal sent successfully'
+        );
+
+
+        await fetchFeed();
+
+
+        if (refreshData) {
+          await refreshData();
+        }
+
+
+        setBargain(null);
+        setProposalItem(null);
+
+      } catch (error) {
+
+        console.error(
+          'FIND JUGAAD - failed to send proposal:',
+          error
+        );
+
+
+        throw error;
       }
-
-      /*
-       * Close whichever modal opened the proposal.
-       */
-      setBargain(null);
-      setProposalItem(null);
-    } catch (error) {
-      console.error(
-        'FIND JUGAAD - failed to send proposal:',
-        error
-      );
-
-      /*
-       * Important:
-       * Re-throw so BargainModal can show
-       * the error message.
-       */
-      throw error;
-    }
-  };
+    };
 
 
-  /* =======================================================
-     SECTIONS
-     ======================================================= */
+  // ================================================================
+  // SECTIONS
+  // ================================================================
 
   const sections = [
+
     [
       'RECOMMENDED FOR YOU',
+
       visible.filter(
         (item) =>
           Number(
-            item?.matchPercentage ?? 0
+            item?.matchPercentage ??
+            0
           ) >= 80
       ),
     ],
 
+
     [
       'BEST SKILL MATCHES',
-      visible.filter((item) => {
-        const percentage =
-          Number(
-            item?.matchPercentage ?? 0
-          );
 
-        return (
-          percentage >= 70 &&
-          percentage < 80
-        );
-      }),
+      visible.filter(
+        (item) => {
+
+          const percentage =
+            Number(
+              item?.matchPercentage ??
+              0
+            );
+
+
+          return (
+            percentage >= 70 &&
+            percentage < 80
+          );
+        }
+      ),
     ],
+
 
     [
       'RECENTLY POSTED',
-      visible
-        .filter((item) => {
-          if (!item?.postedAt) {
-            return false;
-          }
 
-          return (
-            String(item.postedAt) >=
-            '2026-08-21'
-          );
-        })
+      visible
+        .filter(
+          (item) => {
+
+            if (
+              !item?.postedAt
+            ) {
+              return false;
+            }
+
+
+            return (
+              String(
+                item.postedAt
+              ) >=
+              '2026-08-21'
+            );
+          }
+        )
         .slice(0, 4),
     ],
 
+
     [
       'ENDING SOON',
-      visible.filter((item) => {
-        const remaining =
-          safeDaysUntil(
-            item?.deadline
-          );
 
-        return (
-          remaining === 'today' ||
-          remaining === '1 day left' ||
-          remaining === '2 days left'
-        );
-      }),
+      visible.filter(
+        (item) => {
+
+          const remaining =
+            safeDaysUntil(
+              item?.deadline
+            );
+
+
+          return (
+            remaining === 'today' ||
+            remaining === '1 day left' ||
+            remaining === '2 days left'
+          );
+        }
+      ),
     ],
+
 
     [
       'MORE OPPORTUNITIES',
@@ -489,16 +697,16 @@ export function FindJugaadPage() {
   ];
 
 
-  /* =======================================================
-     RENDER
-     ======================================================= */
+  // ================================================================
+  // RENDER
+  // ================================================================
 
   return (
     <div>
 
-      {/* ===================================================
+      {/* ==========================================================
           HEADER
-          =================================================== */}
+      ========================================================== */}
 
       <section className="pt-12 pb-7">
 
@@ -540,9 +748,9 @@ export function FindJugaadPage() {
       </section>
 
 
-      {/* ===================================================
+      {/* ==========================================================
           SEARCH + CATEGORY
-          =================================================== */}
+      ========================================================== */}
 
       <div className="surface-panel rounded-xl p-3 flex flex-col sm:flex-row gap-3 mb-8">
 
@@ -553,14 +761,18 @@ export function FindJugaadPage() {
             className="ml-3 text-ink-3"
           />
 
+
           <input
             value={query}
+
             onChange={(event) =>
               setQuery(
                 event.target.value
               )
             }
+
             placeholder="Search opportunities or skills..."
+
             className="w-full bg-transparent px-3 py-2.5 font-mono text-xs outline-none text-ink-0"
           />
 
@@ -579,14 +791,20 @@ export function FindJugaadPage() {
             'OTHER',
           ].map(
             (currentCategory) => (
+
               <button
-                key={currentCategory}
+                key={
+                  currentCategory
+                }
+
                 type="button"
+
                 onClick={() =>
                   setCategory(
                     currentCategory
                   )
                 }
+
                 className={`px-2.5 py-2 rounded-md font-technical text-[8px] ${
                   category ===
                   currentCategory
@@ -596,6 +814,7 @@ export function FindJugaadPage() {
               >
                 {currentCategory}
               </button>
+
             )
           )}
 
@@ -604,11 +823,12 @@ export function FindJugaadPage() {
       </div>
 
 
-      {/* ===================================================
+      {/* ==========================================================
           UNDO
-          =================================================== */}
+      ========================================================== */}
 
       {undo !== null && (
+
         <div className="mb-4 flex items-center justify-between surface-wood rounded-lg px-4 py-3">
 
           <span className="font-mono text-[10px] text-paper">
@@ -618,7 +838,9 @@ export function FindJugaadPage() {
 
           <button
             type="button"
+
             onClick={() => {
+
               setHidden(
                 (current) =>
                   current.filter(
@@ -629,6 +851,7 @@ export function FindJugaadPage() {
 
               setUndo(null);
             }}
+
             className="flex items-center gap-1.5 font-technical text-[8px] text-amber"
           >
             <Undo2 size={12} />
@@ -637,12 +860,13 @@ export function FindJugaadPage() {
           </button>
 
         </div>
+
       )}
 
 
-      {/* ===================================================
+      {/* ==========================================================
           FEED
-          =================================================== */}
+      ========================================================== */}
 
       {loading ? (
 
@@ -662,7 +886,9 @@ export function FindJugaadPage() {
             ([title, items]) => {
 
               if (
-                !Array.isArray(items) ||
+                !Array.isArray(
+                  items
+                ) ||
                 items.length === 0
               ) {
                 return null;
@@ -670,6 +896,7 @@ export function FindJugaadPage() {
 
 
               return (
+
                 <section
                   key={title}
                 >
@@ -706,11 +933,14 @@ export function FindJugaadPage() {
 
 
                         try {
+
                           existingProposal =
                             getProposalForJugaad(
                               item.id
                             );
+
                         } catch (error) {
+
                           console.error(
                             'Failed to get proposal:',
                             error
@@ -719,22 +949,30 @@ export function FindJugaadPage() {
 
 
                         return (
+
                           <OpportunityCard
                             key={item.id}
+
                             item={item}
+
                             existingProposal={
                               existingProposal
                             }
 
                             onHide={() =>
-                              hide(item.id)
+                              hide(
+                                item.id
+                              )
                             }
 
                             onBargain={() =>
-                              setBargain(item)
+                              setBargain(
+                                item
+                              )
                             }
 
                             onInterest={() => {
+
                               console.log(
                                 'INTERESTED clicked:',
                                 item
@@ -745,6 +983,7 @@ export function FindJugaadPage() {
                               );
                             }}
                           />
+
                         );
                       }
                     )}
@@ -752,6 +991,7 @@ export function FindJugaadPage() {
                   </div>
 
                 </section>
+
               );
             }
           )}
@@ -760,9 +1000,9 @@ export function FindJugaadPage() {
       )}
 
 
-      {/* ===================================================
+      {/* ==========================================================
           EMPTY STATE
-          =================================================== */}
+      ========================================================== */}
 
       {!loading &&
         visible.length === 0 && (
@@ -783,13 +1023,14 @@ export function FindJugaadPage() {
         )}
 
 
-      {/* ===================================================
+      {/* ==========================================================
           BARGAIN MODAL
-          =================================================== */}
+      ========================================================== */}
 
       {bargain && (
 
         <BargainModal
+
           item={bargain}
 
           mode="bargain"
@@ -801,18 +1042,20 @@ export function FindJugaadPage() {
           onSend={
             handleSendProposal
           }
+
         />
 
       )}
 
 
-      {/* ===================================================
+      {/* ==========================================================
           INTERESTED / PROPOSAL MODAL
-          =================================================== */}
+      ========================================================== */}
 
       {proposalItem && (
 
         <BargainModal
+
           item={proposalItem}
 
           mode="interest"
@@ -824,6 +1067,7 @@ export function FindJugaadPage() {
           onSend={
             handleSendProposal
           }
+
         />
 
       )}
@@ -833,9 +1077,9 @@ export function FindJugaadPage() {
 }
 
 
-/* =========================================================
-   OPPORTUNITY CARD
-   ========================================================= */
+// ================================================================
+// OPPORTUNITY CARD
+// ================================================================
 
 function OpportunityCard({
   item,
@@ -860,12 +1104,15 @@ function OpportunityCard({
 
 
   const color =
-    CATEGORY_COLORS?.[category] ||
-    'amber';
+    CATEGORY_COLORS?.[
+      category
+    ] || 'amber';
 
 
   const proposalSent =
-    Boolean(existingProposal);
+    Boolean(
+      existingProposal
+    );
 
 
   const proposalStatus =
@@ -873,76 +1120,85 @@ function OpportunityCard({
     null;
 
 
-  /* =======================================================
-     POSTER DATA
-     ======================================================= */
-
-  const poster =
-    item?.poster &&
-    typeof item.poster === 'object'
-      ? item.poster
-      : null;
-
-
-  const creator =
-    item?.creator &&
-    typeof item.creator === 'object'
-      ? item.creator
-      : null;
-
+  // ============================================================
+  // POSTER
+  // ============================================================
+  //
+  // THIS IS THE PERSON WHO POSTED THE JUGAAD.
+  //
+  // It is deliberately NOT taken from `user`.
+  // ============================================================
 
   const posterName =
-    poster?.name ??
-    creator?.name ??
+    item?.poster_name ??
     item?.posterName ??
+    item?.poster?.name ??
+    item?.creator_name ??
     item?.creatorName ??
+    item?.creator?.name ??
     'Student';
 
 
   const posterInitials =
-    poster?.initials ??
-    creator?.initials ??
+  (
+    item?.poster?.initials ??
+    item?.poster_initials ??
+    item?.posterInitials ??
     String(posterName)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(
+        (part) => part[0]
+      )
+      .join('')
       .slice(0, 2)
-      .toUpperCase();
+      .toUpperCase()
+  ) || 'ST';
 
 
   const posterRating =
-    poster?.rating ??
-    creator?.rating ??
+    item?.poster_rating ??
     item?.posterRating ??
+    item?.poster?.rating ??
     item?.rating ??
     '4.8';
 
 
   const categoryChar =
-    category.charAt(0) || 'J';
+    category.charAt(0) ||
+    'J';
 
 
-  /* =======================================================
-     CARD
-     ======================================================= */
+  // ============================================================
+  // CARD
+  // ============================================================
 
   return (
 
     <article
+
       className="surface-metal-brushed rounded-2xl p-5 relative"
+
       style={{
         border:
           `1px solid color-mix(in srgb, var(--${color}) 22%, transparent)`,
       }}
+
     >
 
-      {/* ---------------------------------------------------
+      {/* ========================================================
           HEADER
-          --------------------------------------------------- */}
+      ======================================================== */}
 
       <div className="flex items-start justify-between gap-3">
 
         <div className="flex gap-3">
 
           <span
+
             className="grid place-items-center w-11 h-11 rounded-xl shrink-0"
+
             style={{
               background:
                 `color-mix(in srgb, var(--${color}) 14%, transparent)`,
@@ -950,6 +1206,7 @@ function OpportunityCard({
               color:
                 `var(--${color})`,
             }}
+
           >
 
             <span className="font-display text-lg">
@@ -970,7 +1227,9 @@ function OpportunityCard({
             <div className="flex flex-wrap items-center gap-2 mt-1.5">
 
               <span
+
                 className="font-technical text-[7px] px-1.5 py-1 rounded"
+
                 style={{
                   background:
                     `var(--${color})`,
@@ -978,6 +1237,7 @@ function OpportunityCard({
                   color:
                     'var(--bg-0)',
                 }}
+
               >
                 {category}
               </span>
@@ -995,10 +1255,12 @@ function OpportunityCard({
         </div>
 
 
-        {item?.matchPercentage != null && (
+        {item?.matchPercentage !=
+          null && (
 
           <span className="font-mono text-[9px] text-mint">
-            {item.matchPercentage}% match
+            {item.matchPercentage}%
+            match
           </span>
 
         )}
@@ -1006,9 +1268,9 @@ function OpportunityCard({
       </div>
 
 
-      {/* ---------------------------------------------------
+      {/* ========================================================
           DESCRIPTION
-          --------------------------------------------------- */}
+      ======================================================== */}
 
       <p className="font-mono text-[10px] leading-relaxed text-ink-2 mt-4">
 
@@ -1018,9 +1280,9 @@ function OpportunityCard({
       </p>
 
 
-      {/* ---------------------------------------------------
+      {/* ========================================================
           META
-          --------------------------------------------------- */}
+      ======================================================== */}
 
       <div className="flex flex-wrap items-center gap-3 mt-4 text-[9px] font-mono text-ink-3">
 
@@ -1073,16 +1335,18 @@ function OpportunityCard({
       </div>
 
 
-      {/* ---------------------------------------------------
+      {/* ========================================================
           PROPOSAL STATUS
-          --------------------------------------------------- */}
+      ======================================================== */}
 
       {proposalSent && (
 
         <div className="mt-3 surface-panel rounded-lg px-3 py-2 flex items-center gap-2">
 
           <CheckCircle2
+
             size={13}
+
             className={
               proposalStatus ===
               'accepted'
@@ -1092,6 +1356,7 @@ function OpportunityCard({
                   ? 'text-coral'
                   : 'text-amber'
             }
+
           />
 
 
@@ -1121,41 +1386,61 @@ function OpportunityCard({
       )}
 
 
-      {/* ---------------------------------------------------
-          FOOTER / ACTIONS
-          --------------------------------------------------- */}
+      {/* ========================================================
+          FOOTER
+      ======================================================== */}
 
       <div className="mt-4 pt-3 border-t border-metal-1/40 flex items-center gap-2">
+
+        {/* Poster avatar */}
 
         <span className="grid place-items-center w-6 h-6 rounded-full bg-amber text-bg-0 font-display text-[8px]">
           {posterInitials}
         </span>
 
 
+        {/* POSTER'S NAME */}
+
         <span className="font-mono text-[9px] text-ink-1 flex-1">
           {posterName}
         </span>
 
 
-        {/* NOT INTERESTED */}
+        {/* ======================================================
+            NOT INTERESTED
+        ====================================================== */}
 
         <button
+
           type="button"
+
           onClick={onHide}
+
           aria-label="Not interested"
+
           className="grid place-items-center w-8 h-8 rounded-lg text-ink-3 hover:text-coral hover:bg-coral/10"
+
         >
+
           <X size={14} />
+
         </button>
 
 
-        {/* BARGAIN */}
+        {/* ======================================================
+            BARGAIN
+        ====================================================== */}
 
         <button
+
           type="button"
+
           onClick={onBargain}
+
           disabled={proposalSent}
+
           className="flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] text-amber border border-amber/30 hover:bg-amber/10 disabled:opacity-40"
+
         >
 
           <HandCoins size={12} />
@@ -1165,33 +1450,38 @@ function OpportunityCard({
         </button>
 
 
-        {/* INTERESTED */}
+        {/* ======================================================
+            INTERESTED
+        ====================================================== */}
 
         <button
+
           type="button"
+
           onClick={onInterest}
+
           disabled={proposalSent}
+
           className={`flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] ${
             proposalSent
               ? 'bg-mint/15 text-mint border border-mint/30'
               : 'bg-amber text-bg-0 hover:bg-amber-soft'
           } disabled:cursor-default`}
+
         >
 
-          <CheckCircle2
-            size={12}
-            className={
-              proposalSent
-                ? 'block'
-                : 'hidden'
-            }
-          />
+          {proposalSent ? (
 
+            <CheckCircle2
+              size={12}
+            />
 
-          {!proposalSent && (
+          ) : (
+
             <span className="text-xs">
               ♥
             </span>
+
           )}
 
 

@@ -2,11 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { LED } from '@/components/primitives/Details';
+
 import { useProposals } from '@/context/ProposalContext';
-import {
-  REQUEST_STATUS,
-  timeAgo,
-} from '@/data/jugaadMockData';
 
 import {
   MessageSquare,
@@ -20,411 +17,422 @@ import {
 
 import { ConfirmActionModal } from '@/components/workshop/pages/ConfirmActionModal';
 
+
+// ================================================================
+// STATUS CONFIG
+// ================================================================
+
 const STATUS_CFG = {
-  ...REQUEST_STATUS,
+
+  accepted: {
+    color: 'mint',
+    label: 'ACCEPTED',
+  },
+
+  'price-agreed': {
+    color: 'mint',
+    label: 'ACCEPTED',
+  },
+
+  'in-progress': {
+    color: 'amber',
+    label: 'IN PROGRESS',
+  },
+
+  completed: {
+    color: 'mint',
+    label: 'COMPLETED',
+  },
+
+  negotiating: {
+    color: 'amber',
+    label: 'NEGOTIATING',
+  },
+
+  pending: {
+    color: 'amber',
+    label: 'PENDING',
+  },
 
   waiting: {
     color: 'amber',
     label: 'PENDING',
   },
 
+  rejected: {
+    color: 'coral',
+    label: 'REJECTED',
+  },
+
   withdrawn: {
     color: 'ink',
     label: 'WITHDRAWN',
   },
+
 };
 
-/* ================================================================
-   POSTER
-================================================================ */
 
-function getPoster(request) {
-  const poster =
-    request?.poster ||
-    request?.owner ||
-    request?.jugaad?.poster ||
-    request?.jugaad?.owner ||
-    request?.jugaad?.user ||
-    request?.user ||
-    request?.creator ||
-    null;
+// ================================================================
+// GET POSTER
+//
+// IMPORTANT:
+// Backend returns:
+//     poster_name
+//
+// This is the person who posted the Jugaad.
+//
+// Do NOT use the logged-in helper here.
+// ================================================================
 
-  if (!poster) {
-    return {
-      name: 'Unknown User',
-      initials: 'U',
-    };
-  }
+function getPoster(request = {}) {
 
   const name =
-    poster.name ||
-    poster.full_name ||
-    poster.fullName ||
-    poster.username ||
-    poster.email ||
+    request?.poster_name ??
+    request?.posterName ??
+    request?.poster?.name ??
+    request?.owner?.name ??
+    request?.jugaad?.poster?.name ??
+    request?.jugaad?.owner?.name ??
+    request?.creator?.name ??
+    request?.creator_name ??
+    request?.creatorName ??
     'Unknown User';
 
-  const initials =
-    poster.initials ||
-    poster.avatarInitials ||
-    name
+
+  const cleanName =
+    String(name).trim() ||
+    'Unknown User';
+
+
+  const initialsSource =
+    request?.poster_initials ??
+    request?.posterInitials ??
+    request?.poster?.initials ??
+    request?.poster?.avatarInitials ??
+    null;
+
+
+  let initials = initialsSource;
+
+
+  if (!initials) {
+
+    initials = cleanName
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
-      .map((part) => part[0])
+      .map(
+        (part) =>
+          part.charAt(0)
+      )
       .join('')
-      .toUpperCase() ||
-    'U';
+      .toUpperCase();
+
+  }
+
+
+  if (!initials) {
+    initials = 'U';
+  }
+
 
   return {
-    name,
+    name: cleanName,
     initials,
   };
+
 }
 
-/* ================================================================
-   SAFE TIME
-================================================================ */
+
+// ================================================================
+// SAFE RELATIVE TIME
+//
+// Uses the ACTUAL backend timestamp.
+//
+// Example:
+//     2026-08-27T14:04:40.385Z
+//
+// Browser converts it to the user's local time automatically.
+// ================================================================
 
 function safeTimeAgo(value) {
-  if (!value) {
-    return 'recently';
-  }
 
-  try {
-    return timeAgo(value);
-  } catch {
-    return 'recently';
-  }
-}
-
-/* ================================================================
-   GET VALID NUMERIC CONVERSATION ID
-================================================================ */
-
-function getNumericConversationId(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  const id = String(value).trim();
-
-  if (!id) {
-    return null;
-  }
-
-  /*
-   * PostgreSQL bigint conversation IDs are numeric.
-   */
-  if (!/^\d+$/.test(id)) {
-    return null;
-  }
-
-  return id;
-}
-
-/* ================================================================
-   FIND CONVERSATION FOR THIS REQUEST
-================================================================ */
-
-function getConversationForRequest(
-  request,
-  conversations = []
-) {
   if (
-    !request ||
-    !Array.isArray(conversations)
+    value === null ||
+    value === undefined ||
+    value === ''
   ) {
-    return null;
+    return 'date unavailable';
   }
 
-  /*
-   * --------------------------------------------------------------
-   * 1. FIRST: conversation ID already inside request
-   * --------------------------------------------------------------
-   */
 
-  const directConversationId =
-    getNumericConversationId(
-      request?.conversationId ??
-        request?.conversation_id ??
-        request?.conversation?.id ??
-        request?.conversation?.conversationId ??
-        request?.conversation?.conversation_id
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return 'date unavailable';
+  }
+
+
+  const now =
+    Date.now();
+
+
+  const difference =
+    now -
+    date.getTime();
+
+
+  // Small clock differences should still be "just now".
+  if (difference < 60000) {
+    return 'just now';
+  }
+
+
+  const seconds =
+    Math.floor(
+      difference / 1000
     );
 
-  if (directConversationId) {
-    return {
-      ...(
-        request?.conversation || {}
-      ),
-      id: directConversationId,
-    };
+
+  const minutes =
+    Math.floor(
+      seconds / 60
+    );
+
+
+  if (minutes < 60) {
+    return `${minutes}m ago`;
   }
 
-  /*
-   * --------------------------------------------------------------
-   * 2. Get proposal ID
-   * --------------------------------------------------------------
-   */
 
-  const proposalId =
-    request?.proposalId ??
-    request?.proposal_id ??
-    request?.proposal?.id ??
-    request?.proposal?.proposalId ??
-    request?.proposal?.proposal_id ??
-    request?.id ??
-    null;
+  const hours =
+    Math.floor(
+      minutes / 60
+    );
 
-  /*
-   * --------------------------------------------------------------
-   * 3. Get Jugaad ID
-   * --------------------------------------------------------------
-   */
 
-  const jugaadId =
-    request?.jugaadId ??
-    request?.jugaad_id ??
-    request?.jugaad?.id ??
-    request?.item?.id ??
-    null;
-
-  /*
-   * --------------------------------------------------------------
-   * 4. FIRST MATCH: proposal_id
-   *
-   * This is the safest match.
-   * --------------------------------------------------------------
-   */
-
-  if (
-    proposalId !== null &&
-    proposalId !== undefined
-  ) {
-    const proposalMatch =
-      conversations.find((conversation) => {
-        const conversationProposalId =
-          conversation?.proposalId ??
-          conversation?.proposal_id ??
-          conversation?.proposal?.id ??
-          conversation?.proposal?.proposalId ??
-          conversation?.proposal?.proposal_id ??
-          conversation?.proposal?.data?.id ??
-          null;
-
-        if (
-          conversationProposalId === null ||
-          conversationProposalId === undefined
-        ) {
-          return false;
-        }
-
-        return (
-          String(
-            conversationProposalId
-          ) === String(proposalId)
-        );
-      });
-
-    if (proposalMatch) {
-      return proposalMatch;
-    }
+  if (hours < 24) {
+    return `${hours}h ago`;
   }
 
-  /*
-   * --------------------------------------------------------------
-   * 5. SECOND MATCH: jugaad_id
-   *
-   * This is a fallback in case the conversations endpoint
-   * doesn't expose proposal_id in the frontend shape.
-   * --------------------------------------------------------------
-   */
 
-  if (
-    jugaadId !== null &&
-    jugaadId !== undefined
-  ) {
-    const jugaadMatch =
-      conversations.find((conversation) => {
-        const conversationJugaadId =
-          conversation?.jugaadId ??
-          conversation?.jugaad_id ??
-          conversation?.jugaad?.id ??
-          null;
+  const days =
+    Math.floor(
+      hours / 24
+    );
 
-        if (
-          conversationJugaadId === null ||
-          conversationJugaadId === undefined
-        ) {
-          return false;
-        }
 
-        return (
-          String(
-            conversationJugaadId
-          ) === String(jugaadId)
-        );
-      });
-
-    if (jugaadMatch) {
-      return jugaadMatch;
-    }
+  if (days < 30) {
+    return `${days}d ago`;
   }
 
-  return null;
+
+  const months =
+    Math.floor(
+      days / 30
+    );
+
+
+  if (months < 12) {
+    return `${months}mo ago`;
+  }
+
+
+  const years =
+    Math.floor(
+      months / 12
+    );
+
+
+  return `${years}y ago`;
+
 }
 
-/* ================================================================
-   GET CONVERSATION ID
-================================================================ */
+
+// ================================================================
+// GET VALID CONVERSATION ID
+//
+// PostgreSQL conversation IDs are bigint.
+// Never use fake values like "conv1".
+// ================================================================
 
 function getValidConversationId(
-  request,
-  conversations = []
+  request = {}
 ) {
-  /*
-   * First try the actual request object.
-   */
-  const directId =
-    getNumericConversationId(
-      request?.conversationId ??
-        request?.conversation_id ??
-        request?.conversation?.id ??
-        request?.conversation?.conversationId ??
-        request?.conversation?.conversation_id
-    );
 
-  if (directId) {
-    return directId;
-  }
+  const rawId =
+    request?.conversation_id ??
+    request?.conversationId ??
+    request?.conversation?.id;
 
-  /*
-   * Then find the conversation from ProposalContext.
-   */
-  const conversation =
-    getConversationForRequest(
-      request,
-      conversations
-    );
 
-  if (!conversation) {
+  if (
+    rawId === null ||
+    rawId === undefined ||
+    rawId === ''
+  ) {
     return null;
   }
 
-  return getNumericConversationId(
-    conversation?.id ??
-      conversation?.conversationId ??
-      conversation?.conversation_id
-  );
+
+  const value =
+    String(rawId).trim();
+
+
+  if (
+    !/^\d+$/.test(value)
+  ) {
+    return null;
+  }
+
+
+  return value;
+
 }
 
-/* ================================================================
-   PAGE
-================================================================ */
+
+// ================================================================
+// MAIN PAGE
+// ================================================================
 
 export function MyRequestsPage() {
+
   const {
+
     myRequests = [],
-    conversations = [],
+
     acceptCounter,
+
     rejectCounter,
+
     withdrawProposal,
+
   } = useProposals();
 
-  const [confirmAction, setConfirmAction] =
-    useState(null);
 
-  const requests = Array.isArray(myRequests)
-    ? myRequests
-    : [];
+  const [
+    confirmAction,
+    setConfirmAction,
+  ] = useState(null);
 
-  /*
-   * Debug information.
-   *
-   * This will help verify exactly what the frontend
-   * receives from the backend.
-   */
-  console.log(
-    'MY REQUESTS:',
-    requests
-  );
 
-  console.log(
-    'MY REQUESTS - CONVERSATIONS:',
-    conversations
-  );
+  const requests =
+    Array.isArray(myRequests)
+      ? myRequests
+      : [];
 
-  /* ================================================================
-     WITHDRAW
-  ================================================================ */
 
-  const handleWithdraw = (request) => {
-    setConfirmAction({
-      variant: 'withdraw',
+  // ================================================================
+  // WITHDRAW
+  // ================================================================
 
-      proposal: {
-        id:
-          request?.proposalId ??
-          request?.proposal_id ??
-          request?.id,
+  const handleWithdraw =
+    (request) => {
 
-        helper: {
-          name: 'You',
+      setConfirmAction({
+
+        variant: 'withdraw',
+
+        proposal: {
+
+          id:
+            request?.proposalId ??
+            request?.proposal_id ??
+            request?.id,
+
+          helper: {
+            name: 'You',
+          },
+
+          jugaadTitle:
+            request?.jugaadTitle ??
+            request?.jugaad_title ??
+            request?.jugaad?.title ??
+            request?.title ??
+            'Jugaad',
+
+          proposedPrice:
+            request?.agreedAmount ??
+            request?.agreed_amount ??
+            request?.proposedAmount ??
+            request?.proposed_amount ??
+            request?.proposed_price ??
+            request?.amount ??
+            0,
+
         },
 
-        jugaadTitle:
-          request?.jugaadTitle ||
-          request?.jugaad_title ||
-          request?.jugaad?.title ||
-          'Jugaad',
+      });
 
-        proposedPrice:
-          request?.proposedAmount ??
-          request?.proposed_amount ??
-          request?.amount ??
-          request?.proposed_price ??
-          0,
-      },
-    });
-  };
+    };
 
-  /* ================================================================
-     CONFIRM ACTION
-  ================================================================ */
 
-  const handleConfirmAction = async () => {
-    if (!confirmAction) {
-      return;
-    }
+  // ================================================================
+  // CONFIRM ACTION
+  // ================================================================
 
-    try {
-      if (
-        confirmAction.variant === 'withdraw' &&
-        confirmAction.proposal?.id
-      ) {
-        await withdrawProposal(
-          confirmAction.proposal.id
-        );
+  const handleConfirmAction =
+    async () => {
+
+      if (!confirmAction) {
+        return;
       }
-    } catch (error) {
-      console.error(
-        'Failed to perform proposal action:',
-        error
-      );
-    } finally {
-      setConfirmAction(null);
-    }
-  };
+
+
+      try {
+
+        if (
+          confirmAction.variant ===
+            'withdraw' &&
+          confirmAction.proposal?.id
+        ) {
+
+          await withdrawProposal(
+            confirmAction.proposal.id
+          );
+
+        }
+
+      } catch (error) {
+
+        console.error(
+          'Failed to perform proposal action:',
+          error
+        );
+
+      } finally {
+
+        setConfirmAction(null);
+
+      }
+
+    };
+
+
+  // ================================================================
+  // RENDER
+  // ================================================================
 
   return (
+
     <div>
+
       {/* ==========================================================
-          HEADER
+          PAGE HEADER
       ========================================================== */}
 
       <section className="pt-12 pb-7">
+
         <div className="flex items-center gap-3 mb-4">
+
           <LED
             color="mint"
             pulse
@@ -434,28 +442,37 @@ export function MyRequestsPage() {
           <span className="font-technical text-[9px] text-ink-2">
             05 — YOUR OUTGOING SIGNALS
           </span>
+
         </div>
 
+
         <h1 className="font-display text-4xl sm:text-5xl">
+
           MY
+
           <br />
+
           <span className="text-mint">
             REQUESTS.
           </span>
+
         </h1>
 
+
         <p className="mt-4 max-w-xl text-sm text-ink-2">
-          Track every Jugaad where you raised your
-          hand, made an offer, or started a
-          collaboration.
+          Track every Jugaad where you raised your hand,
+          made an offer, or started a collaboration.
         </p>
+
       </section>
 
+
       {/* ==========================================================
-          REQUESTS
+          EMPTY STATE
       ========================================================== */}
 
       {requests.length === 0 ? (
+
         <div
           className="surface-panel rounded-2xl p-8 text-center"
           style={{
@@ -463,141 +480,239 @@ export function MyRequestsPage() {
               '1px solid var(--metal-1)',
           }}
         >
+
           <p className="font-display text-lg text-ink-2">
             NO REQUESTS YET.
           </p>
 
+
           <p className="font-mono text-[10px] text-ink-3 mt-2">
-            Your interests and proposals will
-            appear here.
+            Your interests and proposals will appear here.
           </p>
+
         </div>
+
       ) : (
+
+        /* ========================================================
+           REQUEST LIST
+        ======================================================== */
+
         <div className="space-y-3">
+
           {requests.map(
-            (request, index) => (
+            (
+              request,
+              index
+            ) => (
+
               <RequestRow
+
                 key={
-                  request?.id ||
-                  request?.proposalId ||
-                  request?.proposal_id ||
-                  request?.jugaadId ||
-                  request?.jugaad_id ||
+
+                  request?.proposalId ??
+
+                  request?.proposal_id ??
+
+                  request?.id ??
+
+                  request?.jugaadId ??
+
+                  request?.jugaad_id ??
+
                   `request-${index}`
+
                 }
+
                 request={request}
-                conversations={conversations}
-                acceptCounter={acceptCounter}
-                rejectCounter={rejectCounter}
-                onWithdraw={() =>
-                  handleWithdraw(request)
+
+                acceptCounter={
+                  acceptCounter
                 }
+
+                rejectCounter={
+                  rejectCounter
+                }
+
+                onWithdraw={() =>
+                  handleWithdraw(
+                    request
+                  )
+                }
+
               />
+
             )
           )}
+
         </div>
+
       )}
+
 
       {/* ==========================================================
           CONFIRM MODAL
       ========================================================== */}
 
       {confirmAction && (
+
         <ConfirmActionModal
-          variant={confirmAction.variant}
+
+          variant={
+            confirmAction.variant
+          }
+
           proposal={
             confirmAction.proposal
           }
+
           onClose={() =>
             setConfirmAction(null)
           }
+
           onConfirm={
             handleConfirmAction
           }
+
         />
+
       )}
+
     </div>
+
   );
+
 }
 
-/* ================================================================
-   REQUEST ROW
-================================================================ */
+
+// ================================================================
+// REQUEST ROW
+// ================================================================
 
 function RequestRow({
+
   request = {},
-  conversations = [],
+
   acceptCounter,
+
   rejectCounter,
+
   onWithdraw,
+
 }) {
-  const poster = getPoster(request);
+
+
+  // ==============================================================
+  // POSTER
+  // ==============================================================
+
+  const poster =
+    getPoster(request);
+
+
+  // ==============================================================
+  // STATUS
+  // ==============================================================
 
   const status =
-    request?.status || 'waiting';
+    String(
+      request?.status ??
+      'pending'
+    ).toLowerCase();
+
 
   const cfg =
-    STATUS_CFG[status] || {
+    STATUS_CFG[status] ?? {
+
       color: 'amber',
-      label: String(
+
+      label:
         status
-      ).toUpperCase(),
+          .replace(
+            /[-_]/g,
+            ' '
+          )
+          .toUpperCase(),
+
     };
 
+
+  // ==============================================================
+  // STATUS FLAGS
+  // ==============================================================
+
   const isAccepted = [
+
     'accepted',
+
     'price-agreed',
+
     'in-progress',
+
+    'in_progress',
+
     'completed',
+
   ].includes(status);
+
 
   const isNegotiating =
     status === 'negotiating';
 
+
   const isWithdrawn =
     status === 'withdrawn';
 
-  const isPending =
-    status === 'waiting' ||
-    status === 'pending';
 
-  /* ==============================================================
-     PROPOSAL ID
-  ============================================================== */
+  const isPending = [
+
+    'waiting',
+
+    'pending',
+
+  ].includes(status);
+
+
+  // ==============================================================
+  // PROPOSAL ID
+  // ==============================================================
 
   const proposalId =
     request?.proposalId ??
     request?.proposal_id ??
-    request?.proposal?.id ??
-    request?.proposal?.proposalId ??
-    request?.proposal?.proposal_id ??
-    request?.id ??
-    null;
+    request?.id;
+
 
   const canWithdraw =
     Boolean(proposalId) &&
     !isWithdrawn &&
-    (isPending || isNegotiating);
+    (
+      isPending ||
+      isNegotiating
+    );
 
-  /* ==============================================================
-     JUGAAD
-  ============================================================== */
+
+  // ==============================================================
+  // JUGAAD DETAILS
+  // ==============================================================
 
   const jugaadTitle =
-    request?.jugaadTitle ||
-    request?.jugaad_title ||
-    request?.jugaad?.title ||
-    request?.title ||
+    request?.jugaadTitle ??
+    request?.jugaad_title ??
+    request?.jugaad?.title ??
+    request?.title ??
     'Untitled Jugaad';
 
+
   const category =
-    request?.category ||
-    request?.jugaad?.category ||
+    request?.category ??
+    request?.jugaad?.category ??
     'General';
 
-  /* ==============================================================
-     PRICE
-  ============================================================== */
+
+  // ==============================================================
+  // AMOUNT
+  // ==============================================================
 
   const proposedAmount =
     request?.agreedAmount ??
@@ -608,13 +723,14 @@ function RequestRow({
     request?.proposed_price ??
     0;
 
-  /* ==============================================================
-     TYPE
-  ============================================================== */
+
+  // ==============================================================
+  // REQUEST TYPE
+  // ==============================================================
 
   const requestType =
-    request?.requestType ||
-    request?.request_type ||
+    request?.requestType ??
+    request?.request_type ??
     (
       request?.proposedAmount != null ||
       request?.proposed_amount != null ||
@@ -623,101 +739,99 @@ function RequestRow({
         : 'interest'
     );
 
-  /* ==============================================================
-     MESSAGE
-  ============================================================== */
+
+  // ==============================================================
+  // MESSAGE / EXPLANATION
+  // ==============================================================
 
   const explanation =
-    request?.explanation ||
-    request?.proposal_message ||
-    request?.message ||
+    request?.explanation ??
+    request?.proposal_message ??
+    request?.message ??
     '';
 
-  /* ==============================================================
-     SKILLS
-  ============================================================== */
 
-  const skills = Array.isArray(
-    request?.skills
-  )
-    ? request.skills
-    : [];
+  // ==============================================================
+  // SKILLS
+  // ==============================================================
 
-  /* ==============================================================
-     COMPLETION
-  ============================================================== */
+  const skills =
+    Array.isArray(
+      request?.skills
+    )
+      ? request.skills
+      : Array.isArray(
+          request?.required_skills
+        )
+        ? request.required_skills
+        : [];
+
+
+  // ==============================================================
+  // COMPLETION TIME
+  // ==============================================================
 
   const completionTime =
-    request?.completionTime ||
-    request?.completion_time ||
-    request?.estimated_completion ||
+    request?.completionTime ??
+    request?.completion_time ??
+    request?.estimated_completion ??
     '';
 
-  /* ==============================================================
-     REQUEST DATE
-  ============================================================== */
+
+  // ==============================================================
+  // IMPORTANT:
+  //
+  // The backend proposal query returns:
+  //
+  //     p.created_at
+  //
+  // That is the real time the request was submitted.
+  //
+  // Prefer created_at above everything else.
+  // ==============================================================
 
   const requestedAt =
-    request?.requestedAt ||
-    request?.requested_at ||
-    request?.createdAt ||
-    request?.created_at;
+    request?.created_at ??
+    request?.createdAt ??
+    request?.requested_at ??
+    request?.requestedAt ??
+    null;
 
-  /* ==============================================================
-     NEGOTIATION HISTORY
-  ============================================================== */
+
+  // ==============================================================
+  // NEGOTIATION HISTORY
+  // ==============================================================
 
   const negotiationHistory =
     Array.isArray(
       request?.negotiationHistory
     )
+
       ? request.negotiationHistory
+
       : Array.isArray(
           request?.negotiation_history
         )
+
         ? request.negotiation_history
+
         : [];
 
-  /* ==============================================================
-     CONVERSATION
 
-     THIS IS THE IMPORTANT FIX.
-
-     We do NOT only check request.conversation_id.
-
-     We also search the conversations array returned
-     by ProposalContext using proposal_id / jugaad_id.
-  ============================================================== */
-
-  const conversation =
-    getConversationForRequest(
-      request,
-      conversations
-    );
+  // ==============================================================
+  // CONVERSATION ID
+  //
+  // Only show MESSAGE when proposal is accepted.
+  // ==============================================================
 
   const conversationId =
     getValidConversationId(
-      request,
-      conversations
+      request
     );
 
-  /*
-   * Debug only.
-   */
-  console.log(
-    'MY REQUEST ROW:',
-    {
-      proposalId,
-      jugaadId:
-        request?.jugaadId ??
-        request?.jugaad_id,
-      status,
-      conversation,
-      conversationId,
-    }
-  );
 
   return (
+
     <article
       className="surface-panel rounded-2xl p-5"
       style={{
@@ -725,294 +839,516 @@ function RequestRow({
           '1px solid var(--metal-1)',
       }}
     >
-      {/* ==========================================================
-          TOP
-      ========================================================== */}
+
+      {/* ========================================================
+          MAIN CONTENT
+      ======================================================== */}
 
       <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-        {/* POSTER AVATAR */}
+
+        {/* ======================================================
+            POSTER AVATAR
+        ====================================================== */}
 
         <span className="grid place-items-center w-10 h-10 rounded-full bg-amber text-bg-0 font-display text-[9px] shrink-0">
+
           {poster.initials}
+
         </span>
 
+
+        {/* ======================================================
+            INFORMATION
+        ====================================================== */}
+
         <div className="flex-1 min-w-0">
+
           <div className="flex flex-wrap items-center gap-2">
+
             <h2 className="font-display text-lg">
+
               {jugaadTitle}
+
             </h2>
 
+
             <span
+
               className="font-technical text-[7px] px-2 py-1 rounded"
+
               style={{
-                color: `var(--${cfg.color})`,
+                color:
+                  `var(--${cfg.color})`,
+
                 background:
                   `color-mix(in srgb, var(--${cfg.color}) 12%, transparent)`,
               }}
+
             >
+
               {cfg.label}
+
             </span>
+
           </div>
 
+
+          {/* ====================================================
+              POSTER + REAL TIMESTAMP
+          ==================================================== */}
+
           <p className="font-mono text-[9px] text-ink-3 mt-1">
-            Poster: {poster.name} ·{' '}
-            {category} ·{' '}
+
+            Poster:{' '}
+
+            <span className="text-ink-1">
+
+              {poster.name}
+
+            </span>
+
+            {' '}·{' '}
+
+            {category}
+
+            {' '}·{' '}
+
             {safeTimeAgo(
               requestedAt
             )}
+
           </p>
 
-          {/* EXPLANATION */}
+
+          {/* ====================================================
+              PROPOSAL MESSAGE
+          ==================================================== */}
 
           {explanation && (
+
             <p className="font-mono text-[10px] text-ink-2 mt-2 leading-relaxed surface-panel rounded-lg p-3">
+
               "{explanation}"
+
             </p>
+
           )}
 
-          {/* SKILLS */}
+
+          {/* ====================================================
+              SKILLS
+          ==================================================== */}
 
           {skills.length > 0 && (
+
             <p className="font-mono text-[9px] text-ink-3 mt-2 flex items-center gap-1 flex-wrap">
+
               <Tag size={10} />
 
+
               {skills.map(
-                (skill, index) => (
+                (
+                  skill,
+                  index
+                ) => (
+
                   <span
                     key={`${skill}-${index}`}
                   >
+
                     {skill}
 
                     {index <
-                    skills.length - 1
+                      skills.length - 1
                       ? ' · '
                       : ''}
+
                   </span>
+
                 )
               )}
+
             </p>
+
           )}
 
-          {/* COMPLETION TIME */}
+
+          {/* ====================================================
+              COMPLETION TIME
+          ==================================================== */}
 
           {completionTime && (
+
             <p className="font-mono text-[9px] text-ink-3 mt-1 flex items-center gap-1">
+
               <Clock size={11} />
+
               {completionTime}
+
             </p>
+
           )}
+
         </div>
 
-        {/* ========================================================
-            PRICE
-        ======================================================== */}
+
+        {/* ======================================================
+            AMOUNT
+        ====================================================== */}
 
         <div className="text-right shrink-0">
+
           <p className="font-display text-xl text-amber">
+
             ₹
             {Number(
               proposedAmount || 0
             ).toFixed(2)}
+
           </p>
+
 
           <p className="font-mono text-[8px] text-ink-3">
+
             {requestType ===
             'bargain'
+
               ? 'BARGAIN'
+
               : requestType ===
                   'proposal'
+
                 ? 'PROPOSAL'
+
                 : 'INTEREST'}
+
           </p>
+
         </div>
+
       </div>
 
-      {/* ==========================================================
+
+      {/* =========================================================
           NEGOTIATION HISTORY
-      ========================================================== */}
+      ========================================================= */}
 
       {isNegotiating &&
-        negotiationHistory.length >
-          0 && (
+        negotiationHistory.length > 0 && (
+
           <div className="mt-4 surface-wood rounded-xl p-3">
+
             <p className="font-technical text-[8px] text-paper/80 mb-2">
+
               NEGOTIATION HISTORY
+
             </p>
 
+
             {negotiationHistory.map(
-              (offer, index) => (
+              (
+                offer,
+                index
+              ) => (
+
                 <div
+
                   key={
-                    offer?.id ||
+                    offer?.id ??
                     index
                   }
+
                   className="flex items-center gap-2 py-1"
+
                 >
+
                   <span className="font-mono text-[9px] text-paper flex-1">
+
                     {offer?.from ===
                     'me'
+
                       ? 'You'
+
                       : 'Poster'}
 
                     {offer?.message
                       ? ` — ${offer.message}`
                       : ''}
+
                   </span>
+
 
                   <span className="font-display text-sm text-amber">
+
                     ₹
                     {Number(
-                      offer?.amount ||
-                        0
+                      offer?.amount ??
+                      0
                     ).toFixed(2)}
+
                   </span>
+
                 </div>
+
               )
             )}
+
           </div>
+
         )}
 
-      {/* ==========================================================
+
+      {/* =========================================================
           ACTIONS
-      ========================================================== */}
+      ========================================================= */}
 
       <div className="mt-4 pt-3 border-t border-metal-1/40 flex flex-wrap gap-2">
 
-        {/* ========================================================
-            MESSAGE AFTER ACCEPTANCE
-        ======================================================== */}
+        {/* ======================================================
+            MESSAGE
+            ONLY AFTER ACCEPTANCE
+        ====================================================== */}
 
         {isAccepted &&
           conversationId && (
+
             <Link
+
               to={`/dashboard/messages/${conversationId}`}
+
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
+
             >
+
               <MessageSquare
                 size={12}
               />
 
               MESSAGE
+
             </Link>
+
           )}
 
-        {/* ========================================================
-            ONLY SHOW UNAVAILABLE IF THERE REALLY IS NO
-            CONVERSATION
-        ======================================================== */}
+
+        {/* ======================================================
+            ACCEPTED BUT NO CONVERSATION
+        ====================================================== */}
 
         {isAccepted &&
           !conversationId && (
+
             <span className="font-mono text-[9px] text-ink-3">
+
               Conversation unavailable.
+
             </span>
+
           )}
 
-        {/* ========================================================
+
+        {/* ======================================================
             NEGOTIATION ACTIONS
-        ======================================================== */}
+        ====================================================== */}
 
         {isNegotiating &&
           proposalId && (
+
             <>
+
+              {/* ACCEPT COUNTER */}
+
               <button
+
                 type="button"
-                onClick={async () => {
+
+                onClick={() => {
+
                   try {
-                    await acceptCounter(
-                      proposalId
-                    );
+
+                    const result =
+                      acceptCounter(
+                        proposalId
+                      );
+
+
+                    if (
+                      result?.catch
+                    ) {
+
+                      result.catch(
+                        (error) =>
+                          console.error(
+                            'Failed to accept counter offer:',
+                            error
+                          )
+                      );
+
+                    }
+
                   } catch (error) {
+
                     console.error(
                       'Failed to accept counter offer:',
                       error
                     );
+
                   }
+
                 }}
+
                 className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
+
               >
-                <Check
-                  size={12}
-                />
+
+                <Check size={12} />
 
                 ACCEPT OFFER
+
               </button>
 
+
+              {/* REJECT COUNTER */}
+
               <button
+
                 type="button"
-                onClick={async () => {
+
+                onClick={() => {
+
                   try {
-                    await rejectCounter(
-                      proposalId
-                    );
+
+                    const result =
+                      rejectCounter(
+                        proposalId
+                      );
+
+
+                    if (
+                      result?.catch
+                    ) {
+
+                      result.catch(
+                        (error) =>
+                          console.error(
+                            'Failed to reject counter offer:',
+                            error
+                          )
+                      );
+
+                    }
+
                   } catch (error) {
+
                     console.error(
                       'Failed to reject counter offer:',
                       error
                     );
+
                   }
+
                 }}
+
                 className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors"
+
               >
+
                 <X size={12} />
 
                 REJECT
+
               </button>
 
+
+              {/* COUNTER */}
+
               <button
+
                 type="button"
+
                 className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px] hover:bg-amber/10 transition-colors"
+
               >
+
                 <HandCoins
                   size={12}
                 />
 
                 COUNTER
+
               </button>
+
             </>
+
           )}
+
+
+        {/* ======================================================
+            NEGOTIATING WITHOUT PROPOSAL ID
+        ====================================================== */}
 
         {isNegotiating &&
           !proposalId && (
+
             <span className="font-mono text-[9px] text-ink-3">
-              Waiting for your
-              response to the
-              counter offer.
+
+              Waiting for your response to the counter offer.
+
             </span>
+
           )}
 
-        {/* ========================================================
+
+        {/* ======================================================
             WITHDRAW
-        ======================================================== */}
+        ====================================================== */}
 
         {canWithdraw && (
+
           <button
+
             type="button"
+
             onClick={
               onWithdraw
             }
+
             className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors ml-auto"
+
           >
+
             <Undo2
               size={12}
             />
 
             WITHDRAW PROPOSAL
+
           </button>
+
         )}
 
-        {/* ========================================================
+
+        {/* ======================================================
             WITHDRAWN
-        ======================================================== */}
+        ====================================================== */}
 
         {isWithdrawn && (
+
           <span className="font-mono text-[9px] text-ink-3 ml-auto">
+
             This proposal was withdrawn.
+
           </span>
+
         )}
+
       </div>
+
     </article>
+
   );
+
 }
+
 
 export default MyRequestsPage;

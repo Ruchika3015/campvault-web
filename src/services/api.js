@@ -80,11 +80,14 @@ export async function apiRequest(
 
 
     throw {
+
       status: 0,
 
       message:
         'Exchange unavailable. Check your connection and try again.',
+
     };
+
   }
 
 
@@ -108,13 +111,21 @@ export async function apiRequest(
     const message =
       data?.message ||
       data?.error ||
-      (response.status === 401
-        ? 'Your session has expired. Please log in again.'
-        : response.status === 403
-        ? 'You are not authorized to perform this action.'
-        : response.status === 404
-        ? 'Requested resource was not found.'
-        : 'Something went wrong on the exchange. Please try again.');
+      (
+        response.status === 401
+
+          ? 'Your session has expired. Please log in again.'
+
+          : response.status === 403
+
+          ? 'You are not authorized to perform this action.'
+
+          : response.status === 404
+
+          ? 'Requested resource was not found.'
+
+          : 'Something went wrong on the exchange. Please try again.'
+      );
 
 
     console.error(
@@ -129,17 +140,21 @@ export async function apiRequest(
 
 
     throw {
+
       status:
         response.status,
 
       message,
 
       data,
+
     };
+
   }
 
 
   return data;
+
 }
 
 
@@ -228,17 +243,6 @@ export const api = {
   // ------------------------------------------------
   // CHANGE PASSWORD
   // ------------------------------------------------
-  //
-  // PUT /api/v1/users/password
-  //
-  // Payload:
-  //
-  // {
-  //   currentPassword: 'old password',
-  //   newPassword: 'new password',
-  //   confirmPassword: 'new password'
-  // }
-  //
 
   changePassword: (
     payload
@@ -259,15 +263,6 @@ export const api = {
   // ------------------------------------------------
   // DELETE ACCOUNT
   // ------------------------------------------------
-  //
-  // DELETE /api/v1/users/account
-  //
-  // Payload:
-  //
-  // {
-  //   password: 'current password'
-  // }
-  //
 
   deleteAccount: (
     payload
@@ -658,6 +653,36 @@ export const api = {
   getNotifications: () =>
     apiRequest(
       '/api/v1/notifications'
+    ),
+
+
+  // ------------------------------------------------
+  // GET NOTIFICATION PREFERENCES
+  // ------------------------------------------------
+
+  getNotificationPreferences: () =>
+    apiRequest(
+      '/api/v1/notifications/preferences'
+    ),
+
+
+  // ------------------------------------------------
+  // UPDATE NOTIFICATION PREFERENCES
+  // ------------------------------------------------
+
+  updateNotificationPreferences: (
+    preferences
+  ) =>
+    apiRequest(
+      '/api/v1/notifications/preferences',
+      {
+        method: 'PUT',
+
+        body:
+          JSON.stringify(
+            preferences
+          ),
+      }
     ),
 
 

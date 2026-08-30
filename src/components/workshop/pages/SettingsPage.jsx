@@ -289,6 +289,40 @@ export function SettingsPage() {
   );
 
 
+  // ================================================================
+  // NOTIFICATION PREFERENCES
+  // ================================================================
+
+  const [
+    notificationPreferences,
+    setNotificationPreferences,
+  ] = useState({
+
+    interestRequestNotifications: true,
+    proposalNotifications: true,
+    acceptedProposalNotifications: true,
+    rejectedProposalNotifications: true,
+    counterOfferNotifications: true,
+    messageNotifications: true,
+    jugaadTaskNotifications: true,
+    emailNotifications: true,
+    inAppNotifications: true,
+
+  });
+
+
+  const [
+    notificationPreferencesLoading,
+    setNotificationPreferencesLoading,
+  ] = useState(false);
+
+
+  const [
+    notificationPreferencesSaving,
+    setNotificationPreferencesSaving,
+  ] = useState(false);
+
+
   const [
     toast,
     setToast,
@@ -389,6 +423,206 @@ export function SettingsPage() {
       },
       []
     );
+
+
+  // ================================================================
+  // LOAD NOTIFICATION PREFERENCES FROM BACKEND
+  // ================================================================
+
+  useEffect(() => {
+
+    let cancelled = false;
+
+    const loadNotificationPreferences = async () => {
+
+      try {
+
+        setNotificationPreferencesLoading(true);
+
+        const response =
+          await api.getNotificationPreferences();
+
+        if (cancelled) {
+          return;
+        }
+
+        const data =
+          response?.data?.data ??
+          response?.data ??
+          response;
+
+        setNotificationPreferences({
+
+          interestRequestNotifications:
+            Boolean(
+              data?.interestRequestNotifications
+            ),
+
+          proposalNotifications:
+            Boolean(
+              data?.proposalNotifications
+            ),
+
+          acceptedProposalNotifications:
+            Boolean(
+              data?.acceptedProposalNotifications
+            ),
+
+          rejectedProposalNotifications:
+            Boolean(
+              data?.rejectedProposalNotifications
+            ),
+
+          counterOfferNotifications:
+            Boolean(
+              data?.counterOfferNotifications
+            ),
+
+          messageNotifications:
+            Boolean(
+              data?.messageNotifications
+            ),
+
+          jugaadTaskNotifications:
+            Boolean(
+              data?.jugaadTaskNotifications
+            ),
+
+          emailNotifications:
+            Boolean(
+              data?.emailNotifications
+            ),
+
+          inAppNotifications:
+            Boolean(
+              data?.inAppNotifications
+            ),
+
+        });
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load notification preferences:',
+          error
+        );
+
+      } finally {
+
+        if (!cancelled) {
+
+          setNotificationPreferencesLoading(false);
+
+        }
+
+      }
+
+    };
+
+
+    if (user?.id) {
+
+      loadNotificationPreferences();
+
+    }
+
+
+    return () => {
+
+      cancelled = true;
+
+    };
+
+  }, [user?.id]);
+
+
+  // ================================================================
+  // UPDATE NOTIFICATION PREFERENCE
+  // ================================================================
+
+  const updateNotificationPreference = useCallback(
+    async (key, value) => {
+
+      const previous =
+        notificationPreferences;
+
+      const next = {
+        ...previous,
+        [key]: value,
+      };
+
+      setNotificationPreferences(next);
+
+      try {
+
+        setNotificationPreferencesSaving(true);
+
+        const response =
+          await api.updateNotificationPreferences(next);
+
+        const saved =
+          response?.data?.data ??
+          response?.data ??
+          response;
+
+        setNotificationPreferences({
+
+          interestRequestNotifications:
+            Boolean(saved?.interestRequestNotifications),
+
+          proposalNotifications:
+            Boolean(saved?.proposalNotifications),
+
+          acceptedProposalNotifications:
+            Boolean(saved?.acceptedProposalNotifications),
+
+          rejectedProposalNotifications:
+            Boolean(saved?.rejectedProposalNotifications),
+
+          counterOfferNotifications:
+            Boolean(saved?.counterOfferNotifications),
+
+          messageNotifications:
+            Boolean(saved?.messageNotifications),
+
+          jugaadTaskNotifications:
+            Boolean(saved?.jugaadTaskNotifications),
+
+          emailNotifications:
+            Boolean(saved?.emailNotifications),
+
+          inAppNotifications:
+            Boolean(saved?.inAppNotifications),
+
+        });
+
+        showSavedToast('Notification preference saved');
+
+      } catch (error) {
+
+        console.error(
+          'Failed to update notification preference:',
+          error
+        );
+
+        setNotificationPreferences(previous);
+
+        showSavedToast(
+          'Failed to save notification preference'
+        );
+
+      } finally {
+
+        setNotificationPreferencesSaving(false);
+
+      }
+
+    },
+    [
+      notificationPreferences,
+      showSavedToast,
+    ]
+  );
 
 
   // ==============================================================
@@ -748,6 +982,22 @@ export function SettingsPage() {
 
               updateSettings={
                 updateSettings
+              }
+
+              notificationPreferences={
+                notificationPreferences
+              }
+
+              updateNotificationPreference={
+                updateNotificationPreference
+              }
+
+              notificationPreferencesLoading={
+                notificationPreferencesLoading
+              }
+
+              notificationPreferencesSaving={
+                notificationPreferencesSaving
               }
 
             />
@@ -1986,189 +2236,155 @@ function ActionRow({
 function NotificationsPanel({
   settings,
   updateSettings,
+  notificationPreferences,
+  updateNotificationPreference,
+  notificationPreferencesLoading,
+  notificationPreferencesSaving,
 }) {
 
   const n =
-    settings.notifications;
-
-
-  const set =
-    (
-      key,
-      value
-    ) =>
-      updateSettings(
-        'notifications',
-        key,
-        value
-      );
-
+    notificationPreferences;
 
   const items = [
 
     [
-      'newInterestRequests',
+      'interestRequestNotifications',
       'Interest Request Notifications',
       'When someone is interested in your Jugaad',
     ],
 
     [
-      'jugaadRecommendations',
+      'proposalNotifications',
       'Proposal Notifications',
       'When you receive a new proposal',
     ],
 
     [
-      'requestAccepted',
+      'acceptedProposalNotifications',
       'Accepted Proposal Notifications',
       'When a poster accepts your proposal',
     ],
 
     [
-      'requestRejected',
+      'rejectedProposalNotifications',
       'Rejected Proposal Notifications',
       'When a poster rejects your proposal',
     ],
 
     [
-      'counterOffers',
+      'counterOfferNotifications',
       'Counter-Offer Notifications',
       'When a counter offer is received',
     ],
 
     [
-      'messages',
+      'messageNotifications',
       'New Message Notifications',
       'New messages in your conversations',
     ],
 
     [
-      'jugaadUpdates',
+      'jugaadTaskNotifications',
       'Jugaad / Task Notifications',
       'Status changes on your Jugaads and tasks',
     ],
 
   ];
 
-
   return (
 
     <div>
 
       <PanelHeader
-
         icon={Bell}
-
         title="Notifications"
-
         desc="Control which notifications you receive."
-
       />
 
+      {notificationPreferencesLoading ? (
 
-      <div className="space-y-1 mb-6">
+        <div className="surface-panel rounded-xl p-4 mb-6">
 
-        {items.map(
-          ([
-            key,
-            label,
-            desc,
-          ]) => (
+          <p className="font-mono text-[10px] text-ink-3">
+            LOADING NOTIFICATION PREFERENCES...
+          </p>
+
+        </div>
+
+      ) : (
+
+        <>
+
+          <div className="space-y-1 mb-6">
+
+            {items.map(
+              ([key, label, desc]) => (
+
+                <Toggle
+                  key={key}
+                  on={Boolean(n?.[key])}
+                  onChange={(value) =>
+                    updateNotificationPreference(
+                      key,
+                      value
+                    )
+                  }
+                  label={label}
+                  desc={desc}
+                />
+
+              )
+            )}
+
+          </div>
+
+          <div className="pt-4 border-t border-metal-1/40">
+
+            <div className="flex items-center justify-between mb-3">
+
+              <p className="font-technical text-[8px] text-ink-3">
+                DELIVERY CHANNELS
+              </p>
+
+              {notificationPreferencesSaving && (
+
+                <span className="font-mono text-[8px] text-amber">
+                  SAVING...
+                </span>
+
+              )}
+
+            </div>
 
             <Toggle
-
-              key={
-                key
-              }
-
-              on={
-                Boolean(
-                  n[key]
-                )
-              }
-
-              onChange={(
-                value
-              ) =>
-                set(
-                  key,
+              on={Boolean(n?.emailNotifications)}
+              onChange={(value) =>
+                updateNotificationPreference(
+                  'emailNotifications',
                   value
                 )
               }
-
-              label={
-                label
-              }
-
-              desc={
-                desc
-              }
-
+              label="Email Notifications"
+              desc="Receive notifications via email"
             />
 
-          )
-        )}
+            <Toggle
+              on={Boolean(n?.inAppNotifications)}
+              onChange={(value) =>
+                updateNotificationPreference(
+                  'inAppNotifications',
+                  value
+                )
+              }
+              label="In-App Notifications"
+              desc="Show notifications inside CampusJugaad"
+            />
 
-      </div>
+          </div>
 
+        </>
 
-      <div className="pt-4 border-t border-metal-1/40">
-
-        <p className="font-technical text-[8px] text-ink-3 mb-3">
-
-          DELIVERY CHANNELS
-
-        </p>
-
-
-        <Toggle
-
-          on={
-            Boolean(
-              n.emailNotifications
-            )
-          }
-
-          onChange={(
-            value
-          ) =>
-            set(
-              'emailNotifications',
-              value
-            )
-          }
-
-          label="Email Notifications"
-
-          desc="Receive notifications via email"
-
-        />
-
-
-        <Toggle
-
-          on={
-            Boolean(
-              n.inAppNotifications
-            )
-          }
-
-          onChange={(
-            value
-          ) =>
-            set(
-              'inAppNotifications',
-              value
-            )
-          }
-
-          label="In-App Notifications"
-
-          desc="Show notifications inside CampusJugaad"
-
-        />
-
-      </div>
+      )}
 
     </div>
 

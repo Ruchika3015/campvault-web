@@ -244,29 +244,10 @@ function normalizeFeed(data) {
 
 
 // ================================================================
-// SAFE DEADLINE CALCULATOR
-// ================================================================
-//
-// Uses the REAL backend deadline.
-//
-// Examples:
-//
-// 9 days remaining  -> "9 days left"
-// 2 days remaining  -> "2 days left"
-// 1 day remaining   -> "1 day left"
-// expired           -> "Deadline passed"
-//
-// Date-only values such as:
-// 2026-09-09
-//
-// are treated as the end of that local day.
+// SAFE DAYS UNTIL
 // ================================================================
 
-function safeDaysUntil(
-  value,
-  now = Date.now()
-) {
-
+function safeDaysUntil(value, now = Date.now()) {
   if (
     value === null ||
     value === undefined ||
@@ -275,107 +256,56 @@ function safeDaysUntil(
     return 'No deadline';
   }
 
-
-  const rawValue =
-    String(value).trim();
-
-
+  const rawValue = String(value).trim();
   let deadline;
 
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+    const [year, month, day] = rawValue
+      .split('-')
+      .map(Number);
 
-  /*
-   * Date only:
-   *
-   * YYYY-MM-DD
-   *
-   * Treat as end of that local day.
-   */
-
-  if (
-    /^\d{4}-\d{2}-\d{2}$/.test(
-      rawValue
-    )
-  ) {
-
-    const [
+    deadline = new Date(
       year,
-      month,
+      month - 1,
       day,
-    ] =
-      rawValue
-        .split('-')
-        .map(Number);
-
-
-    deadline =
-      new Date(
-        year,
-        month - 1,
-        day,
-        23,
-        59,
-        59,
-        999
-      );
-
+      23,
+      59,
+      59,
+      999
+    );
   } else {
-
-    deadline =
-      new Date(value);
-
+    deadline = new Date(value);
   }
 
-
-  if (
-    Number.isNaN(
-      deadline.getTime()
-    )
-  ) {
+  if (Number.isNaN(deadline.getTime())) {
     return 'No deadline';
   }
 
+  const difference = deadline.getTime() - now;
 
-  const difference =
-    deadline.getTime() -
-    now;
-
-
-  /*
-   * Deadline has passed.
-   */
-
-  if (
-    difference <= 0
-  ) {
+  if (difference <= 0) {
     return 'Deadline passed';
   }
 
+  const nowDate = new Date(now);
+  const deadlineDate = new Date(deadline.getTime());
 
-  /*
-   * Use Math.ceil so the number of days
-   * remains intuitive:
-   *
-   * 8 days + some hours = 9 days left
-   */
+  const sameDay =
+    nowDate.getFullYear() === deadlineDate.getFullYear() &&
+    nowDate.getMonth() === deadlineDate.getMonth() &&
+    nowDate.getDate() === deadlineDate.getDate();
 
-  const days =
-    Math.ceil(
-      difference /
-        (
-          1000 *
-          60 *
-          60 *
-          24
-        )
-    );
-
-
-  if (
-    days === 1
-  ) {
-    return '1 day left';
+  if (sameDay) {
+    return 'today';
   }
 
+  const days = Math.ceil(
+    difference / (1000 * 60 * 60 * 24)
+  );
+
+  if (days === 1) {
+    return '1 day left';
+  }
 
   return `${days} days left`;
 }
@@ -385,12 +315,16 @@ function safeDaysUntil(
 // SAFE RELATIVE TIME
 // ================================================================
 //
-// Uses the actual backend created_at timestamp.
+// IMPORTANT:
+//
+// Do NOT use the mock-data timeAgo() here.
+//
+// This function works directly with the actual backend
+// created_at / createdAt timestamp.
+//
 // ================================================================
 
-function safeTimeAgo(
-  value
-) {
+function safeTimeAgo(value) {
 
   if (
     value === null ||
@@ -416,6 +350,13 @@ function safeTimeAgo(
   }
 
 
+  /*
+   * Compare timestamps directly.
+   *
+   * This avoids the old formatter accidentally treating
+   * backend-created posts as newly created.
+   */
+
   const now =
     Date.now();
 
@@ -429,13 +370,13 @@ function safeTimeAgo(
 
 
   /*
-   * Protect against small server/browser
-   * clock differences.
+   * Future timestamps can happen because the server clock
+   * and browser clock are slightly different.
+   *
+   * Clamp them to zero rather than showing negative time.
    */
 
-  if (
-    difference < 0
-  ) {
+  if (difference < 0) {
     difference = 0;
   }
 
@@ -446,9 +387,7 @@ function safeTimeAgo(
     );
 
 
-  if (
-    seconds < 60
-  ) {
+  if (seconds < 60) {
     return 'just now';
   }
 
@@ -459,9 +398,7 @@ function safeTimeAgo(
     );
 
 
-  if (
-    minutes < 60
-  ) {
+  if (minutes < 60) {
     return `${minutes} ${
       minutes === 1
         ? 'minute'
@@ -476,9 +413,7 @@ function safeTimeAgo(
     );
 
 
-  if (
-    hours < 24
-  ) {
+  if (hours < 24) {
     return `${hours} ${
       hours === 1
         ? 'hour'
@@ -493,9 +428,7 @@ function safeTimeAgo(
     );
 
 
-  if (
-    days < 7
-  ) {
+  if (days < 7) {
     return `${days} ${
       days === 1
         ? 'day'
@@ -510,9 +443,7 @@ function safeTimeAgo(
     );
 
 
-  if (
-    weeks < 5
-  ) {
+  if (weeks < 5) {
     return `${weeks} ${
       weeks === 1
         ? 'week'
@@ -520,6 +451,10 @@ function safeTimeAgo(
     } ago`;
   }
 
+
+  /*
+   * For older posts, show the actual posting date.
+   */
 
   return date.toLocaleDateString(
     'en-IN',
@@ -553,52 +488,34 @@ export function FindJugaadPage() {
 
 
   /*
-   * Re-render once every minute so deadline
-   * counters stay synchronized with real time.
+   * Re-render once every minute so deadline and
+   * relative-posted-time labels stay synchronized.
    */
-
   const [currentTime, setCurrentTime] =
-    useState(
-      () => Date.now()
-    );
-
+    useState(() => Date.now());
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60 * 1000);
 
-    const interval =
-      setInterval(
-        () => {
-          setCurrentTime(
-            Date.now()
-          );
-        },
-        60 * 1000
-      );
-
-
-    return () =>
-      clearInterval(
-        interval
-      );
-
+    return () => clearInterval(interval);
   }, []);
 
 
   const [feedItems, setFeedItems] =
-    useState(
-      () => {
+    useState(() => {
 
-        if (!isDemoMode) {
-          return [];
-        }
-
-
-        return normalizeFeed(
-          mockDiscoveryFeed
-        );
-
+      if (!isDemoMode) {
+        return [];
       }
-    );
+
+
+      return normalizeFeed(
+        mockDiscoveryFeed
+      );
+
+    });
 
 
   const [loading, setLoading] =
@@ -694,9 +611,7 @@ export function FindJugaadPage() {
             normalized
           );
 
-        } catch (
-          error
-        ) {
+        } catch (error) {
 
           console.error(
             'Failed to load Jugaad feed:',
@@ -724,18 +639,16 @@ export function FindJugaadPage() {
 
     fetchFeed();
 
-  }, [
-    fetchFeed
-  ]);
+  }, [fetchFeed]);
 
 
   // ================================================================
   // CURRENT LOGGED-IN USER
   // ================================================================
   //
-  // Used as HELPER when sending a proposal.
+  // ONLY used as HELPER when sending a proposal.
   //
-  // It is NOT used as poster information.
+  // It is NOT used as the poster displayed on cards.
   //
   // ================================================================
 
@@ -767,14 +680,11 @@ export function FindJugaadPage() {
 
       : {
 
-          id:
-            'guest',
+          id: 'guest',
 
-          name:
-            'Guest',
+          name: 'Guest',
 
-          initials:
-            'GU',
+          initials: 'GU',
 
         };
 
@@ -794,9 +704,7 @@ export function FindJugaadPage() {
 
         if (
           item.id !== undefined &&
-          hidden.includes(
-            item.id
-          )
+          hidden.includes(item.id)
         ) {
           return false;
         }
@@ -811,32 +719,25 @@ export function FindJugaadPage() {
         const matchesQuery =
           !search ||
 
-
           String(
             item.title ?? ''
           )
             .toLowerCase()
-            .includes(
-              search
-            ) ||
+            .includes(search) ||
 
 
           String(
             item.skillRequired ?? ''
           )
             .toLowerCase()
-            .includes(
-              search
-            ) ||
+            .includes(search) ||
 
 
           String(
             item.description ?? ''
           )
             .toLowerCase()
-            .includes(
-              search
-            );
+            .includes(search);
 
 
         const matchesCategory =
@@ -859,9 +760,7 @@ export function FindJugaadPage() {
   // ================================================================
 
   const hide =
-    async (
-      id
-    ) => {
+    async (id) => {
 
       if (
         id === undefined ||
@@ -875,9 +774,7 @@ export function FindJugaadPage() {
         (current) => {
 
           if (
-            current.includes(
-              id
-            )
+            current.includes(id)
           ) {
             return current;
           }
@@ -892,9 +789,7 @@ export function FindJugaadPage() {
       );
 
 
-      setUndo(
-        id
-      );
+      setUndo(id);
 
 
       if (!isDemoMode) {
@@ -905,9 +800,7 @@ export function FindJugaadPage() {
             id
           );
 
-        } catch (
-          error
-        ) {
+        } catch (error) {
 
           console.error(
             'Failed to mark not interested:',
@@ -941,9 +834,7 @@ export function FindJugaadPage() {
   // ================================================================
 
   const handleSendProposal =
-    async (
-      payload
-    ) => {
+    async (payload) => {
 
       try {
 
@@ -967,27 +858,18 @@ export function FindJugaadPage() {
         await fetchFeed();
 
 
-        if (
-          refreshData
-        ) {
+        if (refreshData) {
 
           await refreshData();
 
         }
 
 
-        setBargain(
-          null
-        );
+        setBargain(null);
 
+        setProposalItem(null);
 
-        setProposalItem(
-          null
-        );
-
-      } catch (
-        error
-      ) {
+      } catch (error) {
 
         console.error(
           'FIND JUGAAD - failed to send proposal:',
@@ -1060,6 +942,11 @@ export function FindJugaadPage() {
             }
 
 
+            /*
+             * Use actual dates instead of
+             * string comparison.
+             */
+
             const posted =
               new Date(
                 item.postedAt
@@ -1075,6 +962,13 @@ export function FindJugaadPage() {
             }
 
 
+            /*
+             * Show posts from the recent period.
+             *
+             * This keeps the existing page behavior
+             * while using a real timestamp comparison.
+             */
+
             const now =
               Date.now();
 
@@ -1087,15 +981,10 @@ export function FindJugaadPage() {
               1000;
 
 
-            const age =
-              now -
-              posted.getTime();
-
-
             return (
-              age >= 0 &&
-              age <=
-                thirtyDays
+              now -
+                posted.getTime() <=
+              thirtyDays
             );
 
           }
@@ -1116,16 +1005,14 @@ export function FindJugaadPage() {
 
           const remaining =
             safeDaysUntil(
-              item?.deadline,
-              currentTime
+              item?.deadline
             );
 
 
           return (
-            remaining ===
-              '1 day left' ||
-            remaining ===
-              '2 days left'
+            remaining === 'today' ||
+            remaining === '1 day left' ||
+            remaining === '2 days left'
           );
 
         }
@@ -1156,13 +1043,9 @@ export function FindJugaadPage() {
           HEADER
       ========================================================== */}
 
-      <section
-        className="pt-12 pb-7"
-      >
+      <section className="pt-12 pb-7">
 
-        <div
-          className="flex items-center gap-3 mb-4"
-        >
+        <div className="flex items-center gap-3 mb-4">
 
           <LED
             color="amber"
@@ -1171,9 +1054,7 @@ export function FindJugaadPage() {
           />
 
 
-          <span
-            className="font-technical text-[9px] text-ink-2"
-          >
+          <span className="font-technical text-[9px] text-ink-2">
 
             02 — CAMPUS OPPORTUNITY FEED
 
@@ -1182,17 +1063,13 @@ export function FindJugaadPage() {
         </div>
 
 
-        <h1
-          className="font-display text-4xl sm:text-5xl"
-        >
+        <h1 className="font-display text-4xl sm:text-5xl">
 
           FIND A
 
           <br />
 
-          <span
-            className="text-amber"
-          >
+          <span className="text-amber">
 
             JUGAAD.
 
@@ -1201,9 +1078,7 @@ export function FindJugaadPage() {
         </h1>
 
 
-        <p
-          className="mt-4 max-w-xl text-sm text-ink-2"
-        >
+        <p className="mt-4 max-w-xl text-sm text-ink-2">
 
           Opportunities selected for you.
           Discover work posted by other
@@ -1219,13 +1094,9 @@ export function FindJugaadPage() {
           SEARCH + CATEGORY
       ========================================================== */}
 
-      <div
-        className="surface-panel rounded-xl p-3 flex flex-col sm:flex-row gap-3 mb-8"
-      >
+      <div className="surface-panel rounded-xl p-3 flex flex-col sm:flex-row gap-3 mb-8">
 
-        <div
-          className="flex items-center flex-1 rounded-lg bg-bg-1 border border-metal-1"
-        >
+        <div className="flex items-center flex-1 rounded-lg bg-bg-1 border border-metal-1">
 
           <Search
             size={14}
@@ -1239,11 +1110,10 @@ export function FindJugaadPage() {
               query
             }
 
-            onChange={
-              (event) =>
-                setQuery(
-                  event.target.value
-                )
+            onChange={(event) =>
+              setQuery(
+                event.target.value
+              )
             }
 
             placeholder="Search opportunities or skills..."
@@ -1255,9 +1125,7 @@ export function FindJugaadPage() {
         </div>
 
 
-        <div
-          className="flex flex-wrap gap-1.5"
-        >
+        <div className="flex flex-wrap gap-1.5">
 
           {[
             'ALL',
@@ -1268,9 +1136,7 @@ export function FindJugaadPage() {
             'PRESENTATION',
             'OTHER',
           ].map(
-            (
-              currentCategory
-            ) => (
+            (currentCategory) => (
 
               <button
 
@@ -1295,9 +1161,7 @@ export function FindJugaadPage() {
 
               >
 
-                {
-                  currentCategory
-                }
+                {currentCategory}
 
               </button>
 
@@ -1315,13 +1179,9 @@ export function FindJugaadPage() {
 
       {undo !== null && (
 
-        <div
-          className="mb-4 flex items-center justify-between surface-wood rounded-lg px-4 py-3"
-        >
+        <div className="mb-4 flex items-center justify-between surface-wood rounded-lg px-4 py-3">
 
-          <span
-            className="font-mono text-[10px] text-paper"
-          >
+          <span className="font-mono text-[10px] text-paper">
 
             Opportunity hidden from your feed.
 
@@ -1343,9 +1203,7 @@ export function FindJugaadPage() {
               );
 
 
-              setUndo(
-                null
-              );
+              setUndo(null);
 
             }}
 
@@ -1353,9 +1211,7 @@ export function FindJugaadPage() {
 
           >
 
-            <Undo2
-              size={12}
-            />
+            <Undo2 size={12} />
 
             UNDO
 
@@ -1372,13 +1228,9 @@ export function FindJugaadPage() {
 
       {loading ? (
 
-        <div
-          className="py-16 text-center"
-        >
+        <div className="py-16 text-center">
 
-          <p
-            className="font-mono text-sm text-ink-2"
-          >
+          <p className="font-mono text-sm text-ink-2">
 
             Loading opportunities...
 
@@ -1388,14 +1240,10 @@ export function FindJugaadPage() {
 
       ) : (
 
-        <div
-          className="space-y-9"
-        >
+        <div className="space-y-9">
 
           {sections.map(
-            (
-              [title, items]
-            ) => {
+            ([title, items]) => {
 
               if (
                 !Array.isArray(
@@ -1403,9 +1251,7 @@ export function FindJugaadPage() {
                 ) ||
                 items.length === 0
               ) {
-
                 return null;
-
               }
 
 
@@ -1415,22 +1261,16 @@ export function FindJugaadPage() {
                   key={title}
                 >
 
-                  <div
-                    className="flex items-center gap-2 mb-3"
-                  >
+                  <div className="flex items-center gap-2 mb-3">
 
-                    <span
-                      className="font-technical text-[9px] text-ink-0"
-                    >
+                    <span className="font-technical text-[9px] text-ink-0">
 
                       {title}
 
                     </span>
 
 
-                    <span
-                      className="font-mono text-[8px] text-ink-3"
-                    >
+                    <span className="font-mono text-[8px] text-ink-3">
 
                       (
                       {items.length}
@@ -1439,21 +1279,15 @@ export function FindJugaadPage() {
                     </span>
 
 
-                    <span
-                      className="h-px flex-1 bg-metal-1/40"
-                    />
+                    <span className="h-px flex-1 bg-metal-1/40" />
 
                   </div>
 
 
-                  <div
-                    className="grid lg:grid-cols-2 gap-3"
-                  >
+                  <div className="grid lg:grid-cols-2 gap-3">
 
                     {items.map(
-                      (
-                        item
-                      ) => {
+                      (item) => {
 
                         if (!item) {
                           return null;
@@ -1471,9 +1305,7 @@ export function FindJugaadPage() {
                               item.id
                             );
 
-                        } catch (
-                          error
-                        ) {
+                        } catch (error) {
 
                           console.error(
                             'Failed to get proposal:',
@@ -1557,9 +1389,7 @@ export function FindJugaadPage() {
       {!loading &&
         visible.length === 0 && (
 
-          <div
-            className="py-16 text-center"
-          >
+          <div className="py-16 text-center">
 
             <Search
               size={32}
@@ -1567,9 +1397,7 @@ export function FindJugaadPage() {
             />
 
 
-            <p
-              className="font-mono text-sm text-ink-2"
-            >
+            <p className="font-mono text-sm text-ink-2">
 
               No opportunities match this view.
 
@@ -1595,9 +1423,7 @@ export function FindJugaadPage() {
           mode="bargain"
 
           onClose={() =>
-            setBargain(
-              null
-            )
+            setBargain(null)
           }
 
           onSend={
@@ -1624,9 +1450,7 @@ export function FindJugaadPage() {
           mode="interest"
 
           onClose={() =>
-            setProposalItem(
-              null
-            )
+            setProposalItem(null)
           }
 
           onSend={
@@ -1689,6 +1513,20 @@ function OpportunityCard({
 
 
   // ============================================================
+  // DEADLINE STATUS
+  // ============================================================
+
+  const deadlineLabel =
+    safeDaysUntil(
+      item?.deadline,
+      currentTime
+    );
+
+  const deadlinePassed =
+    deadlineLabel === 'Deadline passed';
+
+
+  // ============================================================
   // POSTER
   // ============================================================
 
@@ -1702,21 +1540,12 @@ function OpportunityCard({
     'Student';
 
 
-  /*
-   * IMPORTANT:
-   *
-   * Parentheses are required because JavaScript
-   * does not allow ?? and || to be mixed directly.
-   */
-
   const posterInitials =
     item?.poster?.initials ??
     item?.poster_initials ??
     item?.posterInitials ??
     (
-      String(
-        posterName
-      )
+      String(posterName)
         .trim()
         .split(/\s+/)
         .filter(Boolean)
@@ -1744,9 +1573,18 @@ function OpportunityCard({
     'J';
 
 
-  // ============================================================
-  // POSTED TIMESTAMP
-  // ============================================================
+  /*
+   * IMPORTANT:
+   *
+   * Always use the actual backend timestamp.
+   *
+   * postedAt was normalized from:
+   *
+   * raw.postedAt
+   * raw.posted_at
+   * raw.created_at
+   * raw.createdAt
+   */
 
   const postedTimestamp =
     item?.postedAt ??
@@ -1783,13 +1621,9 @@ function OpportunityCard({
           HEADER
       ======================================================== */}
 
-      <div
-        className="flex items-start justify-between gap-3"
-      >
+      <div className="flex items-start justify-between gap-3">
 
-        <div
-          className="flex gap-3"
-        >
+        <div className="flex gap-3">
 
           <span
 
@@ -1805,9 +1639,7 @@ function OpportunityCard({
 
           >
 
-            <span
-              className="font-display text-lg"
-            >
+            <span className="font-display text-lg">
 
               {categoryChar}
 
@@ -1818,9 +1650,7 @@ function OpportunityCard({
 
           <div>
 
-            <h2
-              className="font-display text-lg text-ink-0 leading-tight"
-            >
+            <h2 className="font-display text-lg text-ink-0 leading-tight">
 
               {item?.title ||
                 'Untitled opportunity'}
@@ -1828,9 +1658,7 @@ function OpportunityCard({
             </h2>
 
 
-            <div
-              className="flex flex-wrap items-center gap-2 mt-1.5"
-            >
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
 
               <span
 
@@ -1851,9 +1679,7 @@ function OpportunityCard({
               </span>
 
 
-              <span
-                className="font-mono text-[8px] text-ink-3"
-              >
+              <span className="font-mono text-[8px] text-ink-3">
 
                 {item?.skillRequired ||
                   'General'}
@@ -1870,9 +1696,7 @@ function OpportunityCard({
         {item?.matchPercentage !=
           null && (
 
-          <span
-            className="font-mono text-[9px] text-mint"
-          >
+          <span className="font-mono text-[9px] text-mint">
 
             {item.matchPercentage}%
 
@@ -1889,9 +1713,7 @@ function OpportunityCard({
           DESCRIPTION
       ======================================================== */}
 
-      <p
-        className="font-mono text-[10px] leading-relaxed text-ink-2 mt-4"
-      >
+      <p className="font-mono text-[10px] leading-relaxed text-ink-2 mt-4">
 
         {item?.description ||
           'No description available.'}
@@ -1903,13 +1725,9 @@ function OpportunityCard({
           META
       ======================================================== */}
 
-      <div
-        className="flex flex-wrap items-center gap-3 mt-4 text-[9px] font-mono text-ink-3"
-      >
+      <div className="flex flex-wrap items-center gap-3 mt-4 text-[9px] font-mono text-ink-3">
 
-        <span
-          className="text-amber font-display text-lg"
-        >
+        <span className="text-amber font-display text-lg">
 
           ₹{item?.amount ?? 0}
 
@@ -1917,25 +1735,21 @@ function OpportunityCard({
 
 
         <span
-          className="flex items-center gap-1"
+          className={`flex items-center gap-1 ${
+            deadlinePassed
+              ? 'text-coral'
+              : ''
+          }`}
         >
 
-          <Clock
-            size={11}
-          />
+          <Clock size={11} />
 
-
-          {safeDaysUntil(
-            item?.deadline,
-            currentTime
-          )}
+          {deadlineLabel}
 
         </span>
 
 
-        <span
-          className="flex items-center gap-1"
-        >
+        <span className="flex items-center gap-1">
 
           <Star
             size={11}
@@ -1966,9 +1780,7 @@ function OpportunityCard({
 
       {proposalSent && (
 
-        <div
-          className="mt-3 surface-panel rounded-lg px-3 py-2 flex items-center gap-2"
-        >
+        <div className="mt-3 surface-panel rounded-lg px-3 py-2 flex items-center gap-2">
 
           <CheckCircle2
 
@@ -1991,9 +1803,7 @@ function OpportunityCard({
           />
 
 
-          <span
-            className="font-mono text-[9px] text-ink-2"
-          >
+          <span className="font-mono text-[9px] text-ink-2">
 
             {proposalStatus ===
             'accepted'
@@ -2023,15 +1833,11 @@ function OpportunityCard({
           FOOTER
       ======================================================== */}
 
-      <div
-        className="mt-4 pt-3 border-t border-metal-1/40 flex items-center gap-2"
-      >
+      <div className="mt-4 pt-3 border-t border-metal-1/40 flex items-center gap-2">
 
         {/* Poster avatar */}
 
-        <span
-          className="grid place-items-center w-6 h-6 rounded-full bg-amber text-bg-0 font-display text-[8px]"
-        >
+        <span className="grid place-items-center w-6 h-6 rounded-full bg-amber text-bg-0 font-display text-[8px]">
 
           {posterInitials}
 
@@ -2040,9 +1846,7 @@ function OpportunityCard({
 
         {/* POSTER'S NAME */}
 
-        <span
-          className="font-mono text-[9px] text-ink-1 flex-1"
-        >
+        <span className="font-mono text-[9px] text-ink-1 flex-1">
 
           {posterName}
 
@@ -2057,9 +1861,7 @@ function OpportunityCard({
 
           type="button"
 
-          onClick={
-            onHide
-          }
+          onClick={onHide}
 
           aria-label="Not interested"
 
@@ -2067,92 +1869,100 @@ function OpportunityCard({
 
         >
 
-          <X
-            size={14}
-          />
+          <X size={14} />
 
         </button>
 
 
         {/* ======================================================
-            BARGAIN
+            ACTIONS
         ====================================================== */}
 
-        <button
+        {deadlinePassed ? (
 
-          type="button"
+          <span
+            className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-2 font-technical text-[8px] text-coral border border-coral/30"
+          >
 
-          onClick={
-            onBargain
-          }
+            <Clock size={12} />
 
-          disabled={
-            proposalSent
-          }
+            DEADLINE PASSED
 
-          className="flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] text-amber border border-amber/30 hover:bg-amber/10 disabled:opacity-40"
+          </span>
 
-        >
+        ) : (
 
-          <HandCoins
-            size={12}
-          />
+          <>
 
-          BARGAIN
+            {/* ==================================================
+                BARGAIN
+            ================================================== */}
 
-        </button>
+            <button
 
+              type="button"
 
-        {/* ======================================================
-            INTERESTED
-        ====================================================== */}
+              onClick={onBargain}
 
-        <button
+              disabled={proposalSent}
 
-          type="button"
+              className="flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] text-amber border border-amber/30 hover:bg-amber/10 disabled:opacity-40"
 
-          onClick={
-            onInterest
-          }
-
-          disabled={
-            proposalSent
-          }
-
-          className={`flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] ${
-            proposalSent
-              ? 'bg-mint/15 text-mint border border-mint/30'
-              : 'bg-amber text-bg-0 hover:bg-amber-soft'
-          } disabled:cursor-default`}
-
-        >
-
-          {proposalSent ? (
-
-            <CheckCircle2
-              size={12}
-            />
-
-          ) : (
-
-            <span
-              className="text-xs"
             >
 
-              ♥
+              <HandCoins size={12} />
 
-            </span>
+              BARGAIN
 
-          )}
+            </button>
 
 
-          {proposalSent
+            {/* ==================================================
+                INTERESTED
+            ================================================== */}
 
-            ? 'PROPOSAL SENT'
+            <button
 
-            : 'INTERESTED'}
+              type="button"
 
-        </button>
+              onClick={onInterest}
+
+              disabled={proposalSent}
+
+              className={`flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] ${
+                proposalSent
+                  ? 'bg-mint/15 text-mint border border-mint/30'
+                  : 'bg-amber text-bg-0 hover:bg-amber-soft'
+              } disabled:cursor-default`}
+
+            >
+
+              {proposalSent ? (
+
+                <CheckCircle2
+                  size={12}
+                />
+
+              ) : (
+
+                <span className="text-xs">
+                  ♥
+                </span>
+
+              )}
+
+
+              {proposalSent
+
+                ? 'PROPOSAL SENT'
+
+                : 'INTERESTED'}
+
+            </button>
+
+          </>
+
+        )}
 
       </div>
 

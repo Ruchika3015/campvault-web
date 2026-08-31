@@ -38,7 +38,7 @@ export function Navigation() {
         <Rivet size={7} className="absolute bottom-2 right-2" />
 
         {/* Brand mark */}
-        <Link to="/" className="flex items-center gap-3 group" aria-label="CampusJugaad home">
+        <Link to="/" className="flex items-center gap-3 group" aria-label="CampusVault home">
           <span
             className="grid place-items-center w-8 h-8 rounded-lg shrink-0"
             style={{
@@ -50,7 +50,7 @@ export function Navigation() {
           </span>
           <div className="flex flex-col leading-none">
             <span className="font-display text-sm tracking-tight text-ink-0">
-              CAMPUS<span className="text-amber">JUGAAD</span>
+              CAMPUS<span className="text-amber">VAULT</span>
             </span>
             <span className="font-technical text-[7px] text-ink-3 mt-0.5">EXCHANGE</span>
           </div>

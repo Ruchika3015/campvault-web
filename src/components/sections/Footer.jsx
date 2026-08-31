@@ -90,7 +90,7 @@ export function Footer() {
               <span className="grid place-items-center w-9 h-9 rounded-lg" style={{ background: 'linear-gradient(135deg, var(--amber), var(--amber-deep))', boxShadow: 'var(--glow-amber)' }}>
                 <span className="font-display text-bg-0 text-base">J</span>
               </span>
-              <span className="font-display text-lg text-ink-0">CAMPUS<span className="text-amber">JUGAAD</span></span>
+              <span className="font-display text-lg text-ink-0">CAMPUS<span className="text-amber">VAULT</span></span>
             </div>
             <p className="text-sm text-ink-2 leading-relaxed max-w-xs">A student-to-student exchange. Your problem. Someone&apos;s skill. That&apos;s a Jugaad.</p>
             <div className="flex items-center gap-3 mt-5">
@@ -100,7 +100,7 @@ export function Footer() {
                     <Icon size={15} />
                   </a>
                 ) : (
-                  /* TODO: Add the official CampusJugaad URL when available. */
+                  /* TODO: Add the official CampusVault URL when available. */
                   <span key={label} title={`${label} link coming soon`} aria-label={`${label} link coming soon`} className="grid place-items-center w-9 h-9 rounded-lg text-ink-2/80" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(107,118,137,0.3)' }}>
                     <Icon size={15} />
                   </span>
@@ -127,7 +127,7 @@ export function Footer() {
         </div>
 
         <div className="pt-8 border-t border-metal-2/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="font-mono text-[11px] text-ink-3">© 2026 CampusJugaad · Built by students, for students</p>
+          <p className="font-mono text-[11px] text-ink-3">© 2026 CampusVault · Built by students, for students</p>
           <p className="font-mono text-[11px] text-ink-3">The Jugaad Exchange · v2.4</p>
         </div>
       </div>

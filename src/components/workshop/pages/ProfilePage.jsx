@@ -858,7 +858,7 @@ export function ProfilePage() {
               <p className="font-mono text-[8px] text-ink-3 mt-2 leading-snug">
                 {isDemoMode
                   ? mockProfileData.completionHint
-                  : 'Profile information comes from your CampusJugaad account.'}
+                  : 'Profile information comes from your CampusVault account.'}
               </p>
             </div>
           </div>

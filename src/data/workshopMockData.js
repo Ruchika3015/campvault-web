@@ -4,7 +4,7 @@
 export const mockUser = {
   id: 'u1',
   name: 'Ruchika Chaudhary',
-  email: 'demo@campusjugaad.com',
+  email: 'demo@campusvault.com',
   role: 'student',
   college: 'GL Bajaj Institute of Technology and Management',
   department: 'CSE-AI',

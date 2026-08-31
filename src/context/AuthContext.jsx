@@ -16,7 +16,7 @@ import { api } from '@/services/api';
 const DEMO_USER = {
   id: 'demo-user',
   name: 'Demo Student',
-  email: 'demo@campusjugaad.demo',
+  email: 'demo@campusvault.demo',
   role: 'student',
   college: 'Demo Campus Institute',
   department: 'CSE',

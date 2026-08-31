@@ -841,7 +841,7 @@ export function SettingsPage() {
 
         <p className="mt-3 text-sm text-ink-2 max-w-lg">
 
-          Manage your CampusJugaad account,
+          Manage your CampusVault account,
           security, preferences, privacy,
           and accessibility.
 
@@ -2377,7 +2377,7 @@ function NotificationsPanel({
                 )
               }
               label="In-App Notifications"
-              desc="Show notifications inside CampusJugaad"
+              desc="Show notifications inside CampusVault"
             />
 
           </div>
@@ -2810,7 +2810,7 @@ function AppearancePanel({
 
         title="Appearance"
 
-        desc="Customize how CampusJugaad looks and feels."
+        desc="Customize how CampusVault looks and feels."
 
       />
 
@@ -3377,7 +3377,7 @@ function DataPanel({
 
           label="Download My Data"
 
-          desc="Export a copy of your CampusJugaad data"
+          desc="Export a copy of your CampusVault data"
 
           onClick={() => {
 

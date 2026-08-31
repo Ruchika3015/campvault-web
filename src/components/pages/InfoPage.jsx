@@ -4,10 +4,10 @@ import { LED } from '@/components/primitives/Details';
 
 const PAGE_CONTENT = {
   about: {
-    label: 'ABOUT CAMPUSJUGAAD',
+    label: 'ABOUT CAMPUSVAULT',
     title: 'Problems meet people who can solve them.',
     paragraphs: [
-      'CampusJugaad is a student-to-student exchange for the things campus life throws at you. Post what you need, find a student with the right skill, and get it done without the usual guesswork.',
+      'CampusVault is a student-to-student exchange for the things campus life throws at you. Post what you need, find a student with the right skill, and get it done without the usual guesswork.',
       'The exchange is built around practical help, fair conversations, and the resourcefulness students already bring to every deadline, fest, project, and late-night problem.',
     ],
   },
@@ -16,14 +16,14 @@ const PAGE_CONTENT = {
     title: 'Bring the Jugaad Exchange to your campus.',
     paragraphs: [
       'Campus programs give student communities a simple way to share skills, discover useful help, and make the most of the talent already around them.',
-      'If you are organising a campus community or student initiative, reach out to explore how CampusJugaad can fit into your exchange.',
+      'If you are organising a campus community or student initiative, reach out to explore how CampusVault can fit into your exchange.',
     ],
   },
   privacy: {
     label: 'PRIVACY POLICY',
     title: 'Your information stays yours.',
     paragraphs: [
-      'CampusJugaad uses account information to provide the exchange, keep conversations connected to the right people, and improve the experience for students.',
+      'CampusVault uses account information to provide the exchange, keep conversations connected to the right people, and improve the experience for students.',
       'We do not sell personal information. Use the Settings area in your workspace to review available privacy and account controls.',
     ],
   },
@@ -31,7 +31,7 @@ const PAGE_CONTENT = {
     label: 'TERMS & CONDITIONS',
     title: 'Use the exchange with care.',
     paragraphs: [
-      'CampusJugaad is a place for students to offer and request legitimate help. Keep proposals accurate, communicate respectfully, and agree on expectations before work begins.',
+      'CampusVault is a place for students to offer and request legitimate help. Keep proposals accurate, communicate respectfully, and agree on expectations before work begins.',
       'You are responsible for the information you share and the agreements you make with other students. We may restrict activity that harms the exchange or its members.',
     ],
   },

@@ -304,7 +304,7 @@ export function SignupPage() {
           </div>
 
           <div className="mt-4 flex items-center justify-center gap-2">
-            <span className="font-technical text-[7px] text-ink-2">CAMPUSJUGAAD EXCHANGE · STUDENT ROLE ASSIGNED AUTOMATICALLY</span>
+            <span className="font-technical text-[7px] text-ink-2">CAMPUSVAULT EXCHANGE · STUDENT ROLE ASSIGNED AUTOMATICALLY</span>
           </div>
         </div>
       </div>

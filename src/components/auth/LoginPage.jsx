@@ -243,7 +243,7 @@ export function LoginPage() {
 
           {/* sub-label below terminal */}
           <div className="mt-4 flex items-center justify-center gap-2">
-            <span className="font-technical text-[7px] text-ink-3">AUTHENTICATED BY CAMPUSJUGAAD EXCHANGE</span>
+            <span className="font-technical text-[7px] text-ink-3">AUTHENTICATED BY CAMPUSVAULT EXCHANGE</span>
           </div>
         </div>
       </div>

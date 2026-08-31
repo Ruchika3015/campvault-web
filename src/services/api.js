@@ -2,7 +2,6 @@ const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   'https://campvault-backend.onrender.com';
 
-
 /**
  * ================================================================
  * LOW-LEVEL API REQUEST
@@ -12,30 +11,23 @@ const BASE_URL =
  * - Automatically attaches Authorization header
  * - Supports JSON requests
  * - Supports FormData requests
- * - Normalizes backend errors
+ * - Gives useful backend error messages
+ * ================================================================
  */
 
 export async function apiRequest(
   path,
   options = {}
 ) {
-
-  /*
-   * AuthContext stores the JWT as cj_token.
-   */
+  // AuthContext stores JWT as cj_token
   const token =
-    sessionStorage.getItem(
-      'cj_token'
-    );
-
+    sessionStorage.getItem('cj_token');
 
   const isFormData =
     typeof FormData !== 'undefined' &&
     options.body instanceof FormData;
 
-
   const headers = {
-
     ...(token
       ? {
           Authorization:
@@ -53,80 +45,74 @@ export async function apiRequest(
     ...(options.headers || {}),
   };
 
-
   const config = {
     ...options,
     headers,
   };
 
-
   let response;
 
-
   try {
-
-    response =
-      await fetch(
-        `${BASE_URL}${path}`,
-        config
-      );
-
+    response = await fetch(
+      `${BASE_URL}${path}`,
+      config
+    );
   } catch (error) {
-
     console.error(
       'API NETWORK ERROR:',
       error
     );
 
-
     throw {
-
       status: 0,
-
       message:
-        'Exchange unavailable. Check your connection and try again.',
-
+        'Unable to connect to the server. Check your internet connection and try again.',
+      data: null,
     };
-
   }
-
 
   let data = null;
 
-
   try {
+    const text =
+      await response.text();
 
-    data =
-      await response.json();
-
-  } catch {
-
-    data = null;
-
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = {
+          message: text,
+        };
+      }
+    }
+  } catch (error) {
+    console.error(
+      'API RESPONSE PARSE ERROR:',
+      error
+    );
   }
 
-
   if (!response.ok) {
-
     const message =
       data?.message ||
       data?.error ||
+      data?.details ||
       (
-        response.status === 401
-
+        response.status === 400
+          ? 'Invalid request.'
+          : response.status === 401
           ? 'Your session has expired. Please log in again.'
-
           : response.status === 403
-
           ? 'You are not authorized to perform this action.'
-
           : response.status === 404
-
           ? 'Requested resource was not found.'
-
-          : 'Something went wrong on the exchange. Please try again.'
+          : response.status === 409
+          ? 'This request conflicts with existing data.'
+          : response.status === 500
+          ? 'Server error. Please try again later.'
+          : `Request failed with status ${response.status}.`
       );
-
 
     console.error(
       'API ERROR:',
@@ -138,23 +124,17 @@ export async function apiRequest(
       }
     );
 
-
     throw {
-
       status:
         response.status,
 
       message,
 
       data,
-
     };
-
   }
 
-
   return data;
-
 }
 
 
@@ -163,7 +143,6 @@ export async function apiRequest(
 ================================================================ */
 
 export const api = {
-
 
   // ================================================================
   // AUTH / USERS
@@ -672,18 +651,67 @@ export const api = {
 
   updateNotificationPreferences: (
     preferences
-  ) =>
-    apiRequest(
+  ) => {
+
+    const payload = {
+      interestRequestNotifications:
+        Boolean(
+          preferences?.interestRequestNotifications
+        ),
+
+      proposalNotifications:
+        Boolean(
+          preferences?.proposalNotifications
+        ),
+
+      acceptedProposalNotifications:
+        Boolean(
+          preferences?.acceptedProposalNotifications
+        ),
+
+      rejectedProposalNotifications:
+        Boolean(
+          preferences?.rejectedProposalNotifications
+        ),
+
+      counterOfferNotifications:
+        Boolean(
+          preferences?.counterOfferNotifications
+        ),
+
+      messageNotifications:
+        Boolean(
+          preferences?.messageNotifications
+        ),
+
+      jugaadTaskNotifications:
+        Boolean(
+          preferences?.jugaadTaskNotifications
+        ),
+
+      emailNotifications:
+        Boolean(
+          preferences?.emailNotifications
+        ),
+
+      inAppNotifications:
+        Boolean(
+          preferences?.inAppNotifications
+        ),
+    };
+
+    return apiRequest(
       '/api/v1/notifications/preferences',
       {
         method: 'PUT',
 
         body:
           JSON.stringify(
-            preferences
+            payload
           ),
       }
-    ),
+    );
+  },
 
 
   // ------------------------------------------------
@@ -718,5 +746,4 @@ export const api = {
           JSON.stringify({}),
       }
     ),
-
 };

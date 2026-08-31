@@ -230,6 +230,34 @@ function getInitials(name) {
   ).toUpperCase();
 }
 
+/*
+ * Normalize the Jugaad budget from the backend.
+ * The database/backend uses `budget`, while some older
+ * frontend objects use `amount` or `price`. Prefer the real
+ * backend budget whenever it is present, even when amount is 0.
+ */
+function getJugaadBudget(item) {
+  const candidates = [
+    item?.budget,
+    item?.amount,
+    item?.price,
+  ];
+
+  for (const value of candidates) {
+    if (value === null || value === undefined || value === '') {
+      continue;
+    }
+
+    const numericValue = Number(value);
+
+    if (Number.isFinite(numericValue)) {
+      return numericValue;
+    }
+  }
+
+  return 0;
+}
+
 export function MyJugaadsPage() {
   const {
     isDemoMode,
@@ -237,16 +265,20 @@ export function MyJugaadsPage() {
   } = useAuth();
 
   const {
-    receivedProposals = [],
+    proposals = [],
     acceptProposal,
     rejectProposal,
     counterProposal,
-    refreshData,
   } = useProposals();
 
   const [jugaadsList, setJugaadsList] = useState(
     isDemoMode ? mockMyPostedJugaads : []
   );
+
+  // Proposals are fetched directly for each Jugaad from the backend.
+  // This is required because the global ProposalContext may not contain
+  // proposals received for the currently logged-in poster.
+  const [jugaadProposals, setJugaadProposals] = useState({});
 
   const [loading, setLoading] = useState(!isDemoMode);
 
@@ -266,7 +298,6 @@ export function MyJugaadsPage() {
     }
 
     if (!isAuthenticated) {
-      setJugaadsList([]);
       setLoading(false);
       return;
     }
@@ -274,25 +305,19 @@ export function MyJugaadsPage() {
     setLoading(true);
 
     try {
-      const [jugaadsResult] = await Promise.all([
-        api.getMyJugaads(),
-        refreshData(),
-      ]);
+      const data = await api.getMyJugaads();
 
       const list =
-        jugaadsResult?.jugaads ||
-        jugaadsResult?.data?.jugaads ||
-        jugaadsResult?.data ||
-        (Array.isArray(jugaadsResult)
-          ? jugaadsResult
-          : []);
+        data?.jugaads ||
+        data?.data ||
+        (Array.isArray(data) ? data : []);
 
       setJugaadsList(
         Array.isArray(list) ? list : []
       );
     } catch (error) {
       console.error(
-        'Failed to load my jugaads/proposals:',
+        'Failed to load my jugaads:',
         error
       );
 
@@ -300,15 +325,69 @@ export function MyJugaadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    isDemoMode,
-    isAuthenticated,
-    refreshData,
-  ]);
+  }, [isDemoMode, isAuthenticated]);
+
+  /*
+   * Fetch proposals/interest requests directly for every Jugaad owned
+   * by the current user.
+   *
+   * This fixes the problem where INTERESTED/BARGAIN requests exist in
+   * the backend but do not appear on the My Jugaads page.
+   */
+  const fetchJugaadProposals = useCallback(async (items) => {
+    if (isDemoMode || !isAuthenticated) {
+      return;
+    }
+
+    const list = Array.isArray(items) ? items : [];
+
+    if (list.length === 0) {
+      setJugaadProposals({});
+      return;
+    }
+
+    const results = {};
+
+    await Promise.all(
+      list.map(async (item) => {
+        if (!item?.id) {
+          return;
+        }
+
+        try {
+          const response = await api.getProposalsForJugaad(item.id);
+
+          const data =
+            response?.data ||
+            response?.proposals ||
+            (Array.isArray(response) ? response : []);
+
+          results[String(item.id)] = Array.isArray(data)
+            ? data
+            : [];
+        } catch (error) {
+          console.error(
+            `Failed to load proposals for Jugaad ${item.id}:`,
+            error
+          );
+
+          results[String(item.id)] = [];
+        }
+      })
+    );
+
+    setJugaadProposals(results);
+  }, [isDemoMode, isAuthenticated]);
 
   useEffect(() => {
     fetchMyJugaads();
   }, [fetchMyJugaads]);
+
+  useEffect(() => {
+    if (!loading) {
+      fetchJugaadProposals(jugaadsList);
+    }
+  }, [loading, jugaadsList, fetchJugaadProposals]);
 
   /*
    * Update Jugaad status.
@@ -355,6 +434,9 @@ export function MyJugaadsPage() {
       : []
   ).map((x) => ({
     ...x,
+
+    // Always expose the backend budget as the value used by the UI.
+    amount: getJugaadBudget(x),
 
     status:
       status[x.id] ||
@@ -410,17 +492,10 @@ export function MyJugaadsPage() {
      * which otherwise fails with strict ===.
      */
     const itemProposals =
-      Array.isArray(receivedProposals)
-        ? receivedProposals.filter((p) => {
-            const proposalJugaadId =
-              getProposalJugaadId(p);
-
-            return (
-              proposalJugaadId !== null &&
-              String(proposalJugaadId) ===
-                String(item.id)
-            );
-          })
+      Array.isArray(
+        jugaadProposals[String(item.id)]
+      )
+        ? jugaadProposals[String(item.id)]
         : [];
 
     return (
@@ -476,6 +551,9 @@ export function MyJugaadsPage() {
             }
 
             await fetchMyJugaads();
+
+            // Refresh the received requests after accept/reject.
+            await fetchJugaadProposals(jugaadsList);
           } catch (error) {
             console.error(
               'Failed to process proposal:',
@@ -552,17 +630,10 @@ export function MyJugaadsPage() {
         <div className="grid lg:grid-cols-2 gap-3">
           {items.map((item) => {
             const itemProposals =
-              Array.isArray(receivedProposals)
-                ? receivedProposals.filter((p) => {
-                    const proposalJugaadId =
-                      getProposalJugaadId(p);
-
-                    return (
-                      proposalJugaadId !== null &&
-                      String(proposalJugaadId) ===
-                        String(item.id)
-                    );
-                  })
+              Array.isArray(
+                jugaadProposals[String(item.id)]
+              )
+                ? jugaadProposals[String(item.id)]
                 : [];
 
             const statusConfig =
@@ -629,7 +700,7 @@ export function MyJugaadsPage() {
 
                 <div className="flex items-center gap-3 mt-4">
                   <span className="font-display text-lg text-amber">
-                    ₹{item.amount}
+                    ₹{getJugaadBudget(item)}
                   </span>
 
                   <span className="font-mono text-[9px] text-ink-3">
@@ -672,6 +743,7 @@ export function MyJugaadsPage() {
               );
 
               await fetchMyJugaads();
+              await fetchJugaadProposals(jugaadsList);
             } catch (error) {
               console.error(
                 'Failed to send counter offer:',
@@ -772,122 +844,32 @@ function Detail({
    * Avoid duplicates where the same student
    * already exists in interestedStudents.
    */
-  const mergedStudents = [];
+  const mergedStudents = [
+    ...directStudents,
+  ];
 
-  // Merge direct interested students with their matching
-  // proposals. This is important because the same student
-  // can exist in both arrays. If we keep only the direct
-  // student object, the proposal status (accepted/rejected)
-  // is lost and the action buttons appear again.
-  directStudents.forEach((student) => {
-    const studentId =
-      student?.id ??
-      student?.userId ??
-      student?.user_id;
-
-    const matchingProposal = proposalStudents.find(
-      (proposalStudent) => {
-        const proposalStudentId =
-          proposalStudent?.id;
-
-        if (
-          studentId == null ||
-          proposalStudentId == null
-        ) {
-          return false;
-        }
-
-        return (
-          String(studentId) ===
-          String(proposalStudentId)
-        );
-      }
-    );
-
-    if (matchingProposal) {
-      mergedStudents.push({
-        ...student,
-        ...matchingProposal,
-
-        id:
-          student.id ??
-          matchingProposal.id,
-
-        name:
-          student.name ??
-          matchingProposal.name,
-
-        fullName:
-          student.fullName ??
-          matchingProposal.fullName,
-
-        username:
-          student.username ??
-          matchingProposal.username,
-
-        initials:
-          student.initials ??
-          matchingProposal.initials,
-
-        skills:
-          Array.isArray(student.skills) &&
-          student.skills.length > 0
-            ? student.skills
-            : matchingProposal.skills,
-
-        rating:
-          student.rating ??
-          matchingProposal.rating,
-
-        message:
-          student.message ||
-          matchingProposal.message,
-
-        // Keep the real proposal information.
-        proposalId:
-          matchingProposal.proposalId,
-
-        proposal:
-          matchingProposal.proposal,
-
-        status:
-          matchingProposal.status,
-
-        proposalStatus:
-          matchingProposal.status,
-
-        conversationId:
-          matchingProposal.conversationId,
-      });
-    } else {
-      mergedStudents.push(student);
-    }
-  });
-
-  // Add proposal students that are not already present
-  // in the direct interested-student list.
   proposalStudents.forEach((proposalStudent) => {
-    const proposalStudentId =
-      proposalStudent?.id;
-
     const alreadyExists =
       mergedStudents.some((student) => {
-        const existingStudentId =
+        const studentId =
           student?.id ??
           student?.userId ??
           student?.user_id;
 
+        const proposalStudentId =
+          proposalStudent?.id;
+
         if (
-          existingStudentId == null ||
-          proposalStudentId == null
+          studentId != null &&
+          proposalStudentId != null
         ) {
-          return false;
+          return (
+            String(studentId) ===
+            String(proposalStudentId)
+          );
         }
 
-        return (
-          String(existingStudentId) ===
-          String(proposalStudentId)
-        );
+        return false;
       });
 
     if (!alreadyExists) {
@@ -955,8 +937,9 @@ function Detail({
 
             <p className="font-display text-2xl text-amber">
               ₹
-              {acceptedStudent?.agreedAmount ||
-                item.amount}
+              {Number.isFinite(Number(acceptedStudent?.agreedAmount))
+                ? Number(acceptedStudent.agreedAmount)
+                : getJugaadBudget(item)}
             </p>
           </div>
         </div>
@@ -1087,66 +1070,14 @@ function Detail({
                       }
                       student={student}
                       assigned={
-                        acceptedStudent?.id != null &&
-                        student?.id != null &&
-                        String(acceptedStudent.id) ===
-                          String(student.id)
+                        acceptedStudent?.id ===
+                        student.id
                       }
                       locked={
                         !!acceptedStudent &&
-                        acceptedStudent?.id != null &&
-                        student?.id != null &&
-                        String(acceptedStudent.id) !==
-                          String(student.id)
+                        acceptedStudent.id !==
+                          student.id
                       }
-                      onAccept={() => {
-                        const proposal = proposals.find(
-                          (p) =>
-                            String(p.id) ===
-                            String(student?.proposalId)
-                        );
-
-                        if (proposal) {
-                          onAcceptProposal(proposal);
-                        } else {
-                          console.error(
-                            'Proposal not found for ACCEPT:',
-                            student
-                          );
-                        }
-                      }}
-                      onReject={() => {
-                        const proposal = proposals.find(
-                          (p) =>
-                            String(p.id) ===
-                            String(student?.proposalId)
-                        );
-
-                        if (proposal) {
-                          onRejectProposal(proposal);
-                        } else {
-                          console.error(
-                            'Proposal not found for REJECT:',
-                            student
-                          );
-                        }
-                      }}
-                      onCounter={() => {
-                        const proposal = proposals.find(
-                          (p) =>
-                            String(p.id) ===
-                            String(student?.proposalId)
-                        );
-
-                        if (proposal) {
-                          onCounterProposal(proposal);
-                        } else {
-                          console.error(
-                            'Proposal not found for COUNTER:',
-                            student
-                          );
-                        }
-                      }}
                     />
                   )
                 )
@@ -1402,48 +1333,22 @@ function StudentRequest({
   student,
   assigned,
   locked,
-  onAccept,
-  onReject,
-  onCounter,
 }) {
-  const skills = Array.isArray(student?.skills)
+  const skills = Array.isArray(
+    student?.skills
+  )
     ? student.skills
     : [];
 
-  // Always use the real proposal status returned by the backend.
-  // This prevents ACCEPT / REJECT / COUNTER from appearing again
-  // after a proposal has already been accepted.
-  const proposalStatus =
-    student?.proposal?.status ||
-    student?.proposalStatus ||
-    student?.proposal_status ||
-    student?.status ||
-    'pending';
-
-  const isAccepted =
-    String(proposalStatus).toLowerCase() === 'accepted';
-
-  const isRejected =
-    String(proposalStatus).toLowerCase() === 'rejected';
-
-  const isWithdrawn =
-    String(proposalStatus).toLowerCase() === 'withdrawn';
-
-  // A proposal whose backend status is accepted is assigned
-  // even if acceptedStudent has not refreshed yet.
-  const isAssigned = Boolean(assigned) || isAccepted;
-
-  const conversationId = getValidConversationId(
-    student?.proposal || student
-  );
-
   const isBargain =
-    student?.requestType === 'bargain' ||
-    student?.request_type === 'bargain' ||
-    student?.proposal?.proposedPrice != null ||
-    student?.proposal?.proposed_price != null ||
-    student?.proposedAmount != null ||
-    student?.proposed_amount != null;
+    student?.requestType ===
+      'bargain' ||
+    student?.request_type ===
+      'bargain' ||
+    student?.proposal?.proposedPrice !=
+      null ||
+    student?.proposal?.proposed_price !=
+      null;
 
   const proposedAmount =
     student?.proposedAmount ??
@@ -1453,10 +1358,6 @@ function StudentRequest({
     student?.proposal?.amount ??
     0;
 
-  const hasProposal =
-    student?.proposalId != null ||
-    student?.proposal?.id != null;
-
   return (
     <div className="surface-panel rounded-xl p-4">
       <div className="flex items-start gap-3">
@@ -1465,8 +1366,7 @@ function StudentRequest({
             getInitials(
               student?.name ||
                 student?.fullName ||
-                student?.username ||
-                'Student'
+                student?.username
             )}
         </span>
 
@@ -1482,18 +1382,6 @@ function StudentRequest({
             {isBargain && (
               <span className="font-technical text-[7px] text-amber px-1.5 py-0.5 rounded bg-amber/10">
                 BARGAIN
-              </span>
-            )}
-
-            {isAccepted && (
-              <span className="font-technical text-[7px] text-mint px-1.5 py-0.5 rounded bg-mint/10">
-                ACCEPTED
-              </span>
-            )}
-
-            {isRejected && (
-              <span className="font-technical text-[7px] text-coral px-1.5 py-0.5 rounded bg-coral/10">
-                REJECTED
               </span>
             )}
           </div>
@@ -1519,65 +1407,35 @@ function StudentRequest({
         </span>
       </div>
 
-      {/* ACCEPTED PROPOSAL → MESSAGE */}
-      {isAccepted && (
+      {!assigned && !locked && (
         <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
-          {conversationId ? (
-            <Link
-              to={`/dashboard/messages/${conversationId}`}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
+          <button
+            type="button"
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px]"
+          >
+            <Check size={12} />
+            ACCEPT
+          </button>
+
+          <button
+            type="button"
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px]"
+          >
+            <X size={12} />
+            REJECT
+          </button>
+
+          {isBargain && (
+            <button
+              type="button"
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px]"
             >
-              <MessageSquare size={12} />
-              MESSAGE
-            </Link>
-          ) : (
-            <span className="flex items-center gap-1 px-3 py-2 rounded-lg bg-bg-2 text-ink-3 font-technical text-[8px]">
-              <MessageSquare size={12} />
-              CONVERSATION UNAVAILABLE
-            </span>
+              <HandCoins size={12} />
+              COUNTER
+            </button>
           )}
         </div>
       )}
-
-      {/* PENDING PROPOSAL → ACCEPT / REJECT / COUNTER */}
-      {!isAssigned &&
-        !locked &&
-        !isRejected &&
-        !isWithdrawn && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
-            <button
-              type="button"
-              onClick={onAccept}
-              disabled={!hasProposal}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Check size={12} />
-              ACCEPT
-            </button>
-
-            <button
-              type="button"
-              onClick={onReject}
-              disabled={!hasProposal}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <X size={12} />
-              REJECT
-            </button>
-
-            {isBargain && (
-              <button
-                type="button"
-                onClick={onCounter}
-                disabled={!hasProposal}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px] hover:bg-amber/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <HandCoins size={12} />
-                COUNTER
-              </button>
-            )}
-          </div>
-        )}
     </div>
   );
 }

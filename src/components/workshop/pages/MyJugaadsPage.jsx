@@ -4,7 +4,6 @@ import { LED } from '@/components/primitives/Details';
 import {
   mockMyPostedJugaads,
   JUGAAD_STATUS,
-  timeAgo,
 } from '@/data/jugaadMockData';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -115,7 +114,36 @@ function proposalToStudentRequest(proposal) {
     return null;
   }
 
-  const helper = proposal.helper || proposal.student || proposal.user || {};
+  const helper =
+    proposal.helper ||
+    proposal.student ||
+    proposal.user ||
+    {};
+
+  // Backend returns helper information as flat fields such as
+  // helper_name and helper_id. Normalize those into the shape the UI uses.
+  const helperId =
+    proposal.helperId ??
+    proposal.helper_id ??
+    proposal.userId ??
+    proposal.user_id ??
+    helper.id ??
+    null;
+
+  const helperName =
+    helper.name ||
+    helper.fullName ||
+    helper.username ||
+    proposal.helperName ||
+    proposal.helper_name ||
+    proposal.studentName ||
+    proposal.student_name ||
+    '';
+
+  // Never create a fake "Student" entry for an unknown helper.
+  if (!helperName || helperName.trim().toLowerCase() === 'student') {
+    return null;
+  }
 
   const requestType =
     proposal.requestType ||
@@ -135,45 +163,28 @@ function proposalToStudentRequest(proposal) {
 
   return {
     id:
-      proposal.helperId ??
-      proposal.helper_id ??
-      helper.id ??
-      proposal.userId ??
-      proposal.user_id ??
+      helperId ??
       `proposal-${proposal.id}`,
 
     proposalId: proposal.id,
 
-    name:
-      helper.name ||
-      helper.fullName ||
-      helper.username ||
-      proposal.helperName ||
-      proposal.helper_name ||
-      proposal.studentName ||
-      proposal.student_name ||
-      'Student',
+    name: helperName,
 
     fullName:
       helper.fullName ||
       helper.name ||
-      proposal.helperName ||
-      proposal.helper_name ||
-      'Student',
+      helperName,
 
-    username: helper.username,
+    username:
+      helper.username ||
+      proposal.helper_username ||
+      null,
 
     initials:
       helper.initials ||
       helper.avatarInitials ||
       proposal.initials ||
-      getInitials(
-        helper.name ||
-          helper.fullName ||
-          proposal.helperName ||
-          proposal.helper_name ||
-          'Student'
-      ),
+      getInitials(helperName),
 
     skills:
       Array.isArray(proposal.skills)
@@ -190,16 +201,17 @@ function proposalToStudentRequest(proposal) {
 
     message:
       proposal.explanation ||
-      proposal.message ||
       proposal.proposalMessage ||
       proposal.proposal_message ||
+      proposal.message ||
       '',
 
     requestType,
-
     proposedAmount,
 
-    status: proposal.status || 'pending',
+    status:
+      proposal.status ||
+      'pending',
 
     conversationId:
       proposal.conversationId ??
@@ -228,6 +240,62 @@ function getInitials(name) {
     parts[0][0] +
     parts[parts.length - 1][0]
   ).toUpperCase();
+}
+
+
+function formatRelativeTime(timestamp, referenceNow = Date.now()) {
+  if (!timestamp) {
+    return '';
+  }
+
+  const parsed = new Date(timestamp).getTime();
+
+  if (!Number.isFinite(parsed)) {
+    return '';
+  }
+
+  const diffMs = referenceNow - parsed;
+
+  if (diffMs < 0) {
+    return 'just now';
+  }
+
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMinutes < 1) {
+    return 'just now';
+  }
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  }
+
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  }
+
+  if (diffDays < 30) {
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  }
+
+  const weeks = Math.floor(diffDays / 7);
+
+  if (weeks < 5) {
+    return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+  }
+
+  const months = Math.floor(diffDays / 30);
+
+  if (months < 12) {
+    return `${months} month${months === 1 ? '' : 's'} ago`;
+  }
+
+  const years = Math.floor(diffDays / 365);
+
+  return `${years} year${years === 1 ? '' : 's'} ago`;
 }
 
 export function MyJugaadsPage() {
@@ -335,7 +403,35 @@ export function MyJugaadsPage() {
             (Array.isArray(response) ? response : []);
 
           results[String(item.id)] = Array.isArray(data)
-            ? data
+            ? data.map((proposal) => ({
+                ...proposal,
+                helper: proposal.helper || {
+                  id:
+                    proposal.helperId ??
+                    proposal.helper_id ??
+                    proposal.userId ??
+                    proposal.user_id ??
+                    null,
+                  name:
+                    proposal.helperName ??
+                    proposal.helper_name ??
+                    proposal.studentName ??
+                    proposal.student_name ??
+                    '',
+                  email:
+                    proposal.helperEmail ??
+                    proposal.helper_email ??
+                    '',
+                  number:
+                    proposal.helperNumber ??
+                    proposal.helper_number ??
+                    '',
+                  location:
+                    proposal.helperLocation ??
+                    proposal.helper_location ??
+                    '',
+                },
+              }))
             : [];
         } catch (error) {
           console.error(
@@ -801,6 +897,21 @@ function Detail({
       acceptedStudent
     );
 
+
+  const [now, setNow] = useState(
+    Date.now()
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setNow(Date.now()),
+      30_000
+    );
+
+    return () =>
+      window.clearInterval(timer);
+  }, []);
+
   /*
    * Direct requests from backend.
    */
@@ -818,66 +929,42 @@ function Detail({
    */
   const mergedStudents = [];
 
-  directStudents.filter(Boolean).forEach((student) => {
-    const studentId =
-      student?.id ??
-      student?.userId ??
-      student?.user_id ??
-      null;
-
-    const matchingProposal = proposals.find((proposal) => {
-      const proposalStudentId =
-        proposal?.helperId ??
-        proposal?.helper_id ??
-        proposal?.userId ??
-        proposal?.user_id ??
-        proposal?.helper?.id ??
-        proposal?.student?.id ??
-        proposal?.user?.id ??
-        null;
-
-      return (
-        studentId != null &&
-        proposalStudentId != null &&
-        String(studentId) === String(proposalStudentId)
-      );
+  // Keep direct interested-student records first.
+  directStudents
+    .filter(Boolean)
+    .forEach((student) => {
+      mergedStudents.push(student);
     });
 
-    mergedStudents.push(
-      matchingProposal
-        ? {
-            ...student,
-            proposalId: matchingProposal.id,
-            proposal: matchingProposal,
-            status: matchingProposal.status,
-            proposalStatus: matchingProposal.status,
-            conversationId:
-              matchingProposal.conversationId ??
-              matchingProposal.conversation_id ??
-              student?.conversationId ??
-              student?.conversation_id ??
-              null,
-            proposedAmount:
-              matchingProposal.proposedPrice ??
-              matchingProposal.proposed_price ??
-              matchingProposal.amount ??
-              student?.proposedAmount ??
-              student?.proposed_amount ??
-              0,
-            requestType:
-              matchingProposal.requestType ??
-              matchingProposal.request_type ??
-              student?.requestType ??
-              student?.request_type,
-            message:
-              student?.message ||
-              matchingProposal.explanation ||
-              matchingProposal.message ||
-              '',
-          }
-        : student
-    );
-  });
+  // Also include real proposal authors in Interested Students.
+  // Anonymous placeholder proposals such as "Student" are ignored.
+  proposals
+    .map(proposalToStudentRequest)
+    .filter(Boolean)
+    .forEach((proposalStudent) => {
+      const exists = mergedStudents.some((student) => {
+        const existingId =
+          student?.id ??
+          student?.userId ??
+          student?.user_id ??
+          null;
+
+        return (
+          existingId != null &&
+          proposalStudent?.id != null &&
+          String(existingId) ===
+            String(proposalStudent.id)
+        );
+      });
+
+      if (exists) {
+        return;
+      }
+
+      mergedStudents.push(
+        proposalStudent
+      );
+    });
 
   return (
     <div>
@@ -927,10 +1014,16 @@ function Detail({
               {item.id} ·{' '}
               {item.skillRequired ||
                 item.category}{' '}
-              {item.postedAt ? (
+              {formatRelativeTime(
+                item.postedAt,
+                now
+              ) ? (
                 <>
                   · posted{' '}
-                  {timeAgo(item.postedAt)}
+                  {formatRelativeTime(
+                    item.postedAt,
+                    now
+                  )}
                 </>
               ) : null}
             </p>
@@ -1014,18 +1107,13 @@ function Detail({
                 proposal?.student_name ||
                 '';
 
-              const helperId =
-                proposal?.helperId ??
-                proposal?.helper_id ??
-                proposal?.userId ??
-                proposal?.user_id ??
-                helper?.id ??
-                null;
-
               // Hide anonymous placeholder rows such as "Student".
+              // A helper ID alone is not enough; the user-facing name must
+              // be real so we do not show a fake "Student" card.
               return Boolean(
-                helperId != null ||
-                (name && name.trim() && name.trim().toLowerCase() !== 'student')
+                name &&
+                name.trim() &&
+                name.trim().toLowerCase() !== 'student'
               );
             });
 

@@ -573,7 +573,7 @@ export function WorkshopNav() {
               <span className="font-display text-xs tracking-tight text-ink-0">
                 CAMPUS
                 <span className="text-amber">
-                  JUGAAD
+                  VAULT
                 </span>
               </span>
 

@@ -7,27 +7,14 @@ const BASE_URL =
  * ================================================================
  * LOW-LEVEL API REQUEST
  * ================================================================
- *
- * - Reads JWT from sessionStorage
- * - Automatically attaches Authorization header
- * - Supports JSON requests
- * - Supports FormData requests
- * - Normalizes backend errors
- * ================================================================
  */
 
 export async function apiRequest(
   path,
   options = {}
 ) {
-
-  /*
-   * AuthContext stores the JWT as cj_token.
-   */
   const token =
-    sessionStorage.getItem(
-      'cj_token'
-    );
+    sessionStorage.getItem('cj_token');
 
 
   const isFormData =
@@ -36,7 +23,6 @@ export async function apiRequest(
 
 
   const headers = {
-
     ...(token
       ? {
           Authorization:
@@ -52,7 +38,6 @@ export async function apiRequest(
         }),
 
     ...(options.headers || {}),
-
   };
 
 
@@ -89,16 +74,11 @@ export async function apiRequest(
 
       data: null,
     };
-
   }
 
 
   let data = null;
 
-
-  /*
-   * Safely handle JSON and plain-text responses.
-   */
 
   try {
 
@@ -141,27 +121,21 @@ export async function apiRequest(
       data?.details ||
       (
         response.status === 400
-
           ? 'Invalid request.'
 
           : response.status === 401
-
           ? 'Your session has expired. Please log in again.'
 
           : response.status === 403
-
           ? 'You are not authorized to perform this action.'
 
           : response.status === 404
-
           ? 'Requested resource was not found.'
 
           : response.status === 409
-
           ? 'This request conflicts with existing data.'
 
           : response.status === 500
-
           ? 'Server error. Please try again later.'
 
           : `Request failed with status ${response.status}.`
@@ -189,12 +163,10 @@ export async function apiRequest(
       data,
 
     };
-
   }
 
 
   return data;
-
 }
 
 
@@ -208,11 +180,6 @@ export const api = {
   // ================================================================
   // AUTH / USERS
   // ================================================================
-
-
-  // ------------------------------------------------
-  // REGISTER
-  // ------------------------------------------------
 
   register: (
     payload
@@ -230,10 +197,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // LOGIN
-  // ------------------------------------------------
-
   login: (
     payload
   ) =>
@@ -250,19 +213,11 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // GET PROFILE
-  // ------------------------------------------------
-
   getProfile: () =>
     apiRequest(
       '/api/v1/users/profile'
     ),
 
-
-  // ------------------------------------------------
-  // UPDATE PROFILE
-  // ------------------------------------------------
 
   updateProfile: (
     payload
@@ -280,10 +235,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // CHANGE PASSWORD
-  // ------------------------------------------------
-
   changePassword: (
     payload
   ) =>
@@ -299,10 +250,6 @@ export const api = {
       }
     ),
 
-
-  // ------------------------------------------------
-  // DELETE ACCOUNT
-  // ------------------------------------------------
 
   deleteAccount: (
     payload
@@ -321,23 +268,24 @@ export const api = {
 
 
   // ================================================================
-  // PROFILE - SKILLS
+  // COLLEGES
   // ================================================================
 
+  getColleges: () =>
+    apiRequest(
+      '/api/v1/colleges'
+    ),
 
-  // ------------------------------------------------
-  // GET USER SKILLS
-  // ------------------------------------------------
+
+  // ================================================================
+  // PROFILE - SKILLS
+  // ================================================================
 
   getSkills: () =>
     apiRequest(
       '/api/v1/users/skills'
     ),
 
-
-  // ------------------------------------------------
-  // ADD SKILL
-  // ------------------------------------------------
 
   addSkill: (
     payload
@@ -350,24 +298,23 @@ export const api = {
         body:
           JSON.stringify({
             name:
-              payload?.name?.trim() ||
-              '',
+              String(
+                payload?.name ?? ''
+              ).trim(),
 
             category:
-              payload?.category?.trim() ||
-              '',
+              String(
+                payload?.category ?? ''
+              ).trim(),
 
             level:
-              payload?.level?.trim() ||
-              '',
+              String(
+                payload?.level ?? ''
+              ).trim(),
           }),
       }
     ),
 
-
-  // ------------------------------------------------
-  // UPDATE SKILL
-  // ------------------------------------------------
 
   updateSkill: (
     skillId,
@@ -381,24 +328,23 @@ export const api = {
         body:
           JSON.stringify({
             name:
-              payload?.name?.trim() ||
-              '',
+              String(
+                payload?.name ?? ''
+              ).trim(),
 
             category:
-              payload?.category?.trim() ||
-              '',
+              String(
+                payload?.category ?? ''
+              ).trim(),
 
             level:
-              payload?.level?.trim() ||
-              '',
+              String(
+                payload?.level ?? ''
+              ).trim(),
           }),
       }
     ),
 
-
-  // ------------------------------------------------
-  // DELETE SKILL
-  // ------------------------------------------------
 
   deleteSkill: (
     skillId
@@ -412,23 +358,310 @@ export const api = {
 
 
   // ================================================================
-  // COLLEGES
+  // PROFILE - LINKS & PROFILES
   // ================================================================
 
-  getColleges: () =>
+  getLinks: () =>
     apiRequest(
-      '/api/v1/colleges'
+      '/api/v1/users/links'
+    ),
+
+
+  addLink: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/links',
+      {
+        method: 'POST',
+
+        body:
+          JSON.stringify({
+            platform:
+              String(
+                payload?.platform ?? ''
+              ).trim(),
+
+            url:
+              String(
+                payload?.url ?? ''
+              ).trim(),
+          }),
+      }
+    ),
+
+
+  updateLink: (
+    linkId,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/links/${linkId}`,
+      {
+        method: 'PUT',
+
+        body:
+          JSON.stringify({
+            platform:
+              String(
+                payload?.platform ?? ''
+              ).trim(),
+
+            url:
+              String(
+                payload?.url ?? ''
+              ).trim(),
+          }),
+      }
+    ),
+
+
+  deleteLink: (
+    linkId
+  ) =>
+    apiRequest(
+      `/api/v1/users/links/${linkId}`,
+      {
+        method: 'DELETE',
+      }
+    ),
+
+
+  // ================================================================
+  // PROFILE - PROJECTS
+  // ================================================================
+
+  getProjects: () =>
+    apiRequest(
+      '/api/v1/users/projects'
+    ),
+
+
+  addProject: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/projects',
+      {
+        method: 'POST',
+
+        body:
+          JSON.stringify({
+
+            name:
+              String(
+                payload?.name ?? ''
+              ).trim(),
+
+            description:
+              String(
+                payload?.description ?? ''
+              ).trim(),
+
+            technologies:
+              Array.isArray(
+                payload?.technologies
+              )
+                ? payload.technologies
+                : String(
+                    payload?.technologies ?? ''
+                  )
+                    .split(',')
+                    .map(
+                      (item) =>
+                        item.trim()
+                    )
+                    .filter(Boolean),
+
+            github:
+              String(
+                payload?.github ?? ''
+              ).trim(),
+
+            link:
+              String(
+                payload?.link ?? ''
+              ).trim(),
+
+          }),
+      }
+    ),
+
+
+  updateProject: (
+    projectId,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/projects/${projectId}`,
+      {
+        method: 'PUT',
+
+        body:
+          JSON.stringify({
+
+            name:
+              String(
+                payload?.name ?? ''
+              ).trim(),
+
+            description:
+              String(
+                payload?.description ?? ''
+              ).trim(),
+
+            technologies:
+              Array.isArray(
+                payload?.technologies
+              )
+                ? payload.technologies
+                : String(
+                    payload?.technologies ?? ''
+                  )
+                    .split(',')
+                    .map(
+                      (item) =>
+                        item.trim()
+                    )
+                    .filter(Boolean),
+
+            github:
+              String(
+                payload?.github ?? ''
+              ).trim(),
+
+            link:
+              String(
+                payload?.link ?? ''
+              ).trim(),
+
+          }),
+      }
+    ),
+
+
+  deleteProject: (
+    projectId
+  ) =>
+    apiRequest(
+      `/api/v1/users/projects/${projectId}`,
+      {
+        method: 'DELETE',
+      }
+    ),
+
+
+  // ================================================================
+  // PROFILE - CERTIFICATIONS
+  // ================================================================
+
+  getCertifications: () =>
+    apiRequest(
+      '/api/v1/users/certifications'
+    ),
+
+
+  addCertification: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/certifications',
+      {
+        method: 'POST',
+
+        body:
+          JSON.stringify({
+
+            title:
+              String(
+                payload?.title ?? ''
+              ).trim(),
+
+            organization:
+              String(
+                payload?.organization ?? ''
+              ).trim(),
+
+            date:
+              String(
+                payload?.date ?? ''
+              ).trim(),
+
+            description:
+              String(
+                payload?.description ?? ''
+              ).trim(),
+
+            credential_url:
+              String(
+                payload?.credential_url ??
+                payload?.url ??
+                ''
+              ).trim(),
+
+          }),
+      }
+    ),
+
+
+  updateCertification: (
+    certificationId,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/certifications/${certificationId}`,
+      {
+        method: 'PUT',
+
+        body:
+          JSON.stringify({
+
+            title:
+              String(
+                payload?.title ?? ''
+              ).trim(),
+
+            organization:
+              String(
+                payload?.organization ?? ''
+              ).trim(),
+
+            date:
+              String(
+                payload?.date ?? ''
+              ).trim(),
+
+            description:
+              String(
+                payload?.description ?? ''
+              ).trim(),
+
+            credential_url:
+              String(
+                payload?.credential_url ??
+                payload?.url ??
+                ''
+              ).trim(),
+
+          }),
+      }
+    ),
+
+
+  deleteCertification: (
+    certificationId
+  ) =>
+    apiRequest(
+      `/api/v1/users/certifications/${certificationId}`,
+      {
+        method: 'DELETE',
+      }
     ),
 
 
   // ================================================================
   // JUGAAD
   // ================================================================
-
-
-  // ------------------------------------------------
-  // CREATE JUGAAD
-  // ------------------------------------------------
 
   createJugaad: (
     payload
@@ -446,29 +679,17 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // DISCOVERY FEED
-  // ------------------------------------------------
-
   getDiscoveryFeed: () =>
     apiRequest(
       '/api/v1/jugaads'
     ),
 
 
-  // ------------------------------------------------
-  // MY JUGAAD POSTS
-  // ------------------------------------------------
-
   getMyJugaads: () =>
     apiRequest(
       '/api/v1/jugaads/my'
     ),
 
-
-  // ------------------------------------------------
-  // GET ONE JUGAAD
-  // ------------------------------------------------
 
   getJugaad: (
     id
@@ -477,10 +698,6 @@ export const api = {
       `/api/v1/jugaads/${id}`
     ),
 
-
-  // ------------------------------------------------
-  // UPDATE JUGAAD
-  // ------------------------------------------------
 
   updateJugaad: (
     id,
@@ -499,10 +716,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // DELETE / CANCEL JUGAAD
-  // ------------------------------------------------
-
   deleteJugaad: (
     id
   ) =>
@@ -518,11 +731,6 @@ export const api = {
   // INTEREST
   // ================================================================
 
-
-  // ------------------------------------------------
-  // EXPRESS INTEREST
-  // ------------------------------------------------
-
   expressInterest: (
     jugaadId
   ) =>
@@ -536,10 +744,6 @@ export const api = {
       }
     ),
 
-
-  // ------------------------------------------------
-  // MARK NOT INTERESTED
-  // ------------------------------------------------
 
   markNotInterested: (
     jugaadId
@@ -559,11 +763,6 @@ export const api = {
   // JUGAAD-SPECIFIC PROPOSALS
   // ================================================================
 
-
-  // ------------------------------------------------
-  // SUBMIT PROPOSAL
-  // ------------------------------------------------
-
   submitProposal: (
     jugaadId,
     payload
@@ -581,10 +780,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // GET PROPOSALS FOR JUGAAD
-  // ------------------------------------------------
-
   getProposalsForJugaad: (
     jugaadId
   ) =>
@@ -597,30 +792,17 @@ export const api = {
   // PROPOSALS
   // ================================================================
 
-
-  // ------------------------------------------------
-  // MY PROPOSALS
-  // ------------------------------------------------
-
   getMyProposals: () =>
     apiRequest(
       '/api/v1/proposals/my'
     ),
 
 
-  // ------------------------------------------------
-  // RECEIVED PROPOSALS
-  // ------------------------------------------------
-
   getReceivedProposals: () =>
     apiRequest(
       '/api/v1/proposals/received'
     ),
 
-
-  // ------------------------------------------------
-  // ACCEPT PROPOSAL
-  // ------------------------------------------------
 
   acceptProposal: (
     proposalId
@@ -636,10 +818,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // REJECT PROPOSAL
-  // ------------------------------------------------
-
   rejectProposal: (
     proposalId
   ) =>
@@ -654,10 +832,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // WITHDRAW PROPOSAL
-  // ------------------------------------------------
-
   withdrawProposal: (
     proposalId
   ) =>
@@ -671,10 +845,6 @@ export const api = {
       }
     ),
 
-
-  // ------------------------------------------------
-  // CREATE COUNTER OFFER
-  // ------------------------------------------------
 
   createCounterOffer: (
     proposalId,
@@ -693,10 +863,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // GET COUNTER OFFERS
-  // ------------------------------------------------
-
   getCounterOffers: (
     proposalId
   ) =>
@@ -709,20 +875,11 @@ export const api = {
   // CONVERSATIONS / MESSAGES
   // ================================================================
 
-
-  // ------------------------------------------------
-  // GET CONVERSATIONS
-  // ------------------------------------------------
-
   getConversations: () =>
     apiRequest(
       '/api/v1/conversations'
     ),
 
-
-  // ------------------------------------------------
-  // GET CONVERSATION MESSAGES
-  // ------------------------------------------------
 
   getConversationMessages: (
     conversationId
@@ -731,10 +888,6 @@ export const api = {
       `/api/v1/conversations/${conversationId}/messages`
     ),
 
-
-  // ------------------------------------------------
-  // SEND MESSAGE
-  // ------------------------------------------------
 
   sendMessage: (
     conversationId,
@@ -754,10 +907,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // MARK CONVERSATION READ
-  // ------------------------------------------------
-
   markConversationAsRead: (
     conversationId
   ) =>
@@ -776,30 +925,17 @@ export const api = {
   // NOTIFICATIONS
   // ================================================================
 
-
-  // ------------------------------------------------
-  // GET NOTIFICATIONS
-  // ------------------------------------------------
-
   getNotifications: () =>
     apiRequest(
       '/api/v1/notifications'
     ),
 
 
-  // ------------------------------------------------
-  // GET NOTIFICATION PREFERENCES
-  // ------------------------------------------------
-
   getNotificationPreferences: () =>
     apiRequest(
       '/api/v1/notifications/preferences'
     ),
 
-
-  // ------------------------------------------------
-  // UPDATE NOTIFICATION PREFERENCES
-  // ------------------------------------------------
 
   updateNotificationPreferences: (
     preferences
@@ -817,10 +953,6 @@ export const api = {
     ),
 
 
-  // ------------------------------------------------
-  // MARK ALL NOTIFICATIONS READ
-  // ------------------------------------------------
-
   markAllNotificationsRead: () =>
     apiRequest(
       '/api/v1/notifications/read-all',
@@ -832,10 +964,6 @@ export const api = {
       }
     ),
 
-
-  // ------------------------------------------------
-  // MARK ONE NOTIFICATION READ
-  // ------------------------------------------------
 
   markNotificationRead: (
     id

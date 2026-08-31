@@ -12,7 +12,7 @@ const BASE_URL =
  * - Automatically attaches Authorization header
  * - Supports JSON requests
  * - Supports FormData requests
- * - Handles backend errors
+ * - Normalizes backend errors
  * ================================================================
  */
 
@@ -97,10 +97,7 @@ export async function apiRequest(
 
 
   /*
-   * Some successful requests may return JSON.
-   * Some backend errors may return plain text.
-   *
-   * Try JSON first, then plain text.
+   * Safely handle JSON and plain-text responses.
    */
 
   try {
@@ -199,132 +196,6 @@ export async function apiRequest(
   return data;
 
 }
-
-
-/**
- * ================================================================
- * NORMALIZE NOTIFICATION PREFERENCES
- * ================================================================
- *
- * PostgreSQL normally returns snake_case:
- *
- * interest_request_notifications
- *
- * Frontend uses camelCase:
- *
- * interestRequestNotifications
- *
- * This function supports BOTH formats.
- *
- * It also supports a response wrapped inside:
- *
- * {
- *   success: true,
- *   data: {...}
- * }
- *
- * ================================================================
- */
-
-const normalizeNotificationPreferences = (
-  response
-) => {
-
-  const source =
-    response?.data &&
-    typeof response.data === 'object'
-      ? response.data
-      : response || {};
-
-
-  return {
-
-    interestRequestNotifications:
-      Boolean(
-        source.interestRequestNotifications ??
-        source.interest_request_notifications ??
-        true
-      ),
-
-
-    proposalNotifications:
-      Boolean(
-        source.proposalNotifications ??
-        source.proposal_notifications ??
-        true
-      ),
-
-
-    acceptedProposalNotifications:
-      Boolean(
-        source.acceptedProposalNotifications ??
-        source.accepted_proposal_notifications ??
-        true
-      ),
-
-
-    rejectedProposalNotifications:
-      Boolean(
-        source.rejectedProposalNotifications ??
-        source.rejected_proposal_notifications ??
-        true
-      ),
-
-
-    counterOfferNotifications:
-      Boolean(
-        source.counterOfferNotifications ??
-        source.counter_offer_notifications ??
-        true
-      ),
-
-
-    messageNotifications:
-      Boolean(
-        source.messageNotifications ??
-        source.message_notifications ??
-        true
-      ),
-
-
-    jugaadTaskNotifications:
-      Boolean(
-        source.jugaadTaskNotifications ??
-        source.jugaad_task_notifications ??
-        true
-      ),
-
-
-    emailNotifications:
-      Boolean(
-        source.emailNotifications ??
-        source.email_notifications ??
-        true
-      ),
-
-
-    inAppNotifications:
-      Boolean(
-        source.inAppNotifications ??
-        source.in_app_notifications ??
-        true
-      ),
-
-
-    createdAt:
-      source.createdAt ??
-      source.created_at ??
-      null,
-
-
-    updatedAt:
-      source.updatedAt ??
-      source.updated_at ??
-      null,
-
-  };
-
-};
 
 
 /* ================================================================
@@ -445,6 +316,97 @@ export const api = {
           JSON.stringify(
             payload
           ),
+      }
+    ),
+
+
+  // ================================================================
+  // PROFILE - SKILLS
+  // ================================================================
+
+
+  // ------------------------------------------------
+  // GET USER SKILLS
+  // ------------------------------------------------
+
+  getSkills: () =>
+    apiRequest(
+      '/api/v1/users/skills'
+    ),
+
+
+  // ------------------------------------------------
+  // ADD SKILL
+  // ------------------------------------------------
+
+  addSkill: (
+    payload
+  ) =>
+    apiRequest(
+      '/api/v1/users/skills',
+      {
+        method: 'POST',
+
+        body:
+          JSON.stringify({
+            name:
+              payload?.name?.trim() ||
+              '',
+
+            category:
+              payload?.category?.trim() ||
+              '',
+
+            level:
+              payload?.level?.trim() ||
+              '',
+          }),
+      }
+    ),
+
+
+  // ------------------------------------------------
+  // UPDATE SKILL
+  // ------------------------------------------------
+
+  updateSkill: (
+    skillId,
+    payload
+  ) =>
+    apiRequest(
+      `/api/v1/users/skills/${skillId}`,
+      {
+        method: 'PUT',
+
+        body:
+          JSON.stringify({
+            name:
+              payload?.name?.trim() ||
+              '',
+
+            category:
+              payload?.category?.trim() ||
+              '',
+
+            level:
+              payload?.level?.trim() ||
+              '',
+          }),
+      }
+    ),
+
+
+  // ------------------------------------------------
+  // DELETE SKILL
+  // ------------------------------------------------
+
+  deleteSkill: (
+    skillId
+  ) =>
+    apiRequest(
+      `/api/v1/users/skills/${skillId}`,
+      {
+        method: 'DELETE',
       }
     ),
 
@@ -829,116 +791,30 @@ export const api = {
   // GET NOTIFICATION PREFERENCES
   // ------------------------------------------------
 
-  getNotificationPreferences: async () => {
-
-    const response =
-      await apiRequest(
-        '/api/v1/notifications/preferences'
-      );
-
-
-    return normalizeNotificationPreferences(
-      response
-    );
-
-  },
+  getNotificationPreferences: () =>
+    apiRequest(
+      '/api/v1/notifications/preferences'
+    ),
 
 
   // ------------------------------------------------
   // UPDATE NOTIFICATION PREFERENCES
   // ------------------------------------------------
 
-  updateNotificationPreferences: async (
+  updateNotificationPreferences: (
     preferences
-  ) => {
+  ) =>
+    apiRequest(
+      '/api/v1/notifications/preferences',
+      {
+        method: 'PUT',
 
-    /*
-     * Send exactly the fields expected
-     * by the backend.
-     */
-
-    const payload = {
-
-      interestRequestNotifications:
-        Boolean(
-          preferences?.interestRequestNotifications
-        ),
-
-      proposalNotifications:
-        Boolean(
-          preferences?.proposalNotifications
-        ),
-
-      acceptedProposalNotifications:
-        Boolean(
-          preferences?.acceptedProposalNotifications
-        ),
-
-      rejectedProposalNotifications:
-        Boolean(
-          preferences?.rejectedProposalNotifications
-        ),
-
-      counterOfferNotifications:
-        Boolean(
-          preferences?.counterOfferNotifications
-        ),
-
-      messageNotifications:
-        Boolean(
-          preferences?.messageNotifications
-        ),
-
-      jugaadTaskNotifications:
-        Boolean(
-          preferences?.jugaadTaskNotifications
-        ),
-
-      emailNotifications:
-        Boolean(
-          preferences?.emailNotifications
-        ),
-
-      inAppNotifications:
-        Boolean(
-          preferences?.inAppNotifications
-        ),
-
-    };
-
-
-    const response =
-      await apiRequest(
-        '/api/v1/notifications/preferences',
-        {
-          method: 'PUT',
-
-          body:
-            JSON.stringify(
-              payload
-            ),
-        }
-      );
-
-
-    /*
-     * IMPORTANT:
-     *
-     * Normalize the response before
-     * returning it to SettingsPage.
-     *
-     * This prevents the switch from:
-     *
-     * ON → saved → OFF
-     *
-     * when the backend returns snake_case.
-     */
-
-    return normalizeNotificationPreferences(
-      response
-    );
-
-  },
+        body:
+          JSON.stringify(
+            preferences
+          ),
+      }
+    ),
 
 
   // ------------------------------------------------

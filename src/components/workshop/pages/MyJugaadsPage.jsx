@@ -4,6 +4,7 @@ import { LED } from '@/components/primitives/Details';
 import {
   mockMyPostedJugaads,
   JUGAAD_STATUS,
+  timeAgo,
 } from '@/data/jugaadMockData';
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -96,6 +97,116 @@ function getProposalJugaadId(proposal) {
 }
 
 /*
+ * Normalize API responses that may return:
+ *   - an array
+ *   - { conversations: [] }
+ *   - { data: [] }
+ *   - { data: { conversations: [] } }
+ */
+function extractList(response, key) {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response?.[key])) {
+    return response[key];
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  if (Array.isArray(response?.data?.[key])) {
+    return response.data[key];
+  }
+
+  return [];
+}
+
+/*
+ * Find the conversation that belongs to a specific proposal.
+ * Proposal ID is the strongest match; Jugaad ID is used as a
+ * fallback because older conversation records may not expose
+ * proposal_id in the frontend response.
+ */
+function findConversationForProposal(
+  conversations,
+  proposal
+) {
+  const proposalId =
+    proposal?.id ??
+    proposal?.proposalId ??
+    proposal?.proposal_id ??
+    null;
+
+  const jugaadId =
+    proposal?.jugaadId ??
+    proposal?.jugaad_id ??
+    null;
+
+  const helperId =
+    proposal?.helperId ??
+    proposal?.helper_id ??
+    proposal?.helper?.id ??
+    null;
+
+  const list = Array.isArray(conversations)
+    ? conversations
+    : [];
+
+  if (proposalId != null) {
+    const exact = list.find((conversation) => {
+      const conversationProposalId =
+        conversation?.proposalId ??
+        conversation?.proposal_id ??
+        conversation?.proposal?.id ??
+        null;
+
+      return (
+        conversationProposalId != null &&
+        String(conversationProposalId) ===
+          String(proposalId)
+      );
+    });
+
+    if (exact) {
+      return exact;
+    }
+  }
+
+  if (jugaadId != null && helperId != null) {
+    const fallback = list.find((conversation) => {
+      const conversationJugaadId =
+        conversation?.jugaadId ??
+        conversation?.jugaad_id ??
+        null;
+
+      const otherUserId =
+        conversation?.otherUserId ??
+        conversation?.other_user_id ??
+        conversation?.personId ??
+        conversation?.person_id ??
+        null;
+
+      return (
+        conversationJugaadId != null &&
+        String(conversationJugaadId) ===
+          String(jugaadId) &&
+        otherUserId != null &&
+        String(otherUserId) ===
+          String(helperId)
+      );
+    });
+
+    if (fallback) {
+      return fallback;
+    }
+  }
+
+  return null;
+}
+
+/*
  * Convert a proposal into the same structure used by
  * interestedStudents.
  *
@@ -114,36 +225,7 @@ function proposalToStudentRequest(proposal) {
     return null;
   }
 
-  const helper =
-    proposal.helper ||
-    proposal.student ||
-    proposal.user ||
-    {};
-
-  // Backend returns helper information as flat fields such as
-  // helper_name and helper_id. Normalize those into the shape the UI uses.
-  const helperId =
-    proposal.helperId ??
-    proposal.helper_id ??
-    proposal.userId ??
-    proposal.user_id ??
-    helper.id ??
-    null;
-
-  const helperName =
-    helper.name ||
-    helper.fullName ||
-    helper.username ||
-    proposal.helperName ||
-    proposal.helper_name ||
-    proposal.studentName ||
-    proposal.student_name ||
-    '';
-
-  // Never create a fake "Student" entry for an unknown helper.
-  if (!helperName || helperName.trim().toLowerCase() === 'student') {
-    return null;
-  }
+  const helper = proposal.helper || proposal.student || proposal.user || {};
 
   const requestType =
     proposal.requestType ||
@@ -163,28 +245,45 @@ function proposalToStudentRequest(proposal) {
 
   return {
     id:
-      helperId ??
+      proposal.helperId ??
+      proposal.helper_id ??
+      helper.id ??
+      proposal.userId ??
+      proposal.user_id ??
       `proposal-${proposal.id}`,
 
     proposalId: proposal.id,
 
-    name: helperName,
+    name:
+      helper.name ||
+      helper.fullName ||
+      helper.username ||
+      proposal.helperName ||
+      proposal.helper_name ||
+      proposal.studentName ||
+      proposal.student_name ||
+      'Student',
 
     fullName:
       helper.fullName ||
       helper.name ||
-      helperName,
+      proposal.helperName ||
+      proposal.helper_name ||
+      'Student',
 
-    username:
-      helper.username ||
-      proposal.helper_username ||
-      null,
+    username: helper.username,
 
     initials:
       helper.initials ||
       helper.avatarInitials ||
       proposal.initials ||
-      getInitials(helperName),
+      getInitials(
+        helper.name ||
+          helper.fullName ||
+          proposal.helperName ||
+          proposal.helper_name ||
+          'Student'
+      ),
 
     skills:
       Array.isArray(proposal.skills)
@@ -201,17 +300,16 @@ function proposalToStudentRequest(proposal) {
 
     message:
       proposal.explanation ||
+      proposal.message ||
       proposal.proposalMessage ||
       proposal.proposal_message ||
-      proposal.message ||
       '',
 
     requestType,
+
     proposedAmount,
 
-    status:
-      proposal.status ||
-      'pending',
+    status: proposal.status || 'pending',
 
     conversationId:
       proposal.conversationId ??
@@ -240,62 +338,6 @@ function getInitials(name) {
     parts[0][0] +
     parts[parts.length - 1][0]
   ).toUpperCase();
-}
-
-
-function formatRelativeTime(timestamp, referenceNow = Date.now()) {
-  if (!timestamp) {
-    return '';
-  }
-
-  const parsed = new Date(timestamp).getTime();
-
-  if (!Number.isFinite(parsed)) {
-    return '';
-  }
-
-  const diffMs = referenceNow - parsed;
-
-  if (diffMs < 0) {
-    return 'just now';
-  }
-
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMinutes < 1) {
-    return 'just now';
-  }
-
-  if (diffMinutes < 60) {
-    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
-  }
-
-  if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  }
-
-  if (diffDays < 30) {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  }
-
-  const weeks = Math.floor(diffDays / 7);
-
-  if (weeks < 5) {
-    return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
-  }
-
-  const months = Math.floor(diffDays / 30);
-
-  if (months < 12) {
-    return `${months} month${months === 1 ? '' : 's'} ago`;
-  }
-
-  const years = Math.floor(diffDays / 365);
-
-  return `${years} year${years === 1 ? '' : 's'} ago`;
 }
 
 export function MyJugaadsPage() {
@@ -388,6 +430,29 @@ export function MyJugaadsPage() {
 
     const results = {};
 
+    /*
+     * Load the current user's conversations once as a fallback.
+     * This is important for accepted proposals that already have a
+     * conversation but whose proposal endpoint does not expose the
+     * conversation id in the expected shape.
+     */
+    let conversations = [];
+
+    try {
+      const conversationResponse =
+        await api.getConversations();
+
+      conversations = extractList(
+        conversationResponse,
+        'conversations'
+      );
+    } catch (error) {
+      console.warn(
+        'Could not load conversations while resolving proposal messages:',
+        error
+      );
+    }
+
     await Promise.all(
       list.map(async (item) => {
         if (!item?.id) {
@@ -395,44 +460,44 @@ export function MyJugaadsPage() {
         }
 
         try {
-          const response = await api.getProposalsForJugaad(item.id);
+          const response =
+            await api.getProposalsForJugaad(item.id);
 
-          const data =
-            response?.data ||
-            response?.proposals ||
-            (Array.isArray(response) ? response : []);
+          const proposalList = extractList(
+            response,
+            'proposals'
+          );
 
-          results[String(item.id)] = Array.isArray(data)
-            ? data.map((proposal) => ({
+          results[String(item.id)] =
+            proposalList.map((proposal) => {
+              const existingConversationId =
+                getValidConversationId(proposal);
+
+              if (existingConversationId) {
+                return {
+                  ...proposal,
+                  conversation_id:
+                    existingConversationId,
+                };
+              }
+
+              const conversation =
+                findConversationForProposal(
+                  conversations,
+                  proposal
+                );
+
+              const conversationId =
+                getValidConversationId(
+                  conversation
+                );
+
+              return {
                 ...proposal,
-                helper: proposal.helper || {
-                  id:
-                    proposal.helperId ??
-                    proposal.helper_id ??
-                    proposal.userId ??
-                    proposal.user_id ??
-                    null,
-                  name:
-                    proposal.helperName ??
-                    proposal.helper_name ??
-                    proposal.studentName ??
-                    proposal.student_name ??
-                    '',
-                  email:
-                    proposal.helperEmail ??
-                    proposal.helper_email ??
-                    '',
-                  number:
-                    proposal.helperNumber ??
-                    proposal.helper_number ??
-                    '',
-                  location:
-                    proposal.helperLocation ??
-                    proposal.helper_location ??
-                    '',
-                },
-              }))
-            : [];
+                conversation_id:
+                  conversationId,
+              };
+            });
         } catch (error) {
           console.error(
             `Failed to load proposals for Jugaad ${item.id}:`,
@@ -503,21 +568,21 @@ export function MyJugaadsPage() {
   ).map((x) => ({
     ...x,
 
-    // The backend returns the real Jugaad price in `budget`.
+    // Backend uses budget for the Jugaad amount.
+    // Prefer it so a stale amount: 0 cannot hide the real value.
     amount:
-      x.budget ??
-      x.amount ??
-      x.price ??
-      0,
+      x?.budget !== null &&
+      x?.budget !== undefined &&
+      x?.budget !== ''
+        ? Number(x.budget)
+        : Number(x?.amount ?? x?.price ?? 0),
 
-    // Always prefer the real database creation timestamp.
-    // This keeps "posted X days ago" synced with when the Jugaad
-    // was actually created instead of a frontend placeholder.
+    // Backend uses created_at for the creation timestamp.
     postedAt:
-      x.created_at ??
-      x.createdAt ??
-      x.posted_at ??
-      x.postedAt ??
+      x?.created_at ??
+      x?.createdAt ??
+      x?.posted_at ??
+      x?.postedAt ??
       null,
 
     status:
@@ -897,21 +962,6 @@ function Detail({
       acceptedStudent
     );
 
-
-  const [now, setNow] = useState(
-    Date.now()
-  );
-
-  useEffect(() => {
-    const timer = window.setInterval(
-      () => setNow(Date.now()),
-      30_000
-    );
-
-    return () =>
-      window.clearInterval(timer);
-  }, []);
-
   /*
    * Direct requests from backend.
    */
@@ -922,49 +972,57 @@ function Detail({
     : [];
 
   /*
-   * Keep the real interested-student records exactly as they arrive,
-   * and enrich them with matching proposal information when available.
-   * This preserves real students such as Ishita while still carrying
-   * the proposal status (accepted/rejected/pending) into the UI.
+   * Convert proposals to student requests.
+   *
+   * This makes INTERESTED and BARGAIN
+   * appear in the same section.
    */
-  const mergedStudents = [];
+  const proposalStudents = Array.isArray(
+    proposals
+  )
+    ? proposals
+        .map(proposalToStudentRequest)
+        .filter(Boolean)
+    : [];
 
-  // Keep direct interested-student records first.
-  directStudents
-    .filter(Boolean)
-    .forEach((student) => {
-      mergedStudents.push(student);
-    });
+  /*
+   * Merge direct requests and proposals.
+   *
+   * Avoid duplicates where the same student
+   * already exists in interestedStudents.
+   */
+  const mergedStudents = [
+    ...directStudents,
+  ];
 
-  // Also include real proposal authors in Interested Students.
-  // Anonymous placeholder proposals such as "Student" are ignored.
-  proposals
-    .map(proposalToStudentRequest)
-    .filter(Boolean)
-    .forEach((proposalStudent) => {
-      const exists = mergedStudents.some((student) => {
-        const existingId =
+  proposalStudents.forEach((proposalStudent) => {
+    const alreadyExists =
+      mergedStudents.some((student) => {
+        const studentId =
           student?.id ??
           student?.userId ??
-          student?.user_id ??
-          null;
+          student?.user_id;
 
-        return (
-          existingId != null &&
-          proposalStudent?.id != null &&
-          String(existingId) ===
-            String(proposalStudent.id)
-        );
+        const proposalStudentId =
+          proposalStudent?.id;
+
+        if (
+          studentId != null &&
+          proposalStudentId != null
+        ) {
+          return (
+            String(studentId) ===
+            String(proposalStudentId)
+          );
+        }
+
+        return false;
       });
 
-      if (exists) {
-        return;
-      }
-
-      mergedStudents.push(
-        proposalStudent
-      );
-    });
+    if (!alreadyExists) {
+      mergedStudents.push(proposalStudent);
+    }
+  });
 
   return (
     <div>
@@ -1014,18 +1072,8 @@ function Detail({
               {item.id} ·{' '}
               {item.skillRequired ||
                 item.category}{' '}
-              {formatRelativeTime(
-                item.postedAt,
-                now
-              ) ? (
-                <>
-                  · posted{' '}
-                  {formatRelativeTime(
-                    item.postedAt,
-                    now
-                  )}
-                </>
-              ) : null}
+              · posted{' '}
+              {timeAgo(item.postedAt)}
             </p>
           </div>
 
@@ -1036,10 +1084,8 @@ function Detail({
 
             <p className="font-display text-2xl text-amber">
               ₹
-              {acceptedStudent?.agreedAmount ??
-                item.amount ??
-                item.budget ??
-                0}
+              {acceptedStudent?.agreedAmount ||
+                item.amount}
             </p>
           </div>
         </div>
@@ -1089,67 +1135,46 @@ function Detail({
         </div>
 
         <div className="space-y-5">
-          {(() => {
-            const visibleProposals = proposals.filter((proposal) => {
-              const helper =
-                proposal?.helper ||
-                proposal?.student ||
-                proposal?.user ||
-                null;
+          {proposals.length > 0 && (
+            <div className="surface-metal-brushed rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-technical text-[9px] text-amber">
+                  PROPOSALS RECEIVED
+                </p>
 
-              const name =
-                helper?.name ||
-                helper?.fullName ||
-                helper?.username ||
-                proposal?.helperName ||
-                proposal?.helper_name ||
-                proposal?.studentName ||
-                proposal?.student_name ||
-                '';
+                <span className="font-mono text-[8px] text-ink-3">
+                  {proposals.length}{' '}
+                  proposals
+                </span>
+              </div>
 
-              // Hide anonymous placeholder rows such as "Student".
-              // A helper ID alone is not enough; the user-facing name must
-              // be real so we do not show a fake "Student" card.
-              return Boolean(
-                name &&
-                name.trim() &&
-                name.trim().toLowerCase() !== 'student'
-              );
-            });
-
-            return visibleProposals.length > 0 ? (
-              <div className="surface-metal-brushed rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="font-technical text-[9px] text-amber">
-                    PROPOSALS RECEIVED
-                  </p>
-
-                  <span className="font-mono text-[8px] text-ink-3">
-                    {visibleProposals.length}{' '}
-                    proposals
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {visibleProposals.map((proposal) => (
+              <div className="space-y-3">
+                {proposals.map(
+                  (proposal) => (
                     <ProposalDetailCard
                       key={proposal.id}
                       proposal={proposal}
                       onAccept={() =>
-                        onAcceptProposal(proposal)
+                        onAcceptProposal(
+                          proposal
+                        )
                       }
                       onReject={() =>
-                        onRejectProposal(proposal)
+                        onRejectProposal(
+                          proposal
+                        )
                       }
                       onCounter={() =>
-                        onCounterProposal(proposal)
+                        onCounterProposal(
+                          proposal
+                        )
                       }
                     />
-                  ))}
-                </div>
+                  )
+                )}
               </div>
-            ) : null;
-          })()}
+            </div>
+          )}
 
           {/* 
            * IMPORTANT:
@@ -1182,92 +1207,25 @@ function Detail({
                 </p>
               ) : (
                 mergedStudents.map(
-                  (student, index) => {
-                    const studentId =
-                      student?.id ??
-                      student?.userId ??
-                      student?.user_id ??
-                      null;
-
-                    const matchingProposal =
-                      proposals.find((proposal) => {
-                        const proposalStudentId =
-                          proposal?.helperId ??
-                          proposal?.helper_id ??
-                          proposal?.userId ??
-                          proposal?.user_id ??
-                          proposal?.helper?.id ??
-                          proposal?.student?.id ??
-                          proposal?.user?.id ??
-                          null;
-
-                        return (
-                          studentId != null &&
-                          proposalStudentId != null &&
-                          String(studentId) ===
-                            String(proposalStudentId)
-                        );
-                      });
-
-                    const studentForCard =
-                      matchingProposal
-                        ? {
-                            ...student,
-                            proposalId: matchingProposal.id,
-                            proposal: matchingProposal,
-                            proposalStatus: matchingProposal.status,
-                            status: matchingProposal.status,
-                            requestType:
-                              matchingProposal.requestType ??
-                              matchingProposal.request_type ??
-                              student?.requestType,
-                            proposedAmount:
-                              matchingProposal.proposedPrice ??
-                              matchingProposal.proposed_price ??
-                              matchingProposal.amount ??
-                              student?.proposedAmount,
-                          }
-                        : student;
-
-                    return (
-                      <StudentRequest
-                        key={
-                          studentForCard?.proposalId ||
-                          studentForCard?.id ||
-                          index
-                        }
-                        student={studentForCard}
-                        assigned={
-                          acceptedStudent?.id != null &&
-                          studentForCard?.id != null &&
-                          String(acceptedStudent.id) ===
-                            String(studentForCard.id)
-                        }
-                        locked={
-                          !!acceptedStudent &&
-                          acceptedStudent?.id != null &&
-                          studentForCard?.id != null &&
-                          String(acceptedStudent.id) !==
-                            String(studentForCard.id)
-                        }
-                        onAccept={() => {
-                          if (matchingProposal) {
-                            onAcceptProposal(matchingProposal);
-                          }
-                        }}
-                        onReject={() => {
-                          if (matchingProposal) {
-                            onRejectProposal(matchingProposal);
-                          }
-                        }}
-                        onCounter={() => {
-                          if (matchingProposal) {
-                            onCounterProposal(matchingProposal);
-                          }
-                        }}
-                      />
-                    );
-                  }
+                  (student, index) => (
+                    <StudentRequest
+                      key={
+                        student?.proposalId ||
+                        student?.id ||
+                        index
+                      }
+                      student={student}
+                      assigned={
+                        acceptedStudent?.id ===
+                        student.id
+                      }
+                      locked={
+                        !!acceptedStudent &&
+                        acceptedStudent.id !==
+                          student.id
+                      }
+                    />
+                  )
                 )
               )}
             </div>
@@ -1359,7 +1317,13 @@ function ProposalDetailCard({
         <span className="grid place-items-center w-9 h-9 rounded-full bg-amber text-bg-0 font-display text-[9px] shrink-0">
           {proposal?.helper?.initials ||
             proposal?.helper?.avatarInitials ||
-            'U'}
+            getInitials(
+              proposal?.helper?.name ||
+                proposal?.helper?.fullName ||
+                proposal?.helper?.username ||
+                proposal?.helper_name ||
+                'Student'
+            )}
         </span>
 
         <div className="flex-1 min-w-0">
@@ -1368,6 +1332,7 @@ function ProposalDetailCard({
               {proposal?.helper?.name ||
                 proposal?.helper?.fullName ||
                 proposal?.helper?.username ||
+                proposal?.helper_name ||
                 'Student'}
             </p>
 
@@ -1395,9 +1360,10 @@ function ProposalDetailCard({
               </p>
             )}
 
-          {proposal?.explanation && (
+          {(proposal?.explanation ||
+            proposal?.proposal_message) && (
             <p className="font-mono text-[10px] text-ink-2 mt-2 leading-relaxed">
-              "{proposal.explanation}"
+              "{proposal.explanation || proposal.proposal_message}"
             </p>
           )}
 
@@ -1410,10 +1376,12 @@ function ProposalDetailCard({
                 0}
             </span>
 
-            {proposal?.completionTime && (
+            {(proposal?.completionTime ||
+              proposal?.estimated_completion) && (
               <span className="flex items-center gap-1">
                 <Clock size={11} />
-                {proposal.completionTime}
+                {proposal.completionTime ||
+                  proposal.estimated_completion}
               </span>
             )}
           </div>
@@ -1443,6 +1411,7 @@ function ProposalDetailCard({
                     'helper'
                       ? proposal
                           ?.helper?.name ||
+                        proposal?.helper_name ||
                         'Helper'
                       : 'You'}
 

@@ -36,7 +36,7 @@ export function DashboardPage() {
           </span>
           <div className="flex flex-col leading-none">
             <span className="font-display text-sm tracking-tight text-ink-0">
-              CAMPUS<span className="text-amber">JUGAAD</span>
+              CAMPUS<span className="text-amber">VAULT</span>
             </span>
             <span className="font-technical text-[7px] text-ink-3 mt-0.5">WORKSHOP</span>
           </div>

@@ -414,14 +414,14 @@ export function MyJugaadsPage() {
       x.price ??
       0,
 
-    // The backend timestamp is `created_at`.
-    // Normalize it so the detail header never receives an undefined
-    // value and never renders "posted Invalid Date".
+    // Always prefer the real database creation timestamp.
+    // This keeps "posted X days ago" synced with when the Jugaad
+    // was actually created instead of a frontend placeholder.
     postedAt:
-      x.postedAt ??
-      x.posted_at ??
-      x.createdAt ??
       x.created_at ??
+      x.createdAt ??
+      x.posted_at ??
+      x.postedAt ??
       null,
 
     status:
@@ -811,16 +811,73 @@ function Detail({
     : [];
 
   /*
-   * Only show real interested students here.
-   *
-   * The PROPOSALS RECEIVED section already shows proposal records.
-   * Keeping proposal fallbacks in INTERESTED STUDENTS creates duplicate
-   * rows such as a second generic "Student" entry.
-   *
-   * Direct interestedStudents are the real interest records and are the
-   * source used for this section.
+   * Keep the real interested-student records exactly as they arrive,
+   * and enrich them with matching proposal information when available.
+   * This preserves real students such as Ishita while still carrying
+   * the proposal status (accepted/rejected/pending) into the UI.
    */
-  const mergedStudents = directStudents.filter(Boolean);
+  const mergedStudents = [];
+
+  directStudents.filter(Boolean).forEach((student) => {
+    const studentId =
+      student?.id ??
+      student?.userId ??
+      student?.user_id ??
+      null;
+
+    const matchingProposal = proposals.find((proposal) => {
+      const proposalStudentId =
+        proposal?.helperId ??
+        proposal?.helper_id ??
+        proposal?.userId ??
+        proposal?.user_id ??
+        proposal?.helper?.id ??
+        proposal?.student?.id ??
+        proposal?.user?.id ??
+        null;
+
+      return (
+        studentId != null &&
+        proposalStudentId != null &&
+        String(studentId) === String(proposalStudentId)
+      );
+    });
+
+    mergedStudents.push(
+      matchingProposal
+        ? {
+            ...student,
+            proposalId: matchingProposal.id,
+            proposal: matchingProposal,
+            status: matchingProposal.status,
+            proposalStatus: matchingProposal.status,
+            conversationId:
+              matchingProposal.conversationId ??
+              matchingProposal.conversation_id ??
+              student?.conversationId ??
+              student?.conversation_id ??
+              null,
+            proposedAmount:
+              matchingProposal.proposedPrice ??
+              matchingProposal.proposed_price ??
+              matchingProposal.amount ??
+              student?.proposedAmount ??
+              student?.proposed_amount ??
+              0,
+            requestType:
+              matchingProposal.requestType ??
+              matchingProposal.request_type ??
+              student?.requestType ??
+              student?.request_type,
+            message:
+              student?.message ||
+              matchingProposal.explanation ||
+              matchingProposal.message ||
+              '',
+          }
+        : student
+    );
+  });
 
   return (
     <div>
@@ -939,46 +996,72 @@ function Detail({
         </div>
 
         <div className="space-y-5">
-          {proposals.length > 0 && (
-            <div className="surface-metal-brushed rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <p className="font-technical text-[9px] text-amber">
-                  PROPOSALS RECEIVED
-                </p>
+          {(() => {
+            const visibleProposals = proposals.filter((proposal) => {
+              const helper =
+                proposal?.helper ||
+                proposal?.student ||
+                proposal?.user ||
+                null;
 
-                <span className="font-mono text-[8px] text-ink-3">
-                  {proposals.length}{' '}
-                  proposals
-                </span>
-              </div>
+              const name =
+                helper?.name ||
+                helper?.fullName ||
+                helper?.username ||
+                proposal?.helperName ||
+                proposal?.helper_name ||
+                proposal?.studentName ||
+                proposal?.student_name ||
+                '';
 
-              <div className="space-y-3">
-                {proposals.map(
-                  (proposal) => (
+              const helperId =
+                proposal?.helperId ??
+                proposal?.helper_id ??
+                proposal?.userId ??
+                proposal?.user_id ??
+                helper?.id ??
+                null;
+
+              // Hide anonymous placeholder rows such as "Student".
+              return Boolean(
+                helperId != null ||
+                (name && name.trim() && name.trim().toLowerCase() !== 'student')
+              );
+            });
+
+            return visibleProposals.length > 0 ? (
+              <div className="surface-metal-brushed rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="font-technical text-[9px] text-amber">
+                    PROPOSALS RECEIVED
+                  </p>
+
+                  <span className="font-mono text-[8px] text-ink-3">
+                    {visibleProposals.length}{' '}
+                    proposals
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {visibleProposals.map((proposal) => (
                     <ProposalDetailCard
                       key={proposal.id}
                       proposal={proposal}
                       onAccept={() =>
-                        onAcceptProposal(
-                          proposal
-                        )
+                        onAcceptProposal(proposal)
                       }
                       onReject={() =>
-                        onRejectProposal(
-                          proposal
-                        )
+                        onRejectProposal(proposal)
                       }
                       onCounter={() =>
-                        onCounterProposal(
-                          proposal
-                        )
+                        onCounterProposal(proposal)
                       }
                     />
-                  )
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            ) : null;
+          })()}
 
           {/* 
            * IMPORTANT:

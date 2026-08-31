@@ -9,7 +9,6 @@ import { LED } from '@/components/primitives/Details';
 import {
   mockDiscoveryFeed,
   CATEGORY_COLORS,
-  timeAgo,
   daysUntil,
 } from '@/data/jugaadMockData';
 
@@ -52,12 +51,11 @@ function normalizeItem(raw) {
       ? raw.creator
       : null;
 
+
   /*
    * IMPORTANT:
-   * poster_name is the name of the person who CREATED/POSTED
-   * this Jugaad.
-   *
-   * It must NOT use the logged-in user's name.
+   * poster_name is the person who actually posted
+   * the Jugaad.
    */
   const posterName =
     raw.poster_name ??
@@ -68,6 +66,7 @@ function normalizeItem(raw) {
     raw.creatorName ??
     null;
 
+
   const posterId =
     raw.poster_id ??
     raw.posterId ??
@@ -76,6 +75,7 @@ function normalizeItem(raw) {
     raw.creator_id ??
     raw.creatorId ??
     null;
+
 
   const posterEmail =
     raw.poster_email ??
@@ -86,6 +86,7 @@ function normalizeItem(raw) {
     raw.creatorEmail ??
     null;
 
+
   const posterRating =
     raw.poster_rating ??
     raw.posterRating ??
@@ -94,8 +95,10 @@ function normalizeItem(raw) {
     raw.rating ??
     null;
 
+
   return {
     ...raw,
+
 
     id:
       raw.id ??
@@ -105,20 +108,24 @@ function normalizeItem(raw) {
         .toString(36)
         .slice(2)}`,
 
+
     title:
       typeof raw.title === 'string'
         ? raw.title
         : 'Untitled opportunity',
+
 
     description:
       typeof raw.description === 'string'
         ? raw.description
         : 'No description available.',
 
+
     category:
       typeof raw.category === 'string'
         ? raw.category
         : 'OTHER',
+
 
     skillRequired:
       typeof raw.skillRequired === 'string'
@@ -131,11 +138,13 @@ function normalizeItem(raw) {
             ? raw.required_skills.join(', ')
             : 'General',
 
+
     amount:
       raw.amount ??
       raw.budget ??
       raw.price ??
       0,
+
 
     deadline:
       raw.deadline ??
@@ -143,6 +152,10 @@ function normalizeItem(raw) {
       raw.due_date ??
       null,
 
+
+    /*
+     * Keep the backend-created timestamp.
+     */
     postedAt:
       raw.postedAt ??
       raw.posted_at ??
@@ -150,57 +163,80 @@ function normalizeItem(raw) {
       raw.createdAt ??
       null,
 
+
     matchPercentage:
       raw.matchPercentage ??
       raw.match_percentage ??
       null,
 
-    /*
-     * Store the ACTUAL POSTER.
-     */
+
     posterName,
     posterId,
     posterEmail,
     posterRating,
 
+
     poster:
       poster || posterName
         ? {
             ...(poster || {}),
+
             id:
               poster?.id ??
               posterId,
+
             name:
               poster?.name ??
               posterName,
+
             email:
               poster?.email ??
               posterEmail,
+
             rating:
               poster?.rating ??
               posterRating,
           }
         : null,
 
+
     creator,
   };
 }
 
 
+// ================================================================
+// NORMALIZE FEED
+// ================================================================
+
 function normalizeFeed(data) {
   let list = [];
 
+
   if (Array.isArray(data)) {
     list = data;
-  } else if (Array.isArray(data?.jugaads)) {
+
+  } else if (
+    Array.isArray(data?.jugaads)
+  ) {
     list = data.jugaads;
-  } else if (Array.isArray(data?.data)) {
+
+  } else if (
+    Array.isArray(data?.data)
+  ) {
     list = data.data;
-  } else if (Array.isArray(data?.items)) {
+
+  } else if (
+    Array.isArray(data?.items)
+  ) {
     list = data.items;
-  } else if (Array.isArray(data?.results)) {
+
+  } else if (
+    Array.isArray(data?.results)
+  ) {
     list = data.results;
   }
+
 
   return list
     .map(normalizeItem)
@@ -208,10 +244,15 @@ function normalizeFeed(data) {
 }
 
 
+// ================================================================
+// SAFE DAYS UNTIL
+// ================================================================
+
 function safeDaysUntil(deadline) {
   if (!deadline) {
     return 'No deadline';
   }
+
 
   try {
     return daysUntil(deadline);
@@ -221,16 +262,159 @@ function safeDaysUntil(deadline) {
 }
 
 
-function safeTimeAgo(date) {
-  if (!date) {
+// ================================================================
+// SAFE RELATIVE TIME
+// ================================================================
+//
+// IMPORTANT:
+//
+// Do NOT use the mock-data timeAgo() here.
+//
+// This function works directly with the actual backend
+// created_at / createdAt timestamp.
+//
+// ================================================================
+
+function safeTimeAgo(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ''
+  ) {
     return '';
   }
 
-  try {
-    return timeAgo(date);
-  } catch {
+
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
     return '';
   }
+
+
+  /*
+   * Compare timestamps directly.
+   *
+   * This avoids the old formatter accidentally treating
+   * backend-created posts as newly created.
+   */
+
+  const now =
+    Date.now();
+
+
+  const postedTime =
+    date.getTime();
+
+
+  let difference =
+    now - postedTime;
+
+
+  /*
+   * Future timestamps can happen because the server clock
+   * and browser clock are slightly different.
+   *
+   * Clamp them to zero rather than showing negative time.
+   */
+
+  if (difference < 0) {
+    difference = 0;
+  }
+
+
+  const seconds =
+    Math.floor(
+      difference / 1000
+    );
+
+
+  if (seconds < 60) {
+    return 'just now';
+  }
+
+
+  const minutes =
+    Math.floor(
+      seconds / 60
+    );
+
+
+  if (minutes < 60) {
+    return `${minutes} ${
+      minutes === 1
+        ? 'minute'
+        : 'minutes'
+    } ago`;
+  }
+
+
+  const hours =
+    Math.floor(
+      minutes / 60
+    );
+
+
+  if (hours < 24) {
+    return `${hours} ${
+      hours === 1
+        ? 'hour'
+        : 'hours'
+    } ago`;
+  }
+
+
+  const days =
+    Math.floor(
+      hours / 24
+    );
+
+
+  if (days < 7) {
+    return `${days} ${
+      days === 1
+        ? 'day'
+        : 'days'
+    } ago`;
+  }
+
+
+  const weeks =
+    Math.floor(
+      days / 7
+    );
+
+
+  if (weeks < 5) {
+    return `${weeks} ${
+      weeks === 1
+        ? 'week'
+        : 'weeks'
+    } ago`;
+  }
+
+
+  /*
+   * For older posts, show the actual posting date.
+   */
+
+  return date.toLocaleDateString(
+    'en-IN',
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }
+  );
 }
 
 
@@ -246,6 +430,7 @@ export function FindJugaadPage() {
     isAuthenticated,
   } = useAuth();
 
+
   const {
     sendProposal,
     getProposalForJugaad,
@@ -260,14 +445,18 @@ export function FindJugaadPage() {
         return [];
       }
 
+
       return normalizeFeed(
         mockDiscoveryFeed
       );
+
     });
 
 
   const [loading, setLoading] =
-    useState(!isDemoMode);
+    useState(
+      !isDemoMode
+    );
 
 
   const [hidden, setHidden] =
@@ -298,84 +487,87 @@ export function FindJugaadPage() {
   // LOAD DISCOVERY FEED
   // ================================================================
 
-  const fetchFeed = useCallback(
-    async () => {
+  const fetchFeed =
+    useCallback(
+      async () => {
 
-      if (isDemoMode) {
+        if (isDemoMode) {
 
-        setFeedItems(
-          normalizeFeed(
-            mockDiscoveryFeed
-          )
-        );
+          setFeedItems(
+            normalizeFeed(
+              mockDiscoveryFeed
+            )
+          );
 
-        setLoading(false);
+          setLoading(false);
 
-        return;
-      }
-
-
-      if (!isAuthenticated) {
-
-        setFeedItems([]);
-
-        setLoading(false);
-
-        return;
-      }
+          return;
+        }
 
 
-      setLoading(true);
+        if (!isAuthenticated) {
+
+          setFeedItems([]);
+
+          setLoading(false);
+
+          return;
+        }
 
 
-      try {
-
-        const response =
-          await api.getDiscoveryFeed();
+        setLoading(true);
 
 
-        console.log(
-          'DISCOVERY FEED RESPONSE:',
-          response
-        );
+        try {
+
+          const response =
+            await api.getDiscoveryFeed();
 
 
-        const normalized =
-          normalizeFeed(
+          console.log(
+            'DISCOVERY FEED RESPONSE:',
             response
           );
 
 
-        console.log(
-          'NORMALIZED DISCOVERY FEED:',
-          normalized
-        );
+          const normalized =
+            normalizeFeed(
+              response
+            );
 
 
-        setFeedItems(
-          normalized
-        );
+          console.log(
+            'NORMALIZED DISCOVERY FEED:',
+            normalized
+          );
 
-      } catch (error) {
 
-        console.error(
-          'Failed to load Jugaad feed:',
-          error
-        );
+          setFeedItems(
+            normalized
+          );
 
-        setFeedItems([]);
+        } catch (error) {
 
-      } finally {
+          console.error(
+            'Failed to load Jugaad feed:',
+            error
+          );
 
-        setLoading(false);
-      }
 
-    },
-    [
-      isDemoMode,
-      isAuthenticated,
-    ]
-  );
+          setFeedItems([]);
+
+        } finally {
+
+          setLoading(false);
+
+        }
+
+      },
+      [
+        isDemoMode,
+        isAuthenticated,
+      ]
+    );
 
 
   useEffect(() => {
@@ -387,38 +579,49 @@ export function FindJugaadPage() {
 
   // ================================================================
   // CURRENT LOGGED-IN USER
+  // ================================================================
   //
-  // ONLY used as the HELPER when sending a proposal.
+  // ONLY used as HELPER when sending a proposal.
   //
   // It is NOT used as the poster displayed on cards.
+  //
   // ================================================================
 
-  const helper = user
-    ? {
-        id:
-          user?.id ??
-          'user',
+  const helper =
+    user
+      ? {
 
-        name:
-          user?.name ??
-          user?.email ??
-          'Student',
+          id:
+            user?.id ??
+            'user',
 
-        initials:
-          String(
+
+          name:
             user?.name ??
             user?.email ??
-            'S'
-          )
-            .slice(0, 2)
-            .toUpperCase(),
-      }
+            'Student',
 
-    : {
-        id: 'guest',
-        name: 'Guest',
-        initials: 'GU',
-      };
+
+          initials:
+            String(
+              user?.name ??
+              user?.email ??
+              'S'
+            )
+              .slice(0, 2)
+              .toUpperCase(),
+
+        }
+
+      : {
+
+          id: 'guest',
+
+          name: 'Guest',
+
+          initials: 'GU',
+
+        };
 
 
   // ================================================================
@@ -450,17 +653,20 @@ export function FindJugaadPage() {
 
         const matchesQuery =
           !search ||
+
           String(
             item.title ?? ''
           )
             .toLowerCase()
             .includes(search) ||
 
+
           String(
             item.skillRequired ?? ''
           )
             .toLowerCase()
             .includes(search) ||
+
 
           String(
             item.description ?? ''
@@ -479,6 +685,7 @@ export function FindJugaadPage() {
           matchesQuery &&
           matchesCategory
         );
+
       }
     );
 
@@ -487,68 +694,74 @@ export function FindJugaadPage() {
   // HIDE OPPORTUNITY
   // ================================================================
 
-  const hide = async (id) => {
+  const hide =
+    async (id) => {
 
-    if (
-      id === undefined ||
-      id === null
-    ) {
-      return;
-    }
+      if (
+        id === undefined ||
+        id === null
+      ) {
+        return;
+      }
 
 
-    setHidden(
-      (current) => {
+      setHidden(
+        (current) => {
 
-        if (
-          current.includes(id)
-        ) {
-          return current;
+          if (
+            current.includes(id)
+          ) {
+            return current;
+          }
+
+
+          return [
+            ...current,
+            id,
+          ];
+
+        }
+      );
+
+
+      setUndo(id);
+
+
+      if (!isDemoMode) {
+
+        try {
+
+          await api.markNotInterested(
+            id
+          );
+
+        } catch (error) {
+
+          console.error(
+            'Failed to mark not interested:',
+            error
+          );
+
         }
 
-        return [
-          ...current,
-          id,
-        ];
       }
-    );
 
 
-    setUndo(id);
+      setTimeout(
+        () => {
 
+          setUndo(
+            (current) =>
+              current === id
+                ? null
+                : current
+          );
 
-    if (!isDemoMode) {
+        },
+        5000
+      );
 
-      try {
-
-        await api.markNotInterested(
-          id
-        );
-
-      } catch (error) {
-
-        console.error(
-          'Failed to mark not interested:',
-          error
-        );
-      }
-    }
-
-
-    setTimeout(
-      () => {
-
-        setUndo(
-          (current) =>
-            current === id
-              ? null
-              : current
-        );
-
-      },
-      5000
-    );
-  };
+    };
 
 
   // ================================================================
@@ -581,11 +794,14 @@ export function FindJugaadPage() {
 
 
         if (refreshData) {
+
           await refreshData();
+
         }
 
 
         setBargain(null);
+
         setProposalItem(null);
 
       } catch (error) {
@@ -597,7 +813,9 @@ export function FindJugaadPage() {
 
 
         throw error;
+
       }
+
     };
 
 
@@ -617,6 +835,7 @@ export function FindJugaadPage() {
             0
           ) >= 80
       ),
+
     ],
 
 
@@ -637,8 +856,10 @@ export function FindJugaadPage() {
             percentage >= 70 &&
             percentage < 80
           );
+
         }
       ),
+
     ],
 
 
@@ -656,15 +877,58 @@ export function FindJugaadPage() {
             }
 
 
-            return (
-              String(
+            /*
+             * Use actual dates instead of
+             * string comparison.
+             */
+
+            const posted =
+              new Date(
                 item.postedAt
-              ) >=
-              '2026-08-21'
+              );
+
+
+            if (
+              Number.isNaN(
+                posted.getTime()
+              )
+            ) {
+              return false;
+            }
+
+
+            /*
+             * Show posts from the recent period.
+             *
+             * This keeps the existing page behavior
+             * while using a real timestamp comparison.
+             */
+
+            const now =
+              Date.now();
+
+
+            const thirtyDays =
+              30 *
+              24 *
+              60 *
+              60 *
+              1000;
+
+
+            return (
+              now -
+                posted.getTime() <=
+              thirtyDays
             );
+
           }
         )
-        .slice(0, 4),
+        .slice(
+          0,
+          4
+        ),
+
     ],
 
 
@@ -685,15 +949,20 @@ export function FindJugaadPage() {
             remaining === '1 day left' ||
             remaining === '2 days left'
           );
+
         }
       ),
+
     ],
 
 
     [
       'MORE OPPORTUNITIES',
+
       visible,
+
     ],
+
   ];
 
 
@@ -702,6 +971,7 @@ export function FindJugaadPage() {
   // ================================================================
 
   return (
+
     <div>
 
       {/* ==========================================================
@@ -718,8 +988,11 @@ export function FindJugaadPage() {
             size={7}
           />
 
+
           <span className="font-technical text-[9px] text-ink-2">
+
             02 — CAMPUS OPPORTUNITY FEED
+
           </span>
 
         </div>
@@ -732,17 +1005,21 @@ export function FindJugaadPage() {
           <br />
 
           <span className="text-amber">
+
             JUGAAD.
+
           </span>
 
         </h1>
 
 
         <p className="mt-4 max-w-xl text-sm text-ink-2">
+
           Opportunities selected for you.
           Discover work posted by other
           students, then choose how you want
           to approach it.
+
         </p>
 
       </section>
@@ -763,7 +1040,10 @@ export function FindJugaadPage() {
 
 
           <input
-            value={query}
+
+            value={
+              query
+            }
 
             onChange={(event) =>
               setQuery(
@@ -774,6 +1054,7 @@ export function FindJugaadPage() {
             placeholder="Search opportunities or skills..."
 
             className="w-full bg-transparent px-3 py-2.5 font-mono text-xs outline-none text-ink-0"
+
           />
 
         </div>
@@ -793,6 +1074,7 @@ export function FindJugaadPage() {
             (currentCategory) => (
 
               <button
+
                 key={
                   currentCategory
                 }
@@ -811,8 +1093,11 @@ export function FindJugaadPage() {
                     ? 'bg-amber text-bg-0'
                     : 'bg-bg-2 text-ink-3 border border-metal-1'
                 }`}
+
               >
+
                 {currentCategory}
+
               </button>
 
             )
@@ -832,11 +1117,14 @@ export function FindJugaadPage() {
         <div className="mb-4 flex items-center justify-between surface-wood rounded-lg px-4 py-3">
 
           <span className="font-mono text-[10px] text-paper">
+
             Opportunity hidden from your feed.
+
           </span>
 
 
           <button
+
             type="button"
 
             onClick={() => {
@@ -849,14 +1137,19 @@ export function FindJugaadPage() {
                   )
               );
 
+
               setUndo(null);
+
             }}
 
             className="flex items-center gap-1.5 font-technical text-[8px] text-amber"
+
           >
+
             <Undo2 size={12} />
 
             UNDO
+
           </button>
 
         </div>
@@ -873,7 +1166,9 @@ export function FindJugaadPage() {
         <div className="py-16 text-center">
 
           <p className="font-mono text-sm text-ink-2">
+
             Loading opportunities...
+
           </p>
 
         </div>
@@ -904,12 +1199,18 @@ export function FindJugaadPage() {
                   <div className="flex items-center gap-2 mb-3">
 
                     <span className="font-technical text-[9px] text-ink-0">
+
                       {title}
+
                     </span>
 
 
                     <span className="font-mono text-[8px] text-ink-3">
-                      ({items.length})
+
+                      (
+                      {items.length}
+                      )
+
                     </span>
 
 
@@ -945,15 +1246,21 @@ export function FindJugaadPage() {
                             'Failed to get proposal:',
                             error
                           );
+
                         }
 
 
                         return (
 
                           <OpportunityCard
-                            key={item.id}
 
-                            item={item}
+                            key={
+                              item.id
+                            }
+
+                            item={
+                              item
+                            }
 
                             existingProposal={
                               existingProposal
@@ -978,13 +1285,17 @@ export function FindJugaadPage() {
                                 item
                               );
 
+
                               setProposalItem(
                                 item
                               );
+
                             }}
+
                           />
 
                         );
+
                       }
                     )}
 
@@ -993,10 +1304,12 @@ export function FindJugaadPage() {
                 </section>
 
               );
+
             }
           )}
 
         </div>
+
       )}
 
 
@@ -1014,8 +1327,11 @@ export function FindJugaadPage() {
               className="mx-auto text-ink-3 mb-3"
             />
 
+
             <p className="font-mono text-sm text-ink-2">
+
               No opportunities match this view.
+
             </p>
 
           </div>
@@ -1031,7 +1347,9 @@ export function FindJugaadPage() {
 
         <BargainModal
 
-          item={bargain}
+          item={
+            bargain
+          }
 
           mode="bargain"
 
@@ -1056,7 +1374,9 @@ export function FindJugaadPage() {
 
         <BargainModal
 
-          item={proposalItem}
+          item={
+            proposalItem
+          }
 
           mode="interest"
 
@@ -1073,7 +1393,9 @@ export function FindJugaadPage() {
       )}
 
     </div>
+
   );
+
 }
 
 
@@ -1123,11 +1445,6 @@ function OpportunityCard({
   // ============================================================
   // POSTER
   // ============================================================
-  //
-  // THIS IS THE PERSON WHO POSTED THE JUGAAD.
-  //
-  // It is deliberately NOT taken from `user`.
-  // ============================================================
 
   const posterName =
     item?.poster_name ??
@@ -1140,21 +1457,23 @@ function OpportunityCard({
 
 
   const posterInitials =
+  item?.poster?.initials ??
+  item?.poster_initials ??
+  item?.posterInitials ??
   (
-    item?.poster?.initials ??
-    item?.poster_initials ??
-    item?.posterInitials ??
     String(posterName)
       .trim()
       .split(/\s+/)
       .filter(Boolean)
       .map(
-        (part) => part[0]
+        (part) =>
+          part[0]
       )
       .join('')
       .slice(0, 2)
       .toUpperCase()
-  ) || 'ST';
+    || 'ST'
+  );
 
 
   const posterRating =
@@ -1168,6 +1487,33 @@ function OpportunityCard({
   const categoryChar =
     category.charAt(0) ||
     'J';
+
+
+  /*
+   * IMPORTANT:
+   *
+   * Always use the actual backend timestamp.
+   *
+   * postedAt was normalized from:
+   *
+   * raw.postedAt
+   * raw.posted_at
+   * raw.created_at
+   * raw.createdAt
+   */
+
+  const postedTimestamp =
+    item?.postedAt ??
+    item?.posted_at ??
+    item?.created_at ??
+    item?.createdAt ??
+    null;
+
+
+  const postedTimeLabel =
+    safeTimeAgo(
+      postedTimestamp
+    );
 
 
   // ============================================================
@@ -1210,7 +1556,9 @@ function OpportunityCard({
           >
 
             <span className="font-display text-lg">
+
               {categoryChar}
+
             </span>
 
           </span>
@@ -1219,8 +1567,10 @@ function OpportunityCard({
           <div>
 
             <h2 className="font-display text-lg text-ink-0 leading-tight">
+
               {item?.title ||
                 'Untitled opportunity'}
+
             </h2>
 
 
@@ -1239,13 +1589,17 @@ function OpportunityCard({
                 }}
 
               >
+
                 {category}
+
               </span>
 
 
               <span className="font-mono text-[8px] text-ink-3">
+
                 {item?.skillRequired ||
                   'General'}
+
               </span>
 
             </div>
@@ -1259,8 +1613,11 @@ function OpportunityCard({
           null && (
 
           <span className="font-mono text-[9px] text-mint">
+
             {item.matchPercentage}%
+
             match
+
           </span>
 
         )}
@@ -1287,7 +1644,9 @@ function OpportunityCard({
       <div className="flex flex-wrap items-center gap-3 mt-4 text-[9px] font-mono text-ink-3">
 
         <span className="text-amber font-display text-lg">
+
           ₹{item?.amount ?? 0}
+
         </span>
 
 
@@ -1314,19 +1673,11 @@ function OpportunityCard({
         </span>
 
 
-        {safeTimeAgo(
-          item?.postedAt ??
-          item?.created_at ??
-          item?.createdAt
-        ) && (
+        {postedTimeLabel && (
 
           <span>
 
-            {safeTimeAgo(
-              item?.postedAt ??
-              item?.created_at ??
-              item?.createdAt
-            )}
+            {postedTimeLabel}
 
           </span>
 
@@ -1350,10 +1701,14 @@ function OpportunityCard({
             className={
               proposalStatus ===
               'accepted'
+
                 ? 'text-mint'
+
                 : proposalStatus ===
                     'rejected'
+
                   ? 'text-coral'
+
                   : 'text-amber'
             }
 
@@ -1395,14 +1750,18 @@ function OpportunityCard({
         {/* Poster avatar */}
 
         <span className="grid place-items-center w-6 h-6 rounded-full bg-amber text-bg-0 font-display text-[8px]">
+
           {posterInitials}
+
         </span>
 
 
         {/* POSTER'S NAME */}
 
         <span className="font-mono text-[9px] text-ink-1 flex-1">
+
           {posterName}
+
         </span>
 
 
@@ -1479,14 +1838,18 @@ function OpportunityCard({
           ) : (
 
             <span className="text-xs">
+
               ♥
+
             </span>
 
           )}
 
 
           {proposalSent
+
             ? 'PROPOSAL SENT'
+
             : 'INTERESTED'}
 
         </button>
@@ -1494,7 +1857,9 @@ function OpportunityCard({
       </div>
 
     </article>
+
   );
+
 }
 
 

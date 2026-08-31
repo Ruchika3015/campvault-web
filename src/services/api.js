@@ -2,6 +2,7 @@ const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   'https://campvault-backend.onrender.com';
 
+
 /**
  * ================================================================
  * LOW-LEVEL API REQUEST
@@ -11,7 +12,7 @@ const BASE_URL =
  * - Automatically attaches Authorization header
  * - Supports JSON requests
  * - Supports FormData requests
- * - Gives useful backend error messages
+ * - Handles backend errors
  * ================================================================
  */
 
@@ -19,15 +20,23 @@ export async function apiRequest(
   path,
   options = {}
 ) {
-  // AuthContext stores JWT as cj_token
+
+  /*
+   * AuthContext stores the JWT as cj_token.
+   */
   const token =
-    sessionStorage.getItem('cj_token');
+    sessionStorage.getItem(
+      'cj_token'
+    );
+
 
   const isFormData =
     typeof FormData !== 'undefined' &&
     options.body instanceof FormData;
 
+
   const headers = {
+
     ...(token
       ? {
           Authorization:
@@ -43,76 +52,124 @@ export async function apiRequest(
         }),
 
     ...(options.headers || {}),
+
   };
+
 
   const config = {
     ...options,
     headers,
   };
 
+
   let response;
 
+
   try {
-    response = await fetch(
-      `${BASE_URL}${path}`,
-      config
-    );
+
+    response =
+      await fetch(
+        `${BASE_URL}${path}`,
+        config
+      );
+
   } catch (error) {
+
     console.error(
       'API NETWORK ERROR:',
       error
     );
 
+
     throw {
       status: 0,
+
       message:
-        'Unable to connect to the server. Check your internet connection and try again.',
+        'Exchange unavailable. Check your connection and try again.',
+
       data: null,
     };
+
   }
+
 
   let data = null;
 
+
+  /*
+   * Some successful requests may return JSON.
+   * Some backend errors may return plain text.
+   *
+   * Try JSON first, then plain text.
+   */
+
   try {
+
     const text =
       await response.text();
 
+
     if (text) {
+
       try {
-        data = JSON.parse(text);
+
+        data =
+          JSON.parse(text);
+
       } catch {
+
         data = {
           message: text,
         };
+
       }
+
     }
+
   } catch (error) {
+
     console.error(
-      'API RESPONSE PARSE ERROR:',
+      'API RESPONSE ERROR:',
       error
     );
+
   }
 
+
   if (!response.ok) {
+
     const message =
       data?.message ||
       data?.error ||
       data?.details ||
       (
         response.status === 400
+
           ? 'Invalid request.'
+
           : response.status === 401
+
           ? 'Your session has expired. Please log in again.'
+
           : response.status === 403
+
           ? 'You are not authorized to perform this action.'
+
           : response.status === 404
+
           ? 'Requested resource was not found.'
+
           : response.status === 409
+
           ? 'This request conflicts with existing data.'
+
           : response.status === 500
+
           ? 'Server error. Please try again later.'
+
           : `Request failed with status ${response.status}.`
       );
+
 
     console.error(
       'API ERROR:',
@@ -124,18 +181,150 @@ export async function apiRequest(
       }
     );
 
+
     throw {
+
       status:
         response.status,
 
       message,
 
       data,
+
     };
+
   }
 
+
   return data;
+
 }
+
+
+/**
+ * ================================================================
+ * NORMALIZE NOTIFICATION PREFERENCES
+ * ================================================================
+ *
+ * PostgreSQL normally returns snake_case:
+ *
+ * interest_request_notifications
+ *
+ * Frontend uses camelCase:
+ *
+ * interestRequestNotifications
+ *
+ * This function supports BOTH formats.
+ *
+ * It also supports a response wrapped inside:
+ *
+ * {
+ *   success: true,
+ *   data: {...}
+ * }
+ *
+ * ================================================================
+ */
+
+const normalizeNotificationPreferences = (
+  response
+) => {
+
+  const source =
+    response?.data &&
+    typeof response.data === 'object'
+      ? response.data
+      : response || {};
+
+
+  return {
+
+    interestRequestNotifications:
+      Boolean(
+        source.interestRequestNotifications ??
+        source.interest_request_notifications ??
+        true
+      ),
+
+
+    proposalNotifications:
+      Boolean(
+        source.proposalNotifications ??
+        source.proposal_notifications ??
+        true
+      ),
+
+
+    acceptedProposalNotifications:
+      Boolean(
+        source.acceptedProposalNotifications ??
+        source.accepted_proposal_notifications ??
+        true
+      ),
+
+
+    rejectedProposalNotifications:
+      Boolean(
+        source.rejectedProposalNotifications ??
+        source.rejected_proposal_notifications ??
+        true
+      ),
+
+
+    counterOfferNotifications:
+      Boolean(
+        source.counterOfferNotifications ??
+        source.counter_offer_notifications ??
+        true
+      ),
+
+
+    messageNotifications:
+      Boolean(
+        source.messageNotifications ??
+        source.message_notifications ??
+        true
+      ),
+
+
+    jugaadTaskNotifications:
+      Boolean(
+        source.jugaadTaskNotifications ??
+        source.jugaad_task_notifications ??
+        true
+      ),
+
+
+    emailNotifications:
+      Boolean(
+        source.emailNotifications ??
+        source.email_notifications ??
+        true
+      ),
+
+
+    inAppNotifications:
+      Boolean(
+        source.inAppNotifications ??
+        source.in_app_notifications ??
+        true
+      ),
+
+
+    createdAt:
+      source.createdAt ??
+      source.created_at ??
+      null,
+
+
+    updatedAt:
+      source.updatedAt ??
+      source.updated_at ??
+      null,
+
+  };
+
+};
 
 
 /* ================================================================
@@ -143,6 +332,7 @@ export async function apiRequest(
 ================================================================ */
 
 export const api = {
+
 
   // ================================================================
   // AUTH / USERS
@@ -639,21 +829,36 @@ export const api = {
   // GET NOTIFICATION PREFERENCES
   // ------------------------------------------------
 
-  getNotificationPreferences: () =>
-    apiRequest(
-      '/api/v1/notifications/preferences'
-    ),
+  getNotificationPreferences: async () => {
+
+    const response =
+      await apiRequest(
+        '/api/v1/notifications/preferences'
+      );
+
+
+    return normalizeNotificationPreferences(
+      response
+    );
+
+  },
 
 
   // ------------------------------------------------
   // UPDATE NOTIFICATION PREFERENCES
   // ------------------------------------------------
 
-  updateNotificationPreferences: (
+  updateNotificationPreferences: async (
     preferences
   ) => {
 
+    /*
+     * Send exactly the fields expected
+     * by the backend.
+     */
+
     const payload = {
+
       interestRequestNotifications:
         Boolean(
           preferences?.interestRequestNotifications
@@ -698,19 +903,41 @@ export const api = {
         Boolean(
           preferences?.inAppNotifications
         ),
+
     };
 
-    return apiRequest(
-      '/api/v1/notifications/preferences',
-      {
-        method: 'PUT',
 
-        body:
-          JSON.stringify(
-            payload
-          ),
-      }
+    const response =
+      await apiRequest(
+        '/api/v1/notifications/preferences',
+        {
+          method: 'PUT',
+
+          body:
+            JSON.stringify(
+              payload
+            ),
+        }
+      );
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Normalize the response before
+     * returning it to SettingsPage.
+     *
+     * This prevents the switch from:
+     *
+     * ON → saved → OFF
+     *
+     * when the backend returns snake_case.
+     */
+
+    return normalizeNotificationPreferences(
+      response
     );
+
   },
 
 
@@ -746,4 +973,5 @@ export const api = {
           JSON.stringify({}),
       }
     ),
+
 };

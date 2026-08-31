@@ -230,34 +230,6 @@ function getInitials(name) {
   ).toUpperCase();
 }
 
-/*
- * Normalize the Jugaad budget from the backend.
- * The database/backend uses `budget`, while some older
- * frontend objects use `amount` or `price`. Prefer the real
- * backend budget whenever it is present, even when amount is 0.
- */
-function getJugaadBudget(item) {
-  const candidates = [
-    item?.budget,
-    item?.amount,
-    item?.price,
-  ];
-
-  for (const value of candidates) {
-    if (value === null || value === undefined || value === '') {
-      continue;
-    }
-
-    const numericValue = Number(value);
-
-    if (Number.isFinite(numericValue)) {
-      return numericValue;
-    }
-  }
-
-  return 0;
-}
-
 export function MyJugaadsPage() {
   const {
     isDemoMode,
@@ -435,8 +407,32 @@ export function MyJugaadsPage() {
   ).map((x) => ({
     ...x,
 
-    // Always expose the backend budget as the value used by the UI.
-    amount: getJugaadBudget(x),
+    // The backend stores the posted price as `budget`.
+    // Always prefer it when present, even when an older frontend
+    // object also contains amount: 0.
+    amount:
+      x.budget !== null &&
+      x.budget !== undefined &&
+      x.budget !== ''
+        ? Number(x.budget)
+        : x.amount !== null &&
+          x.amount !== undefined &&
+          x.amount !== ''
+          ? Number(x.amount)
+          : x.price !== null &&
+            x.price !== undefined &&
+            x.price !== ''
+            ? Number(x.price)
+            : 0,
+
+    // Backend uses created_at. Prefer it so the posted date never
+    // becomes "Invalid Date" when postedAt is absent.
+    postedAt:
+      x.created_at ??
+      x.createdAt ??
+      x.posted_at ??
+      x.postedAt ??
+      null,
 
     status:
       status[x.id] ||
@@ -700,7 +696,7 @@ export function MyJugaadsPage() {
 
                 <div className="flex items-center gap-3 mt-4">
                   <span className="font-display text-lg text-amber">
-                    ₹{getJugaadBudget(item)}
+                    ₹{item.amount}
                   </span>
 
                   <span className="font-mono text-[9px] text-ink-3">
@@ -795,6 +791,37 @@ function Header({
   );
 }
 
+function getBudgetValue(item, acceptedStudent = null) {
+  const acceptedAmount = Number(
+    acceptedStudent?.agreedAmount
+  );
+
+  if (Number.isFinite(acceptedAmount) && acceptedAmount > 0) {
+    return acceptedAmount;
+  }
+
+  const budget = Number(item?.budget);
+
+  if (Number.isFinite(budget)) {
+    return budget;
+  }
+
+  const amount = Number(item?.amount);
+
+  if (Number.isFinite(amount)) {
+    return amount;
+  }
+
+  const price = Number(item?.price);
+
+  if (Number.isFinite(price)) {
+    return price;
+  }
+
+  return 0;
+}
+
+
 function Detail({
   item,
   proposals,
@@ -839,42 +866,57 @@ function Detail({
     : [];
 
   /*
-   * Merge direct requests and proposals.
+   * IMPORTANT:
    *
-   * Avoid duplicates where the same student
-   * already exists in interestedStudents.
+   * The INTERESTED STUDENTS section should contain only the real
+   * interested-student records returned by the Jugaad itself.
+   *
+   * Proposals/bargains are already shown separately under
+   * PROPOSALS RECEIVED. Do not add proposal-only fallback rows here.
+   *
+   * When a real interested student also has a matching proposal,
+   * copy the proposal status/amount onto that same student so the
+   * row can show ACCEPTED/BARGAIN without creating a duplicate
+   * "Student" entry.
    */
-  const mergedStudents = [
-    ...directStudents,
-  ];
+  const mergedStudents = directStudents.map((student) => {
+    const studentId =
+      student?.id ??
+      student?.userId ??
+      student?.user_id;
 
-  proposalStudents.forEach((proposalStudent) => {
-    const alreadyExists =
-      mergedStudents.some((student) => {
-        const studentId =
-          student?.id ??
-          student?.userId ??
-          student?.user_id;
+    const matchingProposal = proposalStudents.find((proposalStudent) => {
+      const proposalStudentId = proposalStudent?.id;
 
-        const proposalStudentId =
-          proposalStudent?.id;
+      return (
+        studentId != null &&
+        proposalStudentId != null &&
+        String(studentId) === String(proposalStudentId)
+      );
+    });
 
-        if (
-          studentId != null &&
-          proposalStudentId != null
-        ) {
-          return (
-            String(studentId) ===
-            String(proposalStudentId)
-          );
-        }
-
-        return false;
-      });
-
-    if (!alreadyExists) {
-      mergedStudents.push(proposalStudent);
+    if (!matchingProposal) {
+      return student;
     }
+
+    return {
+      ...student,
+      proposalId:
+        matchingProposal.proposalId,
+      proposal:
+        matchingProposal.proposal,
+      proposalStatus:
+        matchingProposal.status,
+      status:
+        matchingProposal.status,
+      requestType:
+        student.requestType ??
+        matchingProposal.requestType,
+      proposedAmount:
+        matchingProposal.proposedAmount,
+      conversationId:
+        matchingProposal.conversationId,
+    };
   });
 
   return (
@@ -937,9 +979,13 @@ function Detail({
 
             <p className="font-display text-2xl text-amber">
               ₹
-              {Number.isFinite(Number(acceptedStudent?.agreedAmount))
-                ? Number(acceptedStudent.agreedAmount)
-                : getJugaadBudget(item)}
+              {getBudgetValue(
+                item,
+                acceptedStudent
+              ).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
           </div>
         </div>

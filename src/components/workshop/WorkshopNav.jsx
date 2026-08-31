@@ -562,7 +562,7 @@ export function WorkshopNav() {
             >
 
               <span className="font-display text-bg-0 text-xs leading-none">
-                J
+                V
               </span>
 
             </span>

@@ -407,31 +407,21 @@ export function MyJugaadsPage() {
   ).map((x) => ({
     ...x,
 
-    // The backend stores the posted price as `budget`.
-    // Always prefer it when present, even when an older frontend
-    // object also contains amount: 0.
+    // The backend returns the real Jugaad price in `budget`.
     amount:
-      x.budget !== null &&
-      x.budget !== undefined &&
-      x.budget !== ''
-        ? Number(x.budget)
-        : x.amount !== null &&
-          x.amount !== undefined &&
-          x.amount !== ''
-          ? Number(x.amount)
-          : x.price !== null &&
-            x.price !== undefined &&
-            x.price !== ''
-            ? Number(x.price)
-            : 0,
+      x.budget ??
+      x.amount ??
+      x.price ??
+      0,
 
-    // Backend uses created_at. Prefer it so the posted date never
-    // becomes "Invalid Date" when postedAt is absent.
+    // The backend timestamp is `created_at`.
+    // Normalize it so the detail header never receives an undefined
+    // value and never renders "posted Invalid Date".
     postedAt:
-      x.created_at ??
-      x.createdAt ??
-      x.posted_at ??
       x.postedAt ??
+      x.posted_at ??
+      x.createdAt ??
+      x.created_at ??
       null,
 
     status:
@@ -791,37 +781,6 @@ function Header({
   );
 }
 
-function getBudgetValue(item, acceptedStudent = null) {
-  const acceptedAmount = Number(
-    acceptedStudent?.agreedAmount
-  );
-
-  if (Number.isFinite(acceptedAmount) && acceptedAmount > 0) {
-    return acceptedAmount;
-  }
-
-  const budget = Number(item?.budget);
-
-  if (Number.isFinite(budget)) {
-    return budget;
-  }
-
-  const amount = Number(item?.amount);
-
-  if (Number.isFinite(amount)) {
-    return amount;
-  }
-
-  const price = Number(item?.price);
-
-  if (Number.isFinite(price)) {
-    return price;
-  }
-
-  return 0;
-}
-
-
 function Detail({
   item,
   proposals,
@@ -852,72 +811,16 @@ function Detail({
     : [];
 
   /*
-   * Convert proposals to student requests.
+   * Only show real interested students here.
    *
-   * This makes INTERESTED and BARGAIN
-   * appear in the same section.
+   * The PROPOSALS RECEIVED section already shows proposal records.
+   * Keeping proposal fallbacks in INTERESTED STUDENTS creates duplicate
+   * rows such as a second generic "Student" entry.
+   *
+   * Direct interestedStudents are the real interest records and are the
+   * source used for this section.
    */
-  const proposalStudents = Array.isArray(
-    proposals
-  )
-    ? proposals
-        .map(proposalToStudentRequest)
-        .filter(Boolean)
-    : [];
-
-  /*
-   * IMPORTANT:
-   *
-   * The INTERESTED STUDENTS section should contain only the real
-   * interested-student records returned by the Jugaad itself.
-   *
-   * Proposals/bargains are already shown separately under
-   * PROPOSALS RECEIVED. Do not add proposal-only fallback rows here.
-   *
-   * When a real interested student also has a matching proposal,
-   * copy the proposal status/amount onto that same student so the
-   * row can show ACCEPTED/BARGAIN without creating a duplicate
-   * "Student" entry.
-   */
-  const mergedStudents = directStudents.map((student) => {
-    const studentId =
-      student?.id ??
-      student?.userId ??
-      student?.user_id;
-
-    const matchingProposal = proposalStudents.find((proposalStudent) => {
-      const proposalStudentId = proposalStudent?.id;
-
-      return (
-        studentId != null &&
-        proposalStudentId != null &&
-        String(studentId) === String(proposalStudentId)
-      );
-    });
-
-    if (!matchingProposal) {
-      return student;
-    }
-
-    return {
-      ...student,
-      proposalId:
-        matchingProposal.proposalId,
-      proposal:
-        matchingProposal.proposal,
-      proposalStatus:
-        matchingProposal.status,
-      status:
-        matchingProposal.status,
-      requestType:
-        student.requestType ??
-        matchingProposal.requestType,
-      proposedAmount:
-        matchingProposal.proposedAmount,
-      conversationId:
-        matchingProposal.conversationId,
-    };
-  });
+  const mergedStudents = directStudents.filter(Boolean);
 
   return (
     <div>
@@ -967,8 +870,12 @@ function Detail({
               {item.id} ·{' '}
               {item.skillRequired ||
                 item.category}{' '}
-              · posted{' '}
-              {timeAgo(item.postedAt)}
+              {item.postedAt ? (
+                <>
+                  · posted{' '}
+                  {timeAgo(item.postedAt)}
+                </>
+              ) : null}
             </p>
           </div>
 
@@ -979,13 +886,10 @@ function Detail({
 
             <p className="font-display text-2xl text-amber">
               ₹
-              {getBudgetValue(
-                item,
-                acceptedStudent
-              ).toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {acceptedStudent?.agreedAmount ??
+                item.amount ??
+                item.budget ??
+                0}
             </p>
           </div>
         </div>
@@ -1107,25 +1011,92 @@ function Detail({
                 </p>
               ) : (
                 mergedStudents.map(
-                  (student, index) => (
-                    <StudentRequest
-                      key={
-                        student?.proposalId ||
-                        student?.id ||
-                        index
-                      }
-                      student={student}
-                      assigned={
-                        acceptedStudent?.id ===
-                        student.id
-                      }
-                      locked={
-                        !!acceptedStudent &&
-                        acceptedStudent.id !==
-                          student.id
-                      }
-                    />
-                  )
+                  (student, index) => {
+                    const studentId =
+                      student?.id ??
+                      student?.userId ??
+                      student?.user_id ??
+                      null;
+
+                    const matchingProposal =
+                      proposals.find((proposal) => {
+                        const proposalStudentId =
+                          proposal?.helperId ??
+                          proposal?.helper_id ??
+                          proposal?.userId ??
+                          proposal?.user_id ??
+                          proposal?.helper?.id ??
+                          proposal?.student?.id ??
+                          proposal?.user?.id ??
+                          null;
+
+                        return (
+                          studentId != null &&
+                          proposalStudentId != null &&
+                          String(studentId) ===
+                            String(proposalStudentId)
+                        );
+                      });
+
+                    const studentForCard =
+                      matchingProposal
+                        ? {
+                            ...student,
+                            proposalId: matchingProposal.id,
+                            proposal: matchingProposal,
+                            proposalStatus: matchingProposal.status,
+                            status: matchingProposal.status,
+                            requestType:
+                              matchingProposal.requestType ??
+                              matchingProposal.request_type ??
+                              student?.requestType,
+                            proposedAmount:
+                              matchingProposal.proposedPrice ??
+                              matchingProposal.proposed_price ??
+                              matchingProposal.amount ??
+                              student?.proposedAmount,
+                          }
+                        : student;
+
+                    return (
+                      <StudentRequest
+                        key={
+                          studentForCard?.proposalId ||
+                          studentForCard?.id ||
+                          index
+                        }
+                        student={studentForCard}
+                        assigned={
+                          acceptedStudent?.id != null &&
+                          studentForCard?.id != null &&
+                          String(acceptedStudent.id) ===
+                            String(studentForCard.id)
+                        }
+                        locked={
+                          !!acceptedStudent &&
+                          acceptedStudent?.id != null &&
+                          studentForCard?.id != null &&
+                          String(acceptedStudent.id) !==
+                            String(studentForCard.id)
+                        }
+                        onAccept={() => {
+                          if (matchingProposal) {
+                            onAcceptProposal(matchingProposal);
+                          }
+                        }}
+                        onReject={() => {
+                          if (matchingProposal) {
+                            onRejectProposal(matchingProposal);
+                          }
+                        }}
+                        onCounter={() => {
+                          if (matchingProposal) {
+                            onCounterProposal(matchingProposal);
+                          }
+                        }}
+                      />
+                    );
+                  }
                 )
               )}
             </div>

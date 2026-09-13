@@ -67,7 +67,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden grain preserve-3d flex items-stretch">
+    <div className="relative min-h-screen overflow-y-auto overflow-x-hidden grain preserve-3d flex flex-col lg:flex-row items-center lg:items-stretch justify-center">
       {/* ===== Background — same machine-room atmosphere ===== */}
       <div className="absolute inset-0 tech-diagram pointer-events-none" />
 
@@ -91,8 +91,8 @@ export function LoginPage() {
         style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.14), transparent 60%)', filter: 'blur(70px)' }}
       />
 
-      {/* ===== LEFT — editorial statement ===== */}
-      <div className="relative z-10 flex-1 flex items-center px-6 sm:px-12 lg:px-20 pt-24 pb-12">
+      {/* ===== LEFT — editorial statement (desktop only) ===== */}
+      <div className="relative z-10 hidden lg:flex flex-1 items-center px-6 sm:px-12 lg:px-20 pt-24 pb-12">
         <div className="max-w-lg">
           <div className="flex items-center gap-3 mb-10 anim-reveal">
             <LED color="amber" pulse size={7} />
@@ -135,8 +135,22 @@ export function LoginPage() {
       </div>
 
       {/* ===== RIGHT — authentication terminal ===== */}
-      <div className="relative z-10 w-full max-w-md lg:flex-1 lg:max-w-lg flex items-center justify-center px-6 sm:px-12 lg:px-12 pt-24 pb-12">
+      <div className="relative z-10 w-full max-w-md lg:flex-1 lg:max-w-lg flex items-center justify-center px-4 sm:px-8 lg:px-12 py-10 lg:py-24">
         <div className="w-full max-w-sm anim-reveal" style={{ animationDelay: '0.2s' }}>
+          {/* mobile headline */}
+          <div className="lg:hidden mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <LED color="amber" pulse size={6} />
+              <span className="font-technical text-[9px] text-ink-2">02 — The Entry Terminal</span>
+            </div>
+            <h1 className="font-display text-3xl tracking-tight text-ink-0">
+              READY FOR <span className="text-amber">CAMPUSVAULT?</span>
+            </h1>
+            <p className="mt-2 text-xs text-ink-2">
+              Enter the exchange. Your next gig is waiting.
+            </p>
+          </div>
+
           <div className="relative surface-metal-brushed metal-scratches rounded-2xl p-6 sm:p-8">
             <Rivet size={9} className="absolute top-3 left-3" />
             <Rivet size={9} className="absolute top-3 right-3" />
@@ -253,7 +267,13 @@ export function LoginPage() {
           </div>
 
           {/* sub-label below terminal */}
-          <div className="mt-4 flex items-center justify-center gap-2">
+          <div className="mt-4 flex flex-col items-center justify-center gap-2">
+            <Link
+              to="/"
+              className="lg:hidden font-technical text-[9px] text-ink-2 hover:text-ink-0 transition-colors mb-1"
+            >
+              ← Back to Exchange
+            </Link>
             <span className="font-technical text-[7px] text-ink-3">AUTHENTICATED BY CAMPUSVAULT EXCHANGE</span>
           </div>
         </div>

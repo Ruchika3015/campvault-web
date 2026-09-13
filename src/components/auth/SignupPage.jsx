@@ -95,7 +95,7 @@ export function SignupPage() {
   const busy = phase === 'registering';
 
   return (
-    <div className="relative min-h-screen overflow-hidden grain preserve-3d flex items-stretch">
+    <div className="relative min-h-screen overflow-y-auto overflow-x-hidden grain preserve-3d flex flex-col lg:flex-row items-center lg:items-stretch justify-center">
       {/* ===== Background ===== */}
       <div className="absolute inset-0 tech-diagram pointer-events-none" />
 
@@ -157,7 +157,7 @@ export function SignupPage() {
       </div>
 
       {/* ===== RIGHT — registration terminal ===== */}
-      <div className="relative z-10 w-full max-w-md lg:flex-1 lg:max-w-lg flex items-center justify-center px-6 sm:px-12 lg:px-12 pt-24 pb-12">
+      <div className="relative z-10 w-full max-w-md lg:flex-1 lg:max-w-lg flex items-center justify-center px-4 sm:px-8 lg:px-12 py-10 lg:py-24">
         <div className="w-full max-w-sm anim-reveal" style={{ animationDelay: '0.2s' }}>
           {/* mobile headline */}
           <div className="lg:hidden mb-6">
@@ -314,7 +314,13 @@ export function SignupPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-center gap-2">
+          <div className="mt-4 flex flex-col items-center justify-center gap-2">
+            <Link
+              to="/"
+              className="lg:hidden font-technical text-[9px] text-ink-2 hover:text-ink-0 transition-colors mb-1"
+            >
+              ← Back to Exchange
+            </Link>
             <span className="font-technical text-[7px] text-ink-2">CAMPUSVAULT EXCHANGE · STUDENT ROLE ASSIGNED AUTOMATICALLY</span>
           </div>
         </div>

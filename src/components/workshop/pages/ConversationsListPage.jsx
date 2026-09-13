@@ -95,14 +95,16 @@ export function ConversationsListPage() {
   const visibleConversations = useMemo(() => {
     return conversations.filter((conversation) => {
       return Boolean(
+        conversation?._id ||
         conversation?.id ||
-          conversation?.conversation_id
+        conversation?.conversation_id
       );
     });
   }, [conversations]);
 
   const openConversation = (conversation) => {
     const conversationId =
+      conversation?._id ??
       conversation?.id ??
       conversation?.conversation_id;
 
@@ -152,7 +154,7 @@ export function ConversationsListPage() {
 
         <p className="mt-5 max-w-2xl text-base leading-7 text-[#aaa39a]">
           Conversations unlock only when a poster accepts your
-          request. Every thread belongs to one Jugaad.
+          request. Every thread belongs to one gig.
         </p>
 
         {/* ERROR */}
@@ -217,7 +219,8 @@ export function ConversationsListPage() {
 
             const jugaadTitle =
               conversation?.jugaad_title ||
-              'Jugaad';
+              conversation?.gig_title ||
+              'Gig';
 
             const jugaadId =
               conversation?.jugaad_id ??
@@ -282,7 +285,7 @@ export function ConversationsListPage() {
                     proposalId ||
                     personEmail) && (
                     <div className="mt-2 hidden text-[10px] text-white/30">
-                      user: {personId} · jugaad: {jugaadId} ·
+                      user: {personId} · gig: {jugaadId} ·
                       proposal: {proposalId} · {personEmail}
                     </div>
                   )}

@@ -1,7 +1,17 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LED } from '@/components/primitives/Details';
-import { JUGAAD_CATEGORIES } from '@/data/jugaadMockData';
+const GIG_CATEGORIES = [
+  'Development',
+  'Design',
+  'Academics',
+  'Content & Media',
+  'Hardware & Electronics',
+  'Events & Organization',
+  'Marketing & Outreach',
+  'Other',
+];
+
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
 
@@ -166,7 +176,7 @@ export function PostJugaadPage() {
     // --------------------------------------------------------------
 
     if (!form.title.trim()) {
-      setError('Please enter a Jugaad title.');
+      setError('Please enter a gig title.');
       return;
     }
 
@@ -272,26 +282,24 @@ export function PostJugaadPage() {
     // deadline -> number
     // --------------------------------------------------------------
 
+    const year = deadlineDate.getFullYear();
+    const month = String(deadlineDate.getMonth() + 1).padStart(2, '0');
+    const day = String(deadlineDate.getDate()).padStart(2, '0');
+    const formattedDeadline = `${year}-${month}-${day}`;
+
+    const skillsArray = form.skill
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+
     const payload = {
       title: form.title.trim(),
-
       description: form.description.trim(),
-
       category: form.category.trim(),
-
-      required_skills: form.skill
-        .split(',')
-        .map((skill) => skill.trim())
-        .filter(Boolean),
-
+      skillsRequired: skillsArray,
+      required_skills: skillsArray,
       budget,
-
-      // Convert Date to ISO STRING.
-      // Example:
-      // "2026-11-21T18:29:59.999Z"
-      deadline: deadlineDate.toISOString(),
-
-      priority: 'medium',
+      deadline: formattedDeadline,
     };
 
     console.log(
@@ -302,17 +310,17 @@ export function PostJugaadPage() {
     setSubmitting(true);
 
     try {
-      const response = await api.createJugaad(payload);
+      const response = await api.createGig(payload);
 
       console.log(
-        'Jugaad created successfully:',
+        'Gig created successfully:',
         response
       );
 
       setDone(true);
     } catch (err) {
       console.error(
-        'Create Jugaad error:',
+        'Create gig error:',
         err
       );
 
@@ -323,7 +331,7 @@ export function PostJugaadPage() {
 
       setError(
         backendMessage ||
-          'Failed to post Jugaad. Please try again.'
+          'Failed to post gig. Please try again.'
       );
     } finally {
       setSubmitting(false);
@@ -341,22 +349,20 @@ export function PostJugaadPage() {
           <CheckCircle2 size={35} />
         </div>
 
-        <p className="font-display text-3xl">
-          JUGAAD POSTED
+        <h1 className="font-display text-4xl mb-3">
+          GIG POSTED
+        </h1>
+
+        <p className="font-mono text-sm text-ink-2 max-w-sm mb-7">
+          Your requirement is live. Campus peers can now view and apply.
         </p>
 
-        <p className="font-mono text-xs text-ink-2 mt-3">
-          Your opportunity is now available to students
-          with matching skills.
-        </p>
-
-        <div className="flex justify-center gap-3 mt-7">
+        <div className="flex items-center gap-3 justify-center">
           <Link
-            to="/dashboard/my-jugaads"
-            className="machine-control machine-control--primary"
+            to="/dashboard/my-gigs"
+            className="px-5 py-2.5 rounded-xl font-display text-xs bg-amber text-bg-0 hover:brightness-110 transition-all"
           >
-            <span className="ctrl-led" />
-            VIEW MY JUGAADS
+            VIEW MY GIGS
           </Link>
 
           <button
@@ -407,20 +413,20 @@ export function PostJugaadPage() {
             size={7}
           />
 
-          <span className="font-technical text-[9px] text-ink-2">
+          <span className="font-technical text-[10px] font-bold text-ink-0 tracking-wider">
             03 — DROP BOX
           </span>
         </div>
 
-        <h1 className="font-display text-4xl sm:text-5xl">
+        <h1 className="font-display text-4xl sm:text-5xl mb-2">
           POST A
           <br />
           <span className="text-mint">
-            JUGAAD.
+            GIG.
           </span>
         </h1>
 
-        <p className="mt-4 max-w-xl text-sm text-ink-2">
+        <p className="mt-4 max-w-xl text-sm sm:text-base text-ink-1 font-medium leading-relaxed">
           Tell the campus what you need. Students with
           the right skills can discover it, show interest,
           or make you an offer.
@@ -429,7 +435,7 @@ export function PostJugaadPage() {
 
       <form
         onSubmit={submit}
-        className="surface-metal-brushed rounded-2xl p-5 sm:p-8 max-w-3xl"
+        className="surface-metal-brushed rounded-2xl p-6 sm:p-8 max-w-3xl border-2 border-metal-2 shadow-md"
       >
         {/* ============================================================
             ERROR
@@ -453,7 +459,7 @@ export function PostJugaadPage() {
         ============================================================ */}
 
         <Field
-          label="JUGAAD TITLE"
+          label="GIG TITLE"
           value={form.title}
           onChange={(value) =>
             update('title', value)
@@ -479,14 +485,14 @@ export function PostJugaadPage() {
             CATEGORY + SKILL
         ============================================================ */}
 
-        <div className="grid sm:grid-cols-2 gap-5">
+        <div className="grid sm:grid-cols-2 gap-6">
           <div>
-            <label className="font-technical text-[8px] text-ink-2 block mb-2">
+            <label className="font-technical text-[10px] sm:text-[11px] font-bold text-ink-0 tracking-wider block mb-2">
               REQUIRED CATEGORY
             </label>
 
-            <div className="flex flex-wrap gap-1.5">
-              {JUGAAD_CATEGORIES.map(
+            <div className="flex flex-wrap gap-2">
+              {GIG_CATEGORIES.map(
                 (category) => (
                   <button
                     type="button"
@@ -498,10 +504,10 @@ export function PostJugaadPage() {
                       );
                       setError('');
                     }}
-                    className={`px-2.5 py-2 rounded-md font-technical text-[8px] ${
+                    className={`px-3 py-2 rounded-lg font-technical text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all shadow-sm ${
                       form.category === category
-                        ? 'bg-amber text-bg-0'
-                        : 'bg-bg-2 text-ink-3 border border-metal-1'
+                        ? 'bg-amber text-bg-0 border-2 border-amber font-extrabold shadow'
+                        : 'bg-bg-1 text-ink-0 border-2 border-metal-2 hover:border-ink-0 hover:bg-bg-2'
                     }`}
                   >
                     {category}
@@ -525,7 +531,7 @@ export function PostJugaadPage() {
             BUDGET + DEADLINE
         ============================================================ */}
 
-        <div className="grid sm:grid-cols-2 gap-5 mt-5">
+        <div className="grid sm:grid-cols-2 gap-6 mt-6">
           {/* BUDGET */}
 
           <Field
@@ -543,24 +549,24 @@ export function PostJugaadPage() {
           {/* DEADLINE */}
 
           <div>
-            <label className="font-technical text-[8px] text-ink-2 block mb-2">
+            <label className="font-technical text-[10px] sm:text-[11px] font-bold text-ink-0 tracking-wider block mb-2">
               DEADLINE
             </label>
 
             <div
-              className={`flex items-center rounded-lg bg-bg-1 border ${
+              className={`flex items-center rounded-lg bg-bg-1 border-2 shadow-sm transition-all ${
                 error &&
                 (!form.deadline ||
                   !getDeadlineDate(
                     form.deadline
                   ))
-                  ? 'border-coral/60'
-                  : 'border-metal-1'
+                  ? 'border-coral'
+                  : 'border-metal-2 focus-within:border-amber focus-within:ring-1 focus-within:ring-amber/30'
               }`}
             >
               <CalendarDays
-                size={14}
-                className="ml-3 text-ink-3 shrink-0"
+                size={16}
+                className="ml-3.5 text-ink-1 shrink-0"
               />
 
               <input
@@ -571,11 +577,11 @@ export function PostJugaadPage() {
                 maxLength={10}
                 inputMode="numeric"
                 autoComplete="off"
-                className="w-full bg-transparent px-2 py-3 font-mono text-xs outline-none text-ink-0 placeholder:text-ink-3/50"
+                className="w-full bg-transparent px-3 py-3 font-mono text-xs outline-none text-ink-0 font-medium placeholder:text-ink-3/80"
               />
             </div>
 
-            <p className="font-mono text-[8px] text-ink-3 mt-2">
+            <p className="font-mono text-[9px] text-ink-1 font-medium mt-2">
               Enter a future date as DD-MM-YYYY
             </p>
           </div>
@@ -585,11 +591,11 @@ export function PostJugaadPage() {
             SUBMIT
         ============================================================ */}
 
-        <div className="mt-6 pt-5 border-t border-metal-1/40 flex justify-end">
+        <div className="mt-8 pt-6 border-t-2 border-metal-2/60 flex justify-end">
           <button
             type="submit"
             disabled={submitting}
-            className="machine-control machine-control--primary disabled:opacity-50"
+            className="machine-control machine-control--primary disabled:opacity-50 font-bold"
           >
             <span className="ctrl-led" />
 
@@ -630,7 +636,7 @@ function Field({
 }) {
   return (
     <div className="mb-5">
-      <label className="font-technical text-[8px] text-ink-2 block mb-2">
+      <label className="font-technical text-[10px] sm:text-[11px] font-bold text-ink-0 tracking-wider block mb-2">
         {label}
       </label>
 
@@ -642,7 +648,7 @@ function Field({
           }
           placeholder={placeholder}
           rows={5}
-          className="w-full rounded-lg bg-bg-1 border border-metal-1 p-3 font-mono text-xs outline-none resize-none text-ink-0 placeholder:text-ink-3/50"
+          className="w-full rounded-lg bg-bg-1 border-2 border-metal-2 p-3.5 font-mono text-xs outline-none resize-none text-ink-0 font-medium placeholder:text-ink-3/80 focus:border-amber focus:ring-1 focus:ring-amber/30 transition-all shadow-sm"
         />
       ) : (
         <input
@@ -654,9 +660,12 @@ function Field({
           placeholder={placeholder}
           min={min}
           step={step}
-          className="w-full rounded-lg bg-bg-1 border border-metal-1 px-3 py-3 font-mono text-xs outline-none text-ink-0 placeholder:text-ink-3/50"
+          className="w-full rounded-lg bg-bg-1 border-2 border-metal-2 px-3.5 py-3 font-mono text-xs outline-none text-ink-0 font-medium placeholder:text-ink-3/80 focus:border-amber focus:ring-1 focus:ring-amber/30 transition-all shadow-sm"
         />
       )}
     </div>
   );
 }
+
+export const PostGigPage = PostJugaadPage;
+export default PostJugaadPage;

@@ -70,14 +70,25 @@ export function LoginPage() {
     <div className="relative min-h-screen overflow-hidden grain preserve-3d flex items-stretch">
       {/* ===== Background — same machine-room atmosphere ===== */}
       <div className="absolute inset-0 tech-diagram pointer-events-none" />
-      <div className="bg-lettering">ENTRY</div>
+
+      {/* Large background logo watermark with reduced transparency */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden select-none z-0">
+        <img
+          src="/logo.svg"
+          alt=""
+          aria-hidden="true"
+          className="w-[520px] sm:w-[750px] lg:w-[1000px] max-w-none object-contain logo-watermark"
+        />
+      </div>
+
+      <div className="bg-lettering opacity-[0.02]">ENTRY</div>
       <div className="absolute inset-0 haze pointer-events-none" />
       <div className="absolute inset-0 depth-fog pointer-events-none" />
 
-      {/* ambient warm light */}
+      {/* ambient green light */}
       <div
         className="absolute top-[15%] left-[20%] w-[600px] h-[500px] rounded-full anim-breathe pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(214,138,60,0.10), transparent 60%)', filter: 'blur(70px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.14), transparent 60%)', filter: 'blur(70px)' }}
       />
 
       {/* ===== LEFT — editorial statement ===== */}
@@ -92,15 +103,15 @@ export function LoginPage() {
 
           <h1 className="font-display text-ink-0 anim-reveal" style={{ animationDelay: '0.1s' }}>
             <span className="block text-4xl sm:text-5xl lg:text-6xl leading-[0.95] tracking-tight">
-              READY TO
+              READY FOR
             </span>
             <span className="block text-4xl sm:text-5xl lg:text-6xl leading-[0.95] tracking-tight text-amber">
-              JUGAAD?
+              CAMPUSVAULT?
             </span>
           </h1>
 
           <p className="mt-6 max-w-sm text-sm text-ink-2 leading-relaxed anim-reveal" style={{ animationDelay: '0.3s' }}>
-            Enter the exchange. Your next Jugaad is waiting.
+            Enter the exchange. Your next gig is waiting.
           </p>
 
           {/* machine detail — indicator strip */}
@@ -180,7 +191,7 @@ export function LoginPage() {
 
               {/* Error */}
               {error && (
-                <div className="flex items-start gap-2 surface-panel rounded-lg p-3 anim-reveal" style={{ borderColor: 'rgba(199,93,93,0.3)' }}>
+                <div className="flex items-start gap-2 surface-panel rounded-lg p-3 anim-reveal" style={{ borderColor: 'rgba(251,113,133,0.35)' }}>
                   <AlertTriangle size={14} className="text-coral shrink-0 mt-0.5" />
                   <span className="font-mono text-[10px] text-coral-soft leading-relaxed">{error}</span>
                 </div>
@@ -267,8 +278,8 @@ function TerminalField({ label, type, value, onChange, onFocus, onBlur, active, 
         className="relative flex items-center rounded-lg transition-all duration-300"
         style={{
           background: 'var(--bg-1)',
-          border: `1px solid ${active ? 'rgba(214,138,60,0.45)' : 'rgba(82,74,66,0.5)'}`,
-          boxShadow: active ? 'inset 0 0 12px rgba(214,138,60,0.08)' : 'inset 0 1px 4px rgba(0,0,0,0.3)',
+          border: `1px solid ${active ? 'rgba(34,197,94,0.6)' : 'rgba(82,74,66,0.5)'}`,
+          boxShadow: active ? 'inset 0 0 12px rgba(34,197,94,0.15)' : 'inset 0 1px 4px rgba(0,0,0,0.3)',
         }}
       >
         <span className="pl-3 text-ink-2" style={{ color: active ? 'var(--amber)' : undefined }}>

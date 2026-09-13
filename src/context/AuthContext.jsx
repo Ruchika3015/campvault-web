@@ -119,14 +119,16 @@ export function AuthProvider({
           ======================================================== */
 
           const storedToken =
-            sessionStorage.getItem(
-              REAL_TOKEN_KEY
-            );
+            sessionStorage.getItem(REAL_TOKEN_KEY) ||
+            localStorage.getItem(REAL_TOKEN_KEY) ||
+            sessionStorage.getItem('campvault_token') ||
+            localStorage.getItem('campvault_token');
 
           const storedUserString =
-            sessionStorage.getItem(
-              REAL_USER_KEY
-            );
+            sessionStorage.getItem(REAL_USER_KEY) ||
+            localStorage.getItem(REAL_USER_KEY) ||
+            sessionStorage.getItem('campvault_user') ||
+            localStorage.getItem('campvault_user');
 
 
           if (storedToken) {
@@ -200,10 +202,14 @@ export function AuthProvider({
               }
 
 
+              // Backend returns the user object directly (has _id),
+              // not wrapped in { data } or { user }
               const profileUser =
-                profileResponse?.data ||
-                profileResponse?.user ||
-                null;
+                profileResponse?._id
+                  ? profileResponse
+                  : profileResponse?.data ||
+                    profileResponse?.user ||
+                    null;
 
 
               /*
@@ -235,6 +241,12 @@ export function AuthProvider({
                  */
 
                 sessionStorage.setItem(
+                  REAL_USER_KEY,
+                  JSON.stringify(
+                    mergedUser
+                  )
+                );
+                localStorage.setItem(
                   REAL_USER_KEY,
                   JSON.stringify(
                     mergedUser
@@ -490,6 +502,10 @@ export function AuthProvider({
           REAL_TOKEN_KEY,
           newToken
         );
+        localStorage.setItem(
+          REAL_TOKEN_KEY,
+          newToken
+        );
 
 
         /*
@@ -497,6 +513,12 @@ export function AuthProvider({
          */
 
         sessionStorage.setItem(
+          REAL_USER_KEY,
+          JSON.stringify(
+            newUser
+          )
+        );
+        localStorage.setItem(
           REAL_USER_KEY,
           JSON.stringify(
             newUser
@@ -572,6 +594,10 @@ export function AuthProvider({
             REAL_TOKEN_KEY,
             data.token
           );
+          localStorage.setItem(
+            REAL_TOKEN_KEY,
+            data.token
+          );
 
 
           /*
@@ -581,6 +607,12 @@ export function AuthProvider({
           if (registeredUser) {
 
             sessionStorage.setItem(
+              REAL_USER_KEY,
+              JSON.stringify(
+                registeredUser
+              )
+            );
+            localStorage.setItem(
               REAL_USER_KEY,
               JSON.stringify(
                 registeredUser
@@ -687,8 +719,14 @@ export function AuthProvider({
         sessionStorage.removeItem(
           REAL_TOKEN_KEY
         );
+        localStorage.removeItem(
+          REAL_TOKEN_KEY
+        );
 
         sessionStorage.removeItem(
+          REAL_USER_KEY
+        );
+        localStorage.removeItem(
           REAL_USER_KEY
         );
 
@@ -700,8 +738,14 @@ export function AuthProvider({
         sessionStorage.removeItem(
           DEMO_TOKEN_KEY
         );
+        localStorage.removeItem(
+          DEMO_TOKEN_KEY
+        );
 
         sessionStorage.removeItem(
+          DEMO_USER_KEY
+        );
+        localStorage.removeItem(
           DEMO_USER_KEY
         );
 

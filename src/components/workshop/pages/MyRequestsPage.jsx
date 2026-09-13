@@ -87,6 +87,7 @@ const STATUS_CFG = {
 function getPoster(request = {}) {
 
   const name =
+    request?.gig?.postedBy?.name ??
     request?.poster_name ??
     request?.posterName ??
     request?.poster?.name ??
@@ -286,13 +287,9 @@ function getValidConversationId(
   const value =
     String(rawId).trim();
 
-
-  if (
-    !/^\d+$/.test(value)
-  ) {
+  if (!value || value === 'null' || value === 'undefined') {
     return null;
   }
-
 
   return value;
 
@@ -344,6 +341,7 @@ export function MyRequestsPage() {
         proposal: {
 
           id:
+            request?._id ??
             request?.proposalId ??
             request?.proposal_id ??
             request?.id,
@@ -353,13 +351,15 @@ export function MyRequestsPage() {
           },
 
           jugaadTitle:
+            request?.gig?.title ??
             request?.jugaadTitle ??
             request?.jugaad_title ??
             request?.jugaad?.title ??
             request?.title ??
-            'Jugaad',
+            'Gig',
 
           proposedPrice:
+            request?.expectedBudget ??
             request?.agreedAmount ??
             request?.agreed_amount ??
             request?.proposedAmount ??
@@ -453,15 +453,15 @@ export function MyRequestsPage() {
           <br />
 
           <span className="text-mint">
-            REQUESTS.
+            APPLICATIONS.
           </span>
 
         </h1>
 
 
         <p className="mt-4 max-w-xl text-sm text-ink-2">
-          Track every Jugaad where you raised your hand,
-          made an offer, or started a collaboration.
+          Track every gig where you submitted an application,
+          made an offer, or started working.
         </p>
 
       </section>
@@ -482,12 +482,12 @@ export function MyRequestsPage() {
         >
 
           <p className="font-display text-lg text-ink-2">
-            NO REQUESTS YET.
+            NO APPLICATIONS YET.
           </p>
 
 
           <p className="font-mono text-[10px] text-ink-3 mt-2">
-            Your interests and proposals will appear here.
+            Your submitted applications and status updates will appear here.
           </p>
 
         </div>
@@ -509,6 +509,8 @@ export function MyRequestsPage() {
               <RequestRow
 
                 key={
+
+                  request?._id ??
 
                   request?.proposalId ??
 
@@ -678,6 +680,7 @@ function RequestRow({
   // ==============================================================
 
   const proposalId =
+    request?._id ??
     request?.proposalId ??
     request?.proposal_id ??
     request?.id;
@@ -691,20 +694,26 @@ function RequestRow({
       isNegotiating
     );
 
+  const hasBottomActions =
+    isAccepted ||
+    isNegotiating;
+
 
   // ==============================================================
   // JUGAAD DETAILS
   // ==============================================================
 
   const jugaadTitle =
+    request?.gig?.title ??
     request?.jugaadTitle ??
     request?.jugaad_title ??
     request?.jugaad?.title ??
     request?.title ??
-    'Untitled Jugaad';
+    'Untitled Gig';
 
 
   const category =
+    request?.gig?.category ??
     request?.category ??
     request?.jugaad?.category ??
     'General';
@@ -715,6 +724,7 @@ function RequestRow({
   // ==============================================================
 
   const proposedAmount =
+    request?.expectedBudget ??
     request?.agreedAmount ??
     request?.agreed_amount ??
     request?.proposedAmount ??
@@ -874,14 +884,14 @@ function RequestRow({
 
             <span
 
-              className="font-technical text-[7px] px-2 py-1 rounded"
+              className="font-technical text-[10px] font-semibold px-2.5 py-1 rounded"
 
               style={{
                 color:
                   `var(--${cfg.color})`,
 
                 background:
-                  `color-mix(in srgb, var(--${cfg.color}) 12%, transparent)`,
+                  `color-mix(in srgb, var(--${cfg.color}) 14%, transparent)`,
               }}
 
             >
@@ -993,36 +1003,46 @@ function RequestRow({
 
 
         {/* ======================================================
-            AMOUNT
+            AMOUNT & ACTIONS
         ====================================================== */}
 
-        <div className="text-right shrink-0">
+        <div className="flex items-center gap-3 shrink-0 self-start">
 
-          <p className="font-display text-xl text-amber">
+          {/* WITHDRAW */}
+          {canWithdraw && (
+            <button
+              type="button"
+              onClick={onWithdraw}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-coral/15 text-coral font-technical text-xs font-semibold hover:bg-coral/25 transition-all border border-coral/30 cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
+            >
+              <Undo2 size={13} />
+              WITHDRAW<span className="hidden sm:inline">&nbsp;APPLICATION</span>
+            </button>
+          )}
 
-            ₹
-            {Number(
-              proposedAmount || 0
-            ).toFixed(2)}
+          {/* WITHDRAWN */}
+          {isWithdrawn && (
+            <span className="font-mono text-xs text-ink-3 px-2.5 py-1 rounded bg-bg-2/70 border border-border-default/40 whitespace-nowrap">
+              Withdrawn
+            </span>
+          )}
 
-          </p>
+          <div className="text-right">
+            <p className="font-display text-xl text-amber">
+              ₹
+              {Number(
+                proposedAmount || 0
+              ).toFixed(2)}
+            </p>
 
-
-          <p className="font-mono text-[8px] text-ink-3">
-
-            {requestType ===
-            'bargain'
-
-              ? 'BARGAIN'
-
-              : requestType ===
-                  'proposal'
-
-                ? 'PROPOSAL'
-
-                : 'INTEREST'}
-
-          </p>
+            <p className="font-mono text-[8px] text-ink-3">
+              {requestType === 'bargain'
+                ? 'BARGAIN'
+                : requestType === 'proposal'
+                  ? 'PROPOSAL'
+                  : 'INTEREST'}
+            </p>
+          </div>
 
         </div>
 
@@ -1099,84 +1119,79 @@ function RequestRow({
 
 
       {/* =========================================================
-          ACTIONS
+          BOTTOM ACTIONS (MESSAGES / NEGOTIATION)
       ========================================================= */}
 
-      <div className="mt-4 pt-3 border-t border-metal-1/40 flex flex-wrap gap-2">
+      {hasBottomActions && (
 
-        {/* ======================================================
-            MESSAGE
-            ONLY AFTER ACCEPTANCE
-        ====================================================== */}
+        <div className="mt-4 pt-3 border-t border-metal-1/40 flex flex-wrap items-center gap-2">
 
-        {isAccepted &&
-          conversationId && (
-
-            <Link
-
-              to={`/dashboard/messages/${conversationId}`}
-
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
-
-            >
-
-              <MessageSquare
-                size={12}
-              />
-
+          {/* ======================================================
               MESSAGE
+              ONLY AFTER ACCEPTANCE
+          ====================================================== */}
 
-            </Link>
+          {isAccepted &&
+            conversationId && (
 
-          )}
+              <Link
+
+                to={`/dashboard/messages/${conversationId}`}
+
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs hover:bg-mint/25 transition-colors"
+
+              >
+
+                <MessageSquare
+                  size={13}
+                />
+
+                MESSAGE
+
+              </Link>
+
+            )}
 
 
-        {/* ======================================================
-            ACCEPTED BUT NO CONVERSATION
-        ====================================================== */}
+          {/* ======================================================
+              ACCEPTED BUT NO CONVERSATION
+          ====================================================== */}
 
-        {isAccepted &&
-          !conversationId && (
+          {isAccepted &&
+            !conversationId && (
 
-            <span className="font-mono text-[9px] text-ink-3">
+              <span className="font-mono text-xs text-ink-3">
 
-              Conversation unavailable.
+                Conversation unavailable.
 
-            </span>
+              </span>
 
-          )}
+            )}
 
 
-        {/* ======================================================
-            NEGOTIATION ACTIONS
-        ====================================================== */}
+          {/* ======================================================
+              NEGOTIATION ACTIONS
+          ====================================================== */}
 
-        {isNegotiating &&
-          proposalId && (
+          {isNegotiating && (
 
             <>
 
-              {/* ACCEPT COUNTER */}
+              {/* ACCEPT */}
 
               <button
 
                 type="button"
 
-                onClick={() => {
+                onClick={async () => {
 
                   try {
 
-                    const result =
-                      acceptCounter(
+                    if (proposalId) {
+
+                      await acceptCounter(
                         proposalId
-                      );
-
-
-                    if (
-                      result?.catch
-                    ) {
-
-                      result.catch(
+                      ).catch(
                         (error) =>
                           console.error(
                             'Failed to accept counter offer:',
@@ -1197,38 +1212,32 @@ function RequestRow({
 
                 }}
 
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs hover:bg-mint/25 transition-colors"
 
               >
 
-                <Check size={12} />
+                <Check size={13} />
 
-                ACCEPT OFFER
+                ACCEPT
 
               </button>
 
 
-              {/* REJECT COUNTER */}
+              {/* REJECT */}
 
               <button
 
                 type="button"
 
-                onClick={() => {
+                onClick={async () => {
 
                   try {
 
-                    const result =
-                      rejectCounter(
+                    if (proposalId) {
+
+                      await rejectCounter(
                         proposalId
-                      );
-
-
-                    if (
-                      result?.catch
-                    ) {
-
-                      result.catch(
+                      ).catch(
                         (error) =>
                           console.error(
                             'Failed to reject counter offer:',
@@ -1249,11 +1258,11 @@ function RequestRow({
 
                 }}
 
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-xs hover:bg-coral/20 transition-colors"
 
               >
 
-                <X size={12} />
+                <X size={13} />
 
                 REJECT
 
@@ -1266,12 +1275,12 @@ function RequestRow({
 
                 type="button"
 
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px] hover:bg-amber/10 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-xs hover:bg-amber/10 transition-colors"
 
               >
 
                 <HandCoins
-                  size={12}
+                  size={13}
                 />
 
                 COUNTER
@@ -1283,66 +1292,24 @@ function RequestRow({
           )}
 
 
-        {/* ======================================================
-            NEGOTIATING WITHOUT PROPOSAL ID
-        ====================================================== */}
+          {/* ======================================================
+              NEGOTIATING WITHOUT PROPOSAL ID
+          ====================================================== */}
 
-        {isNegotiating &&
-          !proposalId && (
+          {isNegotiating &&
+            !proposalId && (
 
-            <span className="font-mono text-[9px] text-ink-3">
+              <span className="font-mono text-xs text-ink-3">
 
-              Waiting for your response to the counter offer.
+                Waiting for your response to the counter offer.
 
-            </span>
+              </span>
 
-          )}
+            )}
 
+        </div>
 
-        {/* ======================================================
-            WITHDRAW
-        ====================================================== */}
-
-        {canWithdraw && (
-
-          <button
-
-            type="button"
-
-            onClick={
-              onWithdraw
-            }
-
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px] hover:bg-coral/20 transition-colors ml-auto"
-
-          >
-
-            <Undo2
-              size={12}
-            />
-
-            WITHDRAW PROPOSAL
-
-          </button>
-
-        )}
-
-
-        {/* ======================================================
-            WITHDRAWN
-        ====================================================== */}
-
-        {isWithdrawn && (
-
-          <span className="font-mono text-[9px] text-ink-3 ml-auto">
-
-            This proposal was withdrawn.
-
-          </span>
-
-        )}
-
-      </div>
+      )}
 
     </article>
 
@@ -1351,4 +1318,5 @@ function RequestRow({
 }
 
 
+export const ApplicationsPage = MyRequestsPage;
 export default MyRequestsPage;

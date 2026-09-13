@@ -47,11 +47,11 @@ export function DashboardPage() {
           <div>
             <div className="flex items-center gap-3 mb-4">
               <LED color="mint" pulse size={7} />
-              <span className="font-technical text-[9px] text-ink-2">01 — THE JUGAAD WORKSHOP</span>
+              <span className="font-technical text-xs sm:text-sm text-ink-2">01 — THE CAMPUSVAULT WORKSHOP</span>
               <span className="h-px w-10 bg-metal-2" />
-              <span className="font-technical text-[9px] text-mint">STATUS // ONLINE</span>
+              <span className="font-technical text-xs sm:text-sm text-mint">STATUS // ONLINE</span>
               {isDemoMode && (
-                <span className="font-technical text-[7px] text-amber/60 px-2 py-0.5 rounded" style={{ border: '1px solid rgba(214,138,60,0.2)', background: 'rgba(214,138,60,0.04)' }}>
+                <span className="font-technical text-xs text-amber px-2 py-0.5 rounded font-semibold" style={{ border: '1px solid rgba(34,197,94,0.35)', background: 'rgba(34,197,94,0.1)' }}>
                   DEMO ACCOUNT
                 </span>
               )}
@@ -60,7 +60,7 @@ export function DashboardPage() {
               WELCOME TO<br />
               <span className="text-amber">THE WORKSHOP.</span>
             </h1>
-            <p className="mt-4 max-w-lg text-sm text-ink-2 leading-relaxed">
+            <p className="mt-4 max-w-lg text-sm sm:text-base text-ink-2 leading-relaxed">
               Your creative control center. Find the skill you need, drop a task into the exchange,
               and see what the campus can solve together.
             </p>
@@ -70,16 +70,16 @@ export function DashboardPage() {
           <div className="surface-wood rounded-xl p-4 min-w-[220px] relative" style={{ transform: 'rotate(1deg)' }}>
             <Rivet size={6} className="absolute top-1.5 left-1.5" />
             <Rivet size={6} className="absolute top-1.5 right-1.5" />
-            <div className="flex items-center gap-2 mb-2">
-              <span className="grid place-items-center w-7 h-7 rounded-full bg-amber text-bg-0 font-display text-[10px]">{authUser?.name?.slice(0, 2).toUpperCase() || mockUser.avatar}</span>
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="grid place-items-center w-8 h-8 rounded-full bg-amber text-bg-0 font-display text-xs font-bold">{authUser?.name?.slice(0, 2).toUpperCase() || mockUser.avatar}</span>
               <div>
-                <p className="font-mono text-[10px] text-paper">{displayName}</p>
-                <p className="font-technical text-[7px] text-paper/70">OPERATOR // ACTIVE</p>
+                <p className="font-mono text-xs sm:text-sm font-semibold text-paper">{displayName}</p>
+                <p className="font-technical text-xs text-paper/70">OPERATOR // ACTIVE</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <LED color="mint" pulse size={5} />
-              <span className="font-mono text-[8px] text-paper/80">The room is yours.</span>
+              <span className="font-mono text-xs text-paper/80">The room is yours.</span>
             </div>
           </div>
         </section>
@@ -88,7 +88,7 @@ export function DashboardPage() {
         <section className="relative min-h-[440px] sm:min-h-[480px] rounded-3xl overflow-hidden preserve-3d">
           {/* Back wall */}
           <div className="absolute inset-0 rounded-3xl surface-panel" />
-          <div className="absolute inset-0 rounded-3xl" style={{ background: 'linear-gradient(135deg, rgba(214,138,60,0.04), transparent 45%, rgba(93,184,154,0.03))' }} />
+          <div className="absolute inset-0 rounded-3xl" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.06), transparent 45%, rgba(93,184,154,0.03))' }} />
 
           {/* Wall shelf — minimal */}
           <div className="absolute top-5 left-5 right-5 hidden sm:block">
@@ -200,7 +200,7 @@ function FloatingChit({ task, rotate, depth }) {
         zIndex: isBack ? 1 : 20,
       }}
     >
-      <span className="absolute -top-1 left-3 w-2.5 h-2.5 rounded-full" style={{ background: 'radial-gradient(circle at 35% 30%, #c75d5d, #8a3030)', boxShadow: '0 2px 4px rgba(0,0,0,0.4)' }} />
+      <span className="absolute -top-1 left-3 w-2.5 h-2.5 rounded-full" style={{ background: 'radial-gradient(circle at 35% 30%, #fb7185, #be123c)', boxShadow: '0 2px 4px rgba(0,0,0,0.4)' }} />
       <div className="flex items-start gap-2">
         <span className="text-sm leading-none">{task.emoji}</span>
         <div>

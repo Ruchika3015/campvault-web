@@ -3,7 +3,6 @@ import { PaperNote } from '@/components/primitives/PaperNote';
 import { Screen, LED, LEDMeter, Rivet, Sticker, Particle } from '@/components/primitives/Details';
 import { TactileButton } from '@/components/primitives/TactileButton';
 import { useInView } from '@/hooks/useEnvironment';
-import { PROBLEM_NOTES, MATCHES } from '@/data/mockData';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -19,12 +18,24 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
+const SAMPLE_SLIPS = [
+  { id: 's1', emoji: '🎬', text: 'Edit 3-minute fest teaser reel with sound design', budget: '₹1,200', time: 'Media' },
+  { id: 's2', emoji: '💻', text: 'Fix React state bug & add dark mode toggle', budget: '₹650', time: 'Development' },
+  { id: 's3', emoji: '📊', text: 'DBMS schema normalization & SQL queries', budget: '₹500', time: 'Academics' },
+];
+
+const MATCHED_STUDENTS = [
+  { id: 'm1', name: 'Kabir M.', initials: 'KM', skill: 'Video & Motion', rating: '4.9', completed: '17', tag: 'Fast Delivery', accent: 'mint' },
+  { id: 'm2', name: 'Ruchika C.', initials: 'RC', skill: 'UI/UX Design', rating: '5.0', completed: '24', tag: 'Verified Pro', accent: 'amber' },
+  { id: 'm3', name: 'Aman S.', initials: 'AS', skill: 'Fullstack Dev', rating: '4.8', completed: '19', tag: 'Campus Lead', accent: 'coral' },
+];
+
 export function Storytelling() {
   return (
     <div id="explore" className="relative preserve-3d">
       <StoryProblem />
       <Connector label="request enters the engine" />
-      <StoryJugaad />
+      <StoryEngine />
       <Connector label="engine activates" />
       <StoryMatch />
       <Connector label="a student is chosen" />
@@ -36,9 +47,9 @@ export function Storytelling() {
 }
 
 const ACCENT_LIGHT = {
-  coral: 'rgba(199,93,93,0.10)',
-  amber: 'rgba(214,138,60,0.12)',
-  mint: 'rgba(93,184,154,0.10)',
+  coral: 'rgba(251,113,133,0.14)',
+  amber: 'rgba(34,197,94,0.15)',
+  mint: 'rgba(45,212,191,0.12)',
 };
 
 function SectionShell({ id, index, label, title, accent, children, depth = 0 }) {
@@ -50,7 +61,6 @@ function SectionShell({ id, index, label, title, accent, children, depth = 0 }) 
       ref={ref}
       className="relative min-h-[80vh] flex items-center justify-center py-24 px-4 overflow-hidden grain preserve-3d"
     >
-      {/* per-section ambient light — evolves with the story */}
       <DepthLayer depth={-150} className="absolute inset-0 pointer-events-none">
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full transition-opacity duration-1000"
@@ -90,7 +100,7 @@ function StoryProblem() {
       label="THE PROBLEM"
       accent="coral"
       depth={40}
-      title={<>A student needs something. <span className="text-ink-2">Desperately.</span></>}
+      title={<>A student needs something. <span className="text-ink-2">Urgent.</span></>}
     >
       <div className="grid md:grid-cols-2 gap-8 items-center">
         <div className="space-y-5">
@@ -112,13 +122,13 @@ function StoryProblem() {
         </div>
         <div className="relative h-72 flex items-center justify-center">
           <div className="absolute anim-float-slow" style={{ top: '4%', right: '6%', ['--rot']: '7deg' }}>
-            <PaperNote note={PROBLEM_NOTES[1]} rotate={7} className="w-44" />
+            <PaperNote note={SAMPLE_SLIPS[1]} rotate={7} className="w-44" />
           </div>
           <div className="absolute anim-float-slow" style={{ ['--rot']: '-6deg', animationDelay: '0.5s' }}>
-            <PaperNote note={PROBLEM_NOTES[0]} rotate={-6} className="w-56" />
+            <PaperNote note={SAMPLE_SLIPS[0]} rotate={-6} className="w-56" />
           </div>
           <div className="absolute anim-float-slow" style={{ bottom: '0%', left: '2%', ['--rot']: '-3deg', animationDelay: '1s' }}>
-            <PaperNote note={PROBLEM_NOTES[5]} rotate={-3} className="w-48" />
+            <PaperNote note={SAMPLE_SLIPS[2]} rotate={-3} className="w-48" />
           </div>
         </div>
       </div>
@@ -126,20 +136,20 @@ function StoryProblem() {
   );
 }
 
-function StoryJugaad() {
+function StoryEngine() {
   const { ref, inView } = useInView({ threshold: 0.3 });
   return (
     <SectionShell
-      id="story-jugaad"
+      id="story-engine"
       index="02"
-      label="THE JUGAAD"
+      label="THE INTAKE"
       accent="amber"
       depth={50}
-      title={<>The request enters the <span className="text-amber">Engine.</span></>}
+      title={<>The requirement enters the <span className="text-amber">Engine.</span></>}
     >
       <div className="grid md:grid-cols-[1fr_1fr] gap-8 items-center">
         <p className="text-lg text-ink-1 leading-relaxed max-w-md">
-          Instead of posting into the void, the problem drops straight into the Jugaad Engine.
+          Instead of posting into the void, the project requirement drops straight into the Campusvault Exchange Engine.
           It reads the request, tags the skills needed, and starts scanning the campus for
           students who can actually do it.
         </p>
@@ -162,14 +172,14 @@ function StoryJugaad() {
                   <span className="text-ink-3">$</span> parse --request "edit_fest_video"<br />
                   <span className="text-ink-2">→ tags: [video, editing, premiere]</span><br />
                   <span className="text-ink-2">→ urgency: high</span><br />
-                  <span className="text-mint">→ scanning 12,480 students...</span><br />
-                  <span className="text-ink-3">→ 7 candidates match</span>
+                  <span className="text-mint">→ scanning verified campus students...</span><br />
+                  <span className="text-ink-3">→ matched active candidates</span>
                 </p>
               </Screen>
               <div className="mt-3 flex items-center gap-2">
                 <LED color="amber" pulse size={5} />
                 <span className="font-technical text-[9px] text-ink-3">processing</span>
-                <span className="font-mono text-[7px] text-ink-3 ml-auto">CJ-X24</span>
+                <span className="font-mono text-[7px] text-ink-3 ml-auto">CV-X26</span>
               </div>
             </div>
           </DepthLayer>
@@ -181,7 +191,6 @@ function StoryJugaad() {
 
 function StoryMatch() {
   const { ref, inView } = useInView({ threshold: 0.3 });
-  const candidates = [MATCHES[0], MATCHES[1], MATCHES[2]];
   return (
     <SectionShell
       id="story-match"
@@ -193,11 +202,11 @@ function StoryMatch() {
     >
       <div className="space-y-6">
         <p className="text-lg text-ink-1 leading-relaxed max-w-2xl">
-          Not freelancers. Not bots. Real students from your campus who've done this before —
-          rated by other students, ranked by the Engine, ready to help.
+          Not random bots. Real students from your campus who have proven their craft —
+          rated by peers, verified by Campusvault, ready to deliver.
         </p>
         <div ref={ref} className="grid sm:grid-cols-3 gap-4 preserve-3d">
-          {candidates.map((m, i) => (
+          {MATCHED_STUDENTS.map((m, i) => (
             <DepthLayer key={m.id} depth={inView ? 40 + i * 15 : 0}>
               <div
                 className={`surface-panel rounded-2xl p-5 transition-all duration-500 ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'} obj-lift`}
@@ -227,7 +236,7 @@ function StoryMatch() {
                 </div>
                 {i === 0 && (
                   <div className="mt-3 flex items-center gap-2">
-                    <Sticker color="mint" rotate={-2}>Best match</Sticker>
+                    <Sticker color="mint" rotate={-2}>Top Match</Sticker>
                     <CheckCircle2 size={11} className="text-mint" />
                   </div>
                 )}
@@ -248,7 +257,7 @@ function StoryConnection() {
       label="THE CONNECTION"
       accent="amber"
       depth={50}
-      title={<>The student picks someone. <span className="text-ink-2">They talk.</span></>}
+      title={<>Direct collaboration. <span className="text-ink-2">No friction.</span></>}
     >
       <div className="grid md:grid-cols-2 gap-8 items-center">
         <div className="relative preserve-3d">
@@ -261,17 +270,17 @@ function StoryConnection() {
               </div>
               <div className="space-y-3">
                 <Bubble side="left">Hey! Saw your request for the fest video — I edit in Premiere, done 17 of these.</Bubble>
-                <Bubble side="right">Wait that fast? How much?</Bubble>
-                <Bubble side="left">₹400, delivered by tomorrow night. I'll send a draft first.</Bubble>
-                <Bubble side="right">Bro you're a lifesaver. Let's go 🙌</Bubble>
+                <Bubble side="right">Awesome! What would be your turnaround time?</Bubble>
+                <Bubble side="left">₹400, delivered by tomorrow night with revisions included.</Bubble>
+                <Bubble side="right">Perfect. Let's do this! 🙌</Bubble>
               </div>
             </div>
           </DepthLayer>
         </div>
         <div className="space-y-5">
           <p className="text-lg text-ink-1 leading-relaxed">
-            No middlemen. No commission maze. Just a direct line to the person doing the work.
-            Agree on the price, agree on the deadline, shake hands digitally.
+            No middlemen. No corporate commission maze. Just a direct line to the person doing the work.
+            Agree on the budget, agree on the deadline, shake hands digitally.
           </p>
           <div className="flex items-center gap-3 surface-panel rounded-xl p-4 max-w-sm">
             <Handshake size={20} className="text-mint" />
@@ -304,8 +313,8 @@ function Bubble({ side, children }) {
 function StoryResult() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const handleFind = () => navigate(isAuthenticated ? '/find' : '/signup');
-  const handlePost = () => navigate(isAuthenticated ? '/post' : '/signup');
+  const handleExplore = () => navigate(isAuthenticated ? '/dashboard/gigs' : '/login');
+  const handlePost = () => navigate(isAuthenticated ? '/dashboard/post-gig' : '/login');
   return (
     <SectionShell
       id="story-result"
@@ -313,7 +322,7 @@ function StoryResult() {
       label="THE RESULT"
       accent="mint"
       depth={60}
-      title={<>The Jugaad is <span className="text-mint">done.</span></>}
+      title={<>The project is <span className="text-mint">delivered.</span></>}
     >
       <div className="grid md:grid-cols-2 gap-8 items-center">
         <div className="space-y-6">
@@ -322,8 +331,8 @@ function StoryResult() {
             they needed. Another student earns. Both walk away better off.
           </p>
           <div className="grid grid-cols-2 gap-4">
-            <StatCard icon={<Trophy size={18} className="text-mint" />} value="1,247" label="Jugaads solved" />
-            <StatCard icon={<Wallet size={18} className="text-amber" />} value="₹3.2L" label="Paid to students" />
+            <StatCard icon={<Trophy size={18} className="text-mint" />} value="100%" label="Verified delivery" />
+            <StatCard icon={<Wallet size={18} className="text-amber" />} value="Direct" label="Peer-to-peer payout" />
           </div>
         </div>
         <div className="relative preserve-3d">
@@ -341,15 +350,15 @@ function StoryResult() {
                 <br />
                 <span className="text-ink-2">Someone's skill.</span>
                 <br />
-                <span className="font-editorial text-ink-1">That's a Jugaad.</span>
+                <span className="font-editorial text-ink-1">That's Campusvault.</span>
               </p>
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <TactileButton variant="amber" onClick={handleFind}>
+                <TactileButton variant="amber" onClick={handleExplore}>
                   <ArrowRight size={14} />
-                  Find a Jugaad
+                  Explore Gigs
                 </TactileButton>
                 <TactileButton variant="mint" onClick={handlePost}>
-                  Post a Jugaad
+                  Post a Gig
                 </TactileButton>
               </div>
             </div>

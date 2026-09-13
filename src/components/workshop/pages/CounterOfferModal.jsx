@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { X, HandCoins, Send, IndianRupee, ArrowLeft, Check } from 'lucide-react';
-import { REQUEST_STATUS, timeAgo } from '@/data/jugaadMockData';
 
 export function CounterOfferModal({ proposal, onClose, onSubmit }) {
   const [counterPrice, setCounterPrice] = useState('');
@@ -46,7 +45,7 @@ export function CounterOfferModal({ proposal, onClose, onSubmit }) {
               </span>
               <div>
                 <p className="font-technical text-[10px] text-ink-0">COUNTER OFFER</p>
-                <p className="font-mono text-[9px] text-ink-3 mt-0.5">{proposal.jugaadTitle}</p>
+                <p className="font-mono text-[9px] text-ink-3 mt-0.5">{proposal.gigTitle || proposal.gig?.title || proposal.title || proposal.jugaadTitle || 'Gig Offer'}</p>
               </div>
             </div>
 

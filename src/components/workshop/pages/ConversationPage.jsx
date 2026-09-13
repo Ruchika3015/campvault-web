@@ -98,6 +98,9 @@ function getSenderId(
   message
 ) {
   return (
+    message?.sender?._id ??
+    message?.sender?.id ??
+    (typeof message?.sender === 'string' ? message?.sender : null) ??
     message?.sender_id ??
     message?.senderId ??
     message?.user_id ??
@@ -114,6 +117,7 @@ function getMessageId(
   index
 ) {
   return (
+    message?._id ??
     message?.id ??
     message?.message_id ??
     `message-${index}`
@@ -495,7 +499,8 @@ export function ConversationPage() {
 
   const jugaadTitle =
     conversation?.jugaad_title ||
-    'Jugaad';
+    conversation?.gig_title ||
+    'Gig';
 
   const jugaadId =
     conversation?.jugaad_id ??
@@ -899,7 +904,7 @@ export function ConversationPage() {
             <div className="mt-7">
 
               <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-[#777]">
-                Jugaad
+                Gig
               </div>
 
               <div className="mt-2 text-xl font-bold">
@@ -963,7 +968,7 @@ export function ConversationPage() {
               <br />
               other user: {personId}
               <br />
-              jugaad: {jugaadId}
+              gig: {jugaadId}
               <br />
               proposal: {proposalId}
             </div>

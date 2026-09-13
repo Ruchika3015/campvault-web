@@ -232,7 +232,7 @@ export function RequestsPage() {
         </h1>
 
         <p className="mt-4 max-w-xl text-sm text-ink-2 leading-relaxed">
-          Students who submitted proposals for your Jugaads appear here.
+          Students who submitted applications for your gigs appear here.
           Review their offer, negotiate if needed, or accept the proposal.
         </p>
       </section>
@@ -301,8 +301,8 @@ export function RequestsPage() {
           </p>
 
           <p className="font-mono text-xs text-ink-2 mt-2 max-w-sm mx-auto">
-            When another student submits a proposal for one of your
-            Jugaads, it will appear here automatically.
+            When another student submits an application for one of your
+            gigs, it will appear here automatically.
           </p>
         </div>
       ) : (
@@ -411,7 +411,43 @@ function ProposalCard({
   const isRejected = status === 'rejected';
   const isWithdrawn = status === 'withdrawn';
 
-  const initials = getInitials(proposal.helper_name);
+  const helperName =
+    proposal.applicant?.name ??
+    proposal.helper_name ??
+    proposal.helper?.name ??
+    'Student';
+
+  const helperEmail =
+    proposal.applicant?.email ??
+    proposal.helper_email ??
+    '';
+
+  const helperCollege =
+    proposal.applicant?.college ??
+    proposal.helper_location ??
+    '';
+
+  const gigTitle =
+    proposal.gig?.title ??
+    proposal.jugaad_title ??
+    'Your Gig';
+
+  const message =
+    proposal.proposal ??
+    proposal.proposal_message ??
+    '';
+
+  const price =
+    proposal.expectedBudget ??
+    proposal.proposed_price ??
+    0;
+
+  const timestamp =
+    proposal.createdAt ??
+    proposal.created_at ??
+    null;
+
+  const initials = getInitials(helperName);
 
   return (
     <article
@@ -433,7 +469,7 @@ function ProposalCard({
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-display text-lg">
-                {proposal.helper_name || 'Student'}
+                {helperName}
               </p>
 
               <span
@@ -448,16 +484,16 @@ function ProposalCard({
             </div>
 
             {/* Email */}
-            {proposal.helper_email && (
+            {helperEmail && (
               <p className="font-mono text-[8px] text-ink-3 mt-1">
-                {proposal.helper_email}
+                {helperEmail}
               </p>
             )}
 
-            {/* Location */}
-            {proposal.helper_location && (
+            {/* College */}
+            {helperCollege && (
               <p className="font-mono text-[8px] text-ink-3 mt-1">
-                {proposal.helper_location}
+                {helperCollege}
               </p>
             )}
 
@@ -465,19 +501,19 @@ function ProposalCard({
             <p className="font-mono text-[9px] text-ink-2 mt-3">
               Proposal for{' '}
               <span className="text-amber">
-                {proposal.jugaad_title || 'Your Jugaad'}
+                {gigTitle}
               </span>
             </p>
 
             {/* Proposal message */}
-            {proposal.proposal_message && (
+            {message && (
               <div className="mt-3 surface-panel rounded-lg p-3">
                 <p className="font-technical text-[7px] text-ink-3 mb-1">
                   PROPOSAL MESSAGE
                 </p>
 
                 <p className="font-mono text-[10px] text-ink-2 leading-relaxed">
-                  "{proposal.proposal_message}"
+                  "{message}"
                 </p>
               </div>
             )}
@@ -508,11 +544,11 @@ function ProposalCard({
           </p>
 
           <p className="font-display text-2xl text-amber mt-1">
-            ₹{Number(proposal.proposed_price || 0).toLocaleString('en-IN')}
+            ₹{Number(price).toLocaleString('en-IN')}
           </p>
 
           <p className="font-mono text-[8px] text-ink-3 mt-1">
-            {formatTimeAgo(proposal.created_at)}
+            {formatTimeAgo(timestamp)}
           </p>
         </div>
       </div>

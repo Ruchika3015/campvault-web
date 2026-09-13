@@ -2,14 +2,24 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from 'react';
 
 import { LED } from '@/components/primitives/Details';
 
-import {
-  mockDiscoveryFeed,
-  CATEGORY_COLORS,
-} from '@/data/jugaadMockData';
+const CATEGORY_COLORS = {
+  ALL: 'amber',
+  Design: 'amber',
+  Development: 'mint',
+  Writing: 'coral',
+  Marketing: 'amber',
+  Video: 'mint',
+  Photography: 'coral',
+  Academic: 'mint',
+  Events: 'amber',
+  Business: 'coral',
+  Other: 'amber',
+};
 
 import { api } from '@/services/api';
 
@@ -42,7 +52,13 @@ function normalizeItem(raw) {
     raw.poster &&
     typeof raw.poster === 'object'
       ? raw.poster
-      : null;
+      : raw.postedBy &&
+        typeof raw.postedBy === 'object'
+        ? raw.postedBy
+        : raw.employer &&
+          typeof raw.employer === 'object'
+          ? raw.employer
+          : null;
 
   const creator =
     raw.creator &&
@@ -69,7 +85,9 @@ function normalizeItem(raw) {
   const posterId =
     raw.poster_id ??
     raw.posterId ??
+    poster?._id ??
     poster?.id ??
+    creator?._id ??
     creator?.id ??
     raw.creator_id ??
     raw.creatorId ??
@@ -100,6 +118,7 @@ function normalizeItem(raw) {
 
 
     id:
+      raw._id ??
       raw.id ??
       raw.jugaadId ??
       raw.jugaad_id ??
@@ -127,20 +146,22 @@ function normalizeItem(raw) {
 
 
     skillRequired:
-      typeof raw.skillRequired === 'string'
-        ? raw.skillRequired
-        : typeof raw.skill_required === 'string'
-          ? raw.skill_required
-          : Array.isArray(
-                raw.required_skills
-            )
-            ? raw.required_skills.join(', ')
-            : 'General',
+      Array.isArray(raw.skillsRequired) && raw.skillsRequired.length
+        ? raw.skillsRequired.join(', ')
+        : typeof raw.skillRequired === 'string'
+          ? raw.skillRequired
+          : typeof raw.skill_required === 'string'
+            ? raw.skill_required
+            : Array.isArray(
+                  raw.required_skills
+              )
+              ? raw.required_skills.join(', ')
+              : 'General',
 
 
     amount:
-      raw.amount ??
       raw.budget ??
+      raw.amount ??
       raw.price ??
       0,
 
@@ -214,25 +235,19 @@ function normalizeFeed(data) {
 
   if (Array.isArray(data)) {
     list = data;
-
-  } else if (
-    Array.isArray(data?.jugaads)
-  ) {
+  } else if (Array.isArray(data?.gigs)) {
+    list = data.gigs;
+  } else if (Array.isArray(data?.jugaads)) {
     list = data.jugaads;
-
-  } else if (
-    Array.isArray(data?.data)
-  ) {
+  } else if (Array.isArray(data?.data?.gigs)) {
+    list = data.data.gigs;
+  } else if (Array.isArray(data?.data?.jugaads)) {
+    list = data.data.jugaads;
+  } else if (Array.isArray(data?.data)) {
     list = data.data;
-
-  } else if (
-    Array.isArray(data?.items)
-  ) {
+  } else if (Array.isArray(data?.items)) {
     list = data.items;
-
-  } else if (
-    Array.isArray(data?.results)
-  ) {
+  } else if (Array.isArray(data?.results)) {
     list = data.results;
   }
 
@@ -503,19 +518,7 @@ export function FindJugaadPage() {
   }, []);
 
 
-  const [feedItems, setFeedItems] =
-    useState(() => {
-
-      if (!isDemoMode) {
-        return [];
-      }
-
-
-      return normalizeFeed(
-        mockDiscoveryFeed
-      );
-
-    });
+  const [feedItems, setFeedItems] = useState([]);
 
 
   const [loading, setLoading] =
@@ -533,6 +536,10 @@ export function FindJugaadPage() {
 
 
   const [proposalItem, setProposalItem] =
+    useState(null);
+
+
+  const [selectedGig, setSelectedGig] =
     useState(null);
 
 
@@ -555,30 +562,11 @@ export function FindJugaadPage() {
   const fetchFeed =
     useCallback(
       async () => {
-
-        if (isDemoMode) {
-
-          setFeedItems(
-            normalizeFeed(
-              mockDiscoveryFeed
-            )
-          );
-
-          setLoading(false);
-
-          return;
-        }
-
-
         if (!isAuthenticated) {
-
           setFeedItems([]);
-
           setLoading(false);
-
           return;
         }
-
 
         setLoading(true);
 
@@ -690,6 +678,78 @@ export function FindJugaadPage() {
 
 
   // ================================================================
+  // AVAILABLE CATEGORIES (ONLY SHOW FIELDS WITH AVAILABLE GIGS)
+  // ================================================================
+
+  const availableCategories = useMemo(() => {
+    const unhiddenGigs = feedItems.filter(
+      (item) => item && (item.id === undefined || !hidden.includes(item.id))
+    );
+
+    const activeCategories = [];
+
+    const PREFERRED_CATEGORIES = [
+      'Coding',
+      'Design',
+      'Hardware & Electronics',
+      'Academics',
+      'Marketing',
+      'Photography',
+      'Content & Media',
+      'Events & Organization',
+      'Other',
+    ];
+
+    for (const cat of PREFERRED_CATEGORIES) {
+      const targetCat = cat.toLowerCase().trim();
+      const hasGigs = unhiddenGigs.some((item) => {
+        const itemCat = String(item.category || '').toLowerCase().trim();
+        return (
+          itemCat === targetCat ||
+          (targetCat === 'coding' && (itemCat === 'code' || itemCat === 'development')) ||
+          (targetCat === 'development' && (itemCat === 'code' || itemCat === 'coding')) ||
+          (targetCat === 'content & media' && (itemCat === 'video' || itemCat === 'photography')) ||
+          (targetCat === 'marketing' && itemCat.includes('marketing'))
+        );
+      });
+
+      if (hasGigs) {
+        activeCategories.push(cat);
+      }
+    }
+
+    // Also include any custom categories present in unhidden gigs
+    unhiddenGigs.forEach((item) => {
+      const raw = String(item.category || '').trim();
+      if (!raw) return;
+      const alreadyCovered = activeCategories.some((c) => {
+        const cLow = c.toLowerCase();
+        const rawLow = raw.toLowerCase();
+        return (
+          cLow === rawLow ||
+          (cLow === 'coding' && (rawLow === 'code' || rawLow === 'development')) ||
+          (cLow === 'content & media' && (rawLow === 'video' || rawLow === 'photography')) ||
+          (cLow === 'marketing' && rawLow.includes('marketing'))
+        );
+      });
+      if (!alreadyCovered) {
+        const formatted = raw.charAt(0).toUpperCase() + raw.slice(1);
+        if (!activeCategories.includes(formatted)) {
+          activeCategories.push(formatted);
+        }
+      }
+    });
+
+    return ['ALL', ...activeCategories];
+  }, [feedItems, hidden]);
+
+  useEffect(() => {
+    if (category !== 'ALL' && !availableCategories.includes(category)) {
+      setCategory('ALL');
+    }
+  }, [availableCategories, category]);
+
+  // ================================================================
   // FILTERING
   // ================================================================
 
@@ -740,11 +800,16 @@ export function FindJugaadPage() {
             .includes(search);
 
 
-        const matchesCategory =
-          category === 'ALL' ||
-          item.category ===
-            category;
+        const itemCat = String(item.category || '').toLowerCase().trim();
+        const selectedCat = category.toLowerCase().trim();
 
+        const matchesCategory =
+          selectedCat === 'all' ||
+          itemCat === selectedCat ||
+          (selectedCat === 'coding' && (itemCat === 'code' || itemCat === 'development')) ||
+          (selectedCat === 'development' && (itemCat === 'code' || itemCat === 'coding')) ||
+          (selectedCat === 'content & media' && (itemCat === 'video' || itemCat === 'photography')) ||
+          (selectedCat === 'marketing' && itemCat.includes('marketing'));
 
         return (
           matchesQuery &&
@@ -888,146 +953,17 @@ export function FindJugaadPage() {
   // SECTIONS
   // ================================================================
 
+  const sortedVisible = visible.slice().sort((a, b) => {
+    const da = new Date(a.postedAt || a.createdAt || 0).getTime();
+    const db = new Date(b.postedAt || b.createdAt || 0).getTime();
+    return db - da;
+  });
+
   const sections = [
-
     [
-      'RECOMMENDED FOR YOU',
-
-      visible.filter(
-        (item) =>
-          Number(
-            item?.matchPercentage ??
-            0
-          ) >= 80
-      ),
-
+      category === 'ALL' && !query ? 'ALL LIVE CAMPUS GIGS' : `MATCHING GIGS (${sortedVisible.length})`,
+      sortedVisible,
     ],
-
-
-    [
-      'BEST SKILL MATCHES',
-
-      visible.filter(
-        (item) => {
-
-          const percentage =
-            Number(
-              item?.matchPercentage ??
-              0
-            );
-
-
-          return (
-            percentage >= 70 &&
-            percentage < 80
-          );
-
-        }
-      ),
-
-    ],
-
-
-    [
-      'RECENTLY POSTED',
-
-      visible
-        .filter(
-          (item) => {
-
-            if (
-              !item?.postedAt
-            ) {
-              return false;
-            }
-
-
-            /*
-             * Use actual dates instead of
-             * string comparison.
-             */
-
-            const posted =
-              new Date(
-                item.postedAt
-              );
-
-
-            if (
-              Number.isNaN(
-                posted.getTime()
-              )
-            ) {
-              return false;
-            }
-
-
-            /*
-             * Show posts from the recent period.
-             *
-             * This keeps the existing page behavior
-             * while using a real timestamp comparison.
-             */
-
-            const now =
-              Date.now();
-
-
-            const thirtyDays =
-              30 *
-              24 *
-              60 *
-              60 *
-              1000;
-
-
-            return (
-              now -
-                posted.getTime() <=
-              thirtyDays
-            );
-
-          }
-        )
-        .slice(
-          0,
-          4
-        ),
-
-    ],
-
-
-    [
-      'ENDING SOON',
-
-      visible.filter(
-        (item) => {
-
-          const remaining =
-            safeDaysUntil(
-              item?.deadline
-            );
-
-
-          return (
-            remaining === 'today' ||
-            remaining === '1 day left' ||
-            remaining === '2 days left'
-          );
-
-        }
-      ),
-
-    ],
-
-
-    [
-      'MORE OPPORTUNITIES',
-
-      visible,
-
-    ],
-
   ];
 
 
@@ -1065,13 +1001,13 @@ export function FindJugaadPage() {
 
         <h1 className="font-display text-4xl sm:text-5xl">
 
-          FIND A
+          EXPLORE
 
           <br />
 
           <span className="text-amber">
 
-            JUGAAD.
+            GIGS.
 
           </span>
 
@@ -1094,13 +1030,13 @@ export function FindJugaadPage() {
           SEARCH + CATEGORY
       ========================================================== */}
 
-      <div className="surface-panel rounded-xl p-3 flex flex-col sm:flex-row gap-3 mb-8">
+      <div className="surface-panel rounded-xl p-3 flex flex-col sm:flex-row gap-3 mb-8 border-2 border-metal-2 shadow-sm">
 
-        <div className="flex items-center flex-1 rounded-lg bg-bg-1 border border-metal-1">
+        <div className="flex items-center flex-1 rounded-lg bg-bg-1 border-2 border-metal-2 shadow-sm">
 
           <Search
-            size={14}
-            className="ml-3 text-ink-3"
+            size={16}
+            className="ml-3 text-ink-1 shrink-0"
           />
 
 
@@ -1118,24 +1054,16 @@ export function FindJugaadPage() {
 
             placeholder="Search opportunities or skills..."
 
-            className="w-full bg-transparent px-3 py-2.5 font-mono text-xs outline-none text-ink-0"
+            className="w-full bg-transparent px-3 py-2.5 font-mono text-xs outline-none text-ink-0 placeholder:text-ink-3/80 font-medium"
 
           />
 
         </div>
 
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
 
-          {[
-            'ALL',
-            'CODE',
-            'DESIGN',
-            'VIDEO',
-            'ACADEMICS',
-            'PRESENTATION',
-            'OTHER',
-          ].map(
+          {availableCategories.map(
             (currentCategory) => (
 
               <button
@@ -1152,11 +1080,11 @@ export function FindJugaadPage() {
                   )
                 }
 
-                className={`px-2.5 py-2 rounded-md font-technical text-[8px] ${
+                className={`px-3 py-1.5 rounded-lg font-technical text-xs sm:text-sm uppercase font-bold tracking-wider transition-all shadow-sm ${
                   category ===
                   currentCategory
-                    ? 'bg-amber text-bg-0'
-                    : 'bg-bg-2 text-ink-3 border border-metal-1'
+                    ? 'bg-amber text-bg-0 font-extrabold shadow'
+                    : 'bg-bg-1 text-ink-0 hover:text-ink-0 hover:bg-bg-2 border-2 border-metal-2'
                 }`}
 
               >
@@ -1263,14 +1191,14 @@ export function FindJugaadPage() {
 
                   <div className="flex items-center gap-2 mb-3">
 
-                    <span className="font-technical text-[9px] text-ink-0">
+                    <span className="font-technical text-xs sm:text-sm font-bold text-ink-0 uppercase tracking-wider">
 
                       {title}
 
                     </span>
 
 
-                    <span className="font-mono text-[8px] text-ink-3">
+                    <span className="font-mono text-xs text-ink-3">
 
                       (
                       {items.length}
@@ -1361,6 +1289,12 @@ export function FindJugaadPage() {
 
                             }}
 
+                            onSelect={() =>
+                              setSelectedGig(
+                                item
+                              )
+                            }
+
                           />
 
                         );
@@ -1436,6 +1370,53 @@ export function FindJugaadPage() {
 
 
       {/* ==========================================================
+          FULL DETAIL MODAL (CENTERED)
+      ========================================================== */}
+
+      {selectedGig && (
+
+        <GigDetailModal
+
+          item={
+            selectedGig
+          }
+
+          existingProposal={(() => {
+            try {
+              return getProposalForJugaad(
+                selectedGig.id
+              );
+            } catch {
+              return null;
+            }
+          })()}
+
+          currentTime={
+            currentTime
+          }
+
+          onClose={() =>
+            setSelectedGig(null)
+          }
+
+          onBargain={() => {
+            const gig = selectedGig;
+            setSelectedGig(null);
+            setBargain(gig);
+          }}
+
+          onInterest={() => {
+            const gig = selectedGig;
+            setSelectedGig(null);
+            setProposalItem(gig);
+          }}
+
+        />
+
+      )}
+
+
+      {/* ==========================================================
           INTERESTED / PROPOSAL MODAL
       ========================================================== */}
 
@@ -1469,7 +1450,7 @@ export function FindJugaadPage() {
 
 
 // ================================================================
-// OPPORTUNITY CARD
+// OPPORTUNITY CARD (UNIFORM SIZE)
 // ================================================================
 
 function OpportunityCard({
@@ -1479,8 +1460,8 @@ function OpportunityCard({
   onInterest,
   onHide,
   onBargain,
+  onSelect,
 }) {
-
   if (
     !item ||
     typeof item !== 'object'
@@ -1512,10 +1493,6 @@ function OpportunityCard({
     null;
 
 
-  // ============================================================
-  // DEADLINE STATUS
-  // ============================================================
-
   const deadlineLabel =
     safeDaysUntil(
       item?.deadline,
@@ -1525,10 +1502,6 @@ function OpportunityCard({
   const deadlinePassed =
     deadlineLabel === 'Deadline passed';
 
-
-  // ============================================================
-  // POSTER
-  // ============================================================
 
   const posterName =
     item?.poster_name ??
@@ -1570,21 +1543,8 @@ function OpportunityCard({
 
   const categoryChar =
     category.charAt(0) ||
-    'J';
+    'G';
 
-
-  /*
-   * IMPORTANT:
-   *
-   * Always use the actual backend timestamp.
-   *
-   * postedAt was normalized from:
-   *
-   * raw.postedAt
-   * raw.posted_at
-   * raw.created_at
-   * raw.createdAt
-   */
 
   const postedTimestamp =
     item?.postedAt ??
@@ -1600,377 +1560,430 @@ function OpportunityCard({
     );
 
 
-  // ============================================================
-  // CARD
-  // ============================================================
-
   return (
-
     <article
-
-      className="surface-metal-brushed rounded-2xl p-5 relative"
-
+      className="surface-metal-brushed rounded-2xl p-5 relative flex flex-col justify-between h-[320px] transition-all duration-200 hover:border-amber/50 hover:shadow-lg group"
       style={{
         border:
           `1px solid color-mix(in srgb, var(--${color}) 22%, transparent)`,
       }}
-
     >
-
-      {/* ========================================================
-          HEADER
-      ======================================================== */}
-
-      <div className="flex items-start justify-between gap-3">
-
-        <div className="flex gap-3">
-
-          <span
-
-            className="grid place-items-center w-11 h-11 rounded-xl shrink-0"
-
-            style={{
-              background:
-                `color-mix(in srgb, var(--${color}) 14%, transparent)`,
-
-              color:
-                `var(--${color})`,
-            }}
-
-          >
-
-            <span className="font-display text-lg">
-
-              {categoryChar}
-
+      {/* UPPER SECTION */}
+      <div>
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <span
+              onClick={onSelect}
+              className="grid place-items-center w-11 h-11 rounded-xl shrink-0 cursor-pointer"
+              style={{
+                background:
+                  `color-mix(in srgb, var(--${color}) 14%, transparent)`,
+                color:
+                  `var(--${color})`,
+              }}
+            >
+              <span className="font-display text-lg">
+                {categoryChar}
+              </span>
             </span>
 
-          </span>
-
-
-          <div>
-
-            <h2 className="font-display text-lg text-ink-0 leading-tight">
-
-              {item?.title ||
-                'Untitled opportunity'}
-
-            </h2>
-
-
-            <div className="flex flex-wrap items-center gap-2 mt-1.5">
-
-              <span
-
-                className="font-technical text-[7px] px-1.5 py-1 rounded"
-
-                style={{
-                  background:
-                    `var(--${color})`,
-
-                  color:
-                    'var(--bg-0)',
-                }}
-
+            <div className="min-w-0 flex-1">
+              <h2
+                onClick={onSelect}
+                className="font-display text-base sm:text-lg text-ink-0 leading-snug font-bold truncate cursor-pointer hover:text-amber transition-colors"
+                title={item?.title}
               >
-
-                {category}
-
-              </span>
-
-
-              <span className="font-mono text-[8px] text-ink-3">
-
-                {item?.skillRequired ||
-                  'General'}
-
-              </span>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-        {item?.matchPercentage !=
-          null && (
-
-          <span className="font-mono text-[9px] text-mint">
-
-            {item.matchPercentage}%
-
-            match
-
-          </span>
-
-        )}
-
-      </div>
-
-
-      {/* ========================================================
-          DESCRIPTION
-      ======================================================== */}
-
-      <p className="font-mono text-[10px] leading-relaxed text-ink-2 mt-4">
-
-        {item?.description ||
-          'No description available.'}
-
-      </p>
-
-
-      {/* ========================================================
-          META
-      ======================================================== */}
-
-      <div className="flex flex-wrap items-center gap-3 mt-4 text-[9px] font-mono text-ink-3">
-
-        <span className="text-amber font-display text-lg">
-
-          ₹{item?.amount ?? 0}
-
-        </span>
-
-
-        <span
-          className={`flex items-center gap-1 ${
-            deadlinePassed
-              ? 'text-coral'
-              : ''
-          }`}
-        >
-
-          <Clock size={11} />
-
-          {deadlineLabel}
-
-        </span>
-
-
-        <span className="flex items-center gap-1">
-
-          <Star
-            size={11}
-            className="text-amber fill-amber"
-          />
-
-          {posterRating}
-
-        </span>
-
-
-        {postedTimeLabel && (
-
-          <span>
-
-            {postedTimeLabel}
-
-          </span>
-
-        )}
-
-      </div>
-
-
-      {/* ========================================================
-          PROPOSAL STATUS
-      ======================================================== */}
-
-      {proposalSent && (
-
-        <div className="mt-3 surface-panel rounded-lg px-3 py-2 flex items-center gap-2">
-
-          <CheckCircle2
-
-            size={13}
-
-            className={
-              proposalStatus ===
-              'accepted'
-
-                ? 'text-mint'
-
-                : proposalStatus ===
-                    'rejected'
-
-                  ? 'text-coral'
-
-                  : 'text-amber'
-            }
-
-          />
-
-
-          <span className="font-mono text-[9px] text-ink-2">
-
-            {proposalStatus ===
-            'accepted'
-
-              ? 'Proposal Accepted — check My Requests to message'
-
-              : proposalStatus ===
-                  'rejected'
-
-                ? 'Proposal Rejected'
-
-                : proposalStatus ===
-                    'counter-offer'
-
-                  ? 'Counter offer received — check My Requests'
-
-                  : 'Proposal Sent — see status in My Requests'}
-
-          </span>
-
-        </div>
-
-      )}
-
-
-      {/* ========================================================
-          FOOTER
-      ======================================================== */}
-
-      <div className="mt-4 pt-3 border-t border-metal-1/40 flex items-center gap-2">
-
-        {/* Poster avatar */}
-
-        <span className="grid place-items-center w-6 h-6 rounded-full bg-amber text-bg-0 font-display text-[8px]">
-
-          {posterInitials}
-
-        </span>
-
-
-        {/* POSTER'S NAME */}
-
-        <span className="font-mono text-[9px] text-ink-1 flex-1">
-
-          {posterName}
-
-        </span>
-
-
-        {/* ======================================================
-            NOT INTERESTED
-        ====================================================== */}
-
-        <button
-
-          type="button"
-
-          onClick={onHide}
-
-          aria-label="Not interested"
-
-          className="grid place-items-center w-8 h-8 rounded-lg text-ink-3 hover:text-coral hover:bg-coral/10"
-
-        >
-
-          <X size={14} />
-
-        </button>
-
-
-        {/* ======================================================
-            ACTIONS
-        ====================================================== */}
-
-        {deadlinePassed ? (
-
-          <span
-            className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-2 font-technical text-[8px] text-coral border border-coral/30"
-          >
-
-            <Clock size={12} />
-
-            DEADLINE PASSED
-
-          </span>
-
-        ) : (
-
-          <>
-
-            {/* ==================================================
-                BARGAIN
-            ================================================== */}
-
-            <button
-
-              type="button"
-
-              onClick={onBargain}
-
-              disabled={proposalSent}
-
-              className="flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] text-amber border border-amber/30 hover:bg-amber/10 disabled:opacity-40"
-
-            >
-
-              <HandCoins size={12} />
-
-              BARGAIN
-
-            </button>
-
-
-            {/* ==================================================
-                INTERESTED
-            ================================================== */}
-
-            <button
-
-              type="button"
-
-              onClick={onInterest}
-
-              disabled={proposalSent}
-
-              className={`flex items-center gap-1 rounded-lg px-3 py-2 font-technical text-[8px] ${
-                proposalSent
-                  ? 'bg-mint/15 text-mint border border-mint/30'
-                  : 'bg-amber text-bg-0 hover:bg-amber-soft'
-              } disabled:cursor-default`}
-
-            >
-
-              {proposalSent ? (
-
-                <CheckCircle2
-                  size={12}
-                />
-
-              ) : (
-
-                <span className="text-xs">
-                  ♥
+                {item?.title ||
+                  'Untitled opportunity'}
+              </h2>
+
+              <div className="flex items-center gap-2 mt-1.5 min-w-0">
+                <span
+                  className="font-technical text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0"
+                  style={{
+                    background:
+                      `var(--${color})`,
+                    color:
+                      'var(--bg-0)',
+                  }}
+                >
+                  {category}
                 </span>
 
-              )}
+                <span
+                  className="font-mono text-xs text-ink-2 font-medium truncate flex-1"
+                  title={item?.skillRequired || 'General'}
+                >
+                  {item?.skillRequired ||
+                    'General'}
+                </span>
+              </div>
+            </div>
+          </div>
 
+          {item?.matchPercentage !=
+            null && (
+            <span className="font-mono text-xs font-semibold text-mint shrink-0 bg-mint/10 px-2 py-0.5 rounded">
+              {item.matchPercentage}% match
+            </span>
+          )}
+        </div>
 
-              {proposalSent
+        {/* CLAMPED DESCRIPTION (2 lines max for uniform card height) */}
+        <p
+          onClick={onSelect}
+          className="font-sans text-xs sm:text-sm leading-relaxed text-ink-1 mt-3 line-clamp-2 break-words cursor-pointer hover:text-paper transition-colors"
+        >
+          {item?.description ||
+            'No description available.'}
+        </p>
 
-                ? 'PROPOSAL SENT'
-
-                : 'INTERESTED'}
-
-            </button>
-
-          </>
-
-        )}
-
+        {/* VIEW DETAILS ACTION */}
+        <button
+          type="button"
+          onClick={onSelect}
+          className="font-technical text-[10px] sm:text-xs text-amber hover:underline mt-2 inline-flex items-center gap-1 font-bold"
+        >
+          VIEW FULL DETAILS →
+        </button>
       </div>
 
+      {/* LOWER SECTION */}
+      <div className="mt-3">
+        {/* META ROW */}
+        <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-ink-2">
+          <span className="text-amber font-display text-xl font-bold">
+            ₹{item?.amount ?? 0}
+          </span>
+
+          <span
+            className={`flex items-center gap-1 ${
+              deadlinePassed
+                ? 'text-coral font-medium'
+                : ''
+            }`}
+          >
+            <Clock size={13} />
+            {deadlineLabel}
+          </span>
+
+          <span className="flex items-center gap-1">
+            <Star
+              size={13}
+              className="text-amber fill-amber"
+            />
+            {posterRating}
+          </span>
+
+          {postedTimeLabel && (
+            <span>
+              {postedTimeLabel}
+            </span>
+          )}
+        </div>
+
+        {/* PROPOSAL STATUS BADGE */}
+        {proposalSent && (
+          <div className="mt-2 surface-panel rounded-lg px-2.5 py-1.5 flex items-center gap-2 truncate">
+            <CheckCircle2
+              size={13}
+              className={
+                proposalStatus === 'accepted'
+                  ? 'text-mint'
+                  : proposalStatus === 'rejected'
+                  ? 'text-coral'
+                  : 'text-amber'
+              }
+            />
+            <span className="font-mono text-[9px] text-ink-2 truncate">
+              {proposalStatus === 'accepted'
+                ? 'Proposal Accepted'
+                : proposalStatus === 'rejected'
+                ? 'Proposal Rejected'
+                : proposalStatus === 'counter-offer'
+                ? 'Counter offer received'
+                : 'Proposal Sent'}
+            </span>
+          </div>
+        )}
+
+        {/* FOOTER ROW */}
+        <div className="mt-3 pt-2.5 border-t border-metal-1/40 flex items-center gap-2">
+          {/* Poster avatar */}
+          <span className="grid place-items-center w-7 h-7 rounded-full bg-amber text-bg-0 font-display text-xs font-bold shrink-0">
+            {posterInitials}
+          </span>
+
+          {/* POSTER NAME */}
+          <span className="font-mono text-xs sm:text-sm text-ink-1 font-medium flex-1 truncate">
+            {posterName}
+          </span>
+
+          {/* NOT INTERESTED */}
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label="Not interested"
+            className="grid place-items-center w-8 h-8 rounded-lg text-ink-3 hover:text-coral hover:bg-coral/10 shrink-0"
+          >
+            <X size={14} />
+          </button>
+
+          {/* ACTIONS */}
+          {deadlinePassed ? (
+            <span
+              className="ml-auto flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-technical text-xs font-semibold text-coral border border-coral/30 shrink-0"
+            >
+              <Clock size={13} />
+              DEADLINE PASSED
+            </span>
+          ) : (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={onBargain}
+                disabled={proposalSent}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-technical text-xs sm:text-sm font-semibold text-amber border border-amber/30 hover:bg-amber/10 transition-colors disabled:opacity-40"
+              >
+                <HandCoins size={14} />
+                BARGAIN
+              </button>
+
+              <button
+                type="button"
+                onClick={onInterest}
+                disabled={proposalSent}
+                className={`flex items-center gap-1 rounded-lg px-3 py-1.5 font-technical text-xs sm:text-sm font-semibold transition-colors ${
+                  proposalSent
+                    ? 'bg-mint/15 text-mint border border-mint/30'
+                    : 'bg-amber text-bg-0 hover:bg-amber-soft'
+                } disabled:cursor-default`}
+              >
+                {proposalSent ? (
+                  <CheckCircle2
+                    size={14}
+                  />
+                ) : (
+                  <span className="text-xs">
+                    ♥
+                  </span>
+                )}
+                {proposalSent
+                  ? 'SENT'
+                  : 'INTERESTED'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </article>
-
   );
-
 }
 
 
+// ================================================================
+// GIG DETAIL MODAL (FULL VIEW IN CENTER)
+// ================================================================
+
+function GigDetailModal({
+  item,
+  existingProposal,
+  currentTime,
+  onClose,
+  onBargain,
+  onInterest,
+}) {
+  if (!item) return null;
+
+  const category =
+    typeof item.category === 'string' ? item.category : 'OTHER';
+
+  const color = CATEGORY_COLORS?.[category] || 'amber';
+
+  const deadlineLabel = safeDaysUntil(item?.deadline, currentTime);
+  const deadlinePassed = deadlineLabel === 'Deadline passed';
+
+  const posterName =
+    item?.poster_name ??
+    item?.posterName ??
+    item?.poster?.name ??
+    item?.creator_name ??
+    item?.creatorName ??
+    item?.creator?.name ??
+    'Student';
+
+  const posterRating =
+    item?.poster_rating ??
+    item?.posterRating ??
+    item?.poster?.rating ??
+    item?.rating ??
+    '4.8';
+
+  const postedTimestamp =
+    item?.postedAt ??
+    item?.posted_at ??
+    item?.created_at ??
+    item?.createdAt ??
+    null;
+
+  const postedTimeLabel = safeTimeAgo(postedTimestamp);
+
+  const proposalSent = Boolean(existingProposal);
+
+  return (
+    <div className="workshop-overlay" onClick={onClose}>
+      <div
+        className="workshop-panel surface-metal-brushed rounded-2xl p-6 sm:p-8 w-full max-w-2xl mx-4 relative max-h-[90vh] overflow-y-auto border border-metal-1 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* CLOSE BUTTON */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-lg text-ink-3 hover:text-ink-0 hover:bg-white/5 transition-colors"
+          aria-label="Close"
+        >
+          <X size={20} />
+        </button>
+
+        {/* CATEGORY & MATCH */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span
+            className="font-technical text-xs font-bold px-2.5 py-1 rounded uppercase tracking-wider"
+            style={{
+              background: `var(--${color})`,
+              color: 'var(--bg-0)',
+            }}
+          >
+            {category}
+          </span>
+
+          {item?.matchPercentage != null && (
+            <span className="font-mono text-xs font-semibold text-mint bg-mint/10 px-2 py-0.5 rounded">
+              {item.matchPercentage}% match
+            </span>
+          )}
+        </div>
+
+        {/* FULL TITLE */}
+        <h2 className="font-display text-2xl sm:text-3xl text-ink-0 font-bold leading-snug mb-3">
+          {item?.title || 'Untitled opportunity'}
+        </h2>
+
+        {/* SKILLS */}
+        <div className="mb-4">
+          <p className="font-technical text-xs text-ink-3 uppercase tracking-wider mb-1 font-bold">
+            SKILLS REQUIRED
+          </p>
+          <p className="font-mono text-sm text-amber font-semibold">
+            {item?.skillRequired || 'General'}
+          </p>
+        </div>
+
+        {/* FULL UN-TRUNCATED DESCRIPTION */}
+        <div className="surface-panel rounded-xl p-4 sm:p-5 mb-5 border border-metal-1/40">
+          <p className="font-technical text-xs text-ink-3 uppercase tracking-wider mb-2 font-bold">
+            FULL GIG DESCRIPTION
+          </p>
+          <p className="font-sans text-sm sm:text-base leading-relaxed text-ink-1 whitespace-pre-wrap break-words">
+            {item?.description || 'No description provided.'}
+          </p>
+        </div>
+
+        {/* SPECIFICATIONS GRID */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+          <div className="surface-panel rounded-xl p-3.5 border border-metal-1/30">
+            <p className="font-technical text-xs text-ink-3 font-semibold">BUDGET</p>
+            <p className="font-display text-2xl font-bold text-amber mt-1">
+              ₹{item?.amount ?? 0}
+            </p>
+          </div>
+
+          <div className="surface-panel rounded-xl p-3.5 border border-metal-1/30">
+            <p className="font-technical text-xs text-ink-3 font-semibold">DEADLINE</p>
+            <p
+              className={`font-mono text-sm mt-1 flex items-center gap-1.5 font-bold ${
+                deadlinePassed ? 'text-coral' : 'text-ink-1'
+              }`}
+            >
+              <Clock size={15} />
+              {deadlineLabel}
+            </p>
+          </div>
+
+          <div className="surface-panel rounded-xl p-3.5 border border-metal-1/30 col-span-2 sm:col-span-1">
+            <p className="font-technical text-xs text-ink-3 font-semibold">POSTED BY</p>
+            <p className="font-mono text-sm text-ink-1 mt-1 truncate font-bold flex items-center gap-1.5">
+              <span>{posterName}</span>
+              <span className="text-amber flex items-center text-xs">
+                <Star size={12} className="fill-amber mr-0.5" />
+                {posterRating}
+              </span>
+            </p>
+            {postedTimeLabel && (
+              <p className="font-mono text-xs text-ink-3 mt-0.5">{postedTimeLabel}</p>
+            )}
+          </div>
+        </div>
+
+        {/* MODAL ACTIONS */}
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-metal-1/40">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-lg font-technical text-xs font-semibold text-ink-2 hover:text-ink-0 hover:bg-white/5 transition-colors"
+          >
+            CLOSE
+          </button>
+
+          {deadlinePassed ? (
+            <span className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 font-technical text-xs font-semibold text-coral border border-coral/30">
+              <Clock size={15} />
+              DEADLINE PASSED
+            </span>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onBargain}
+                disabled={proposalSent}
+                className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 font-technical text-xs sm:text-sm font-semibold text-amber border border-amber/30 hover:bg-amber/10 transition-colors disabled:opacity-40"
+              >
+                <HandCoins size={16} />
+                BARGAIN
+              </button>
+
+              <button
+                type="button"
+                onClick={onInterest}
+                disabled={proposalSent}
+                className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 font-technical text-xs sm:text-sm font-semibold transition-colors ${
+                  proposalSent
+                    ? 'bg-mint/15 text-mint border border-mint/30'
+                    : 'bg-amber text-bg-0 hover:bg-amber-soft'
+                } disabled:cursor-default`}
+              >
+                {proposalSent ? (
+                  <>
+                    <CheckCircle2 size={16} />
+                    PROPOSAL SENT
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm">♥</span>
+                    INTERESTED
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+export const ExploreGigsPage = FindJugaadPage;
 export default FindJugaadPage;

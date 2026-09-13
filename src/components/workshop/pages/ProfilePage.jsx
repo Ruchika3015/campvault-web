@@ -4,21 +4,18 @@ import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
 import { LED, Rivet } from '@/components/primitives/Details';
 
-import {
-  mockUser,
-  mockSkills,
-  mockAchievements,
-  mockEarnings,
-} from '@/data/workshopMockData';
-
-import {
-  mockProfileData,
-  mockProfileLinks,
-  mockProfileProjects,
-  mockProfileCertifications,
-  mockProfileStats,
-  CATEGORY_COLORS,
-} from '@/data/jugaadMockData';
+const CATEGORY_COLORS = {
+  Design: 'amber',
+  Development: 'mint',
+  Writing: 'coral',
+  Marketing: 'amber',
+  Video: 'mint',
+  Photography: 'coral',
+  Academic: 'mint',
+  Events: 'amber',
+  Business: 'coral',
+  Other: 'amber',
+};
 
 import {
   User,
@@ -68,20 +65,8 @@ export function ProfilePage() {
   } = useAuth();
 
 
-  const [profile, setProfile] =
-    useState(
-      isDemoMode
-        ? {
-            ...mockUser,
-            ...mockProfileData,
-            ...(authUser || {}),
-          }
-        : authUser || {}
-    );
-
-
-  const [myJugaads, setMyJugaads] =
-    useState([]);
+  const [profile, setProfile] = useState(authUser || {});
+  const [myJugaads, setMyJugaads] = useState([]);
 
 
   /*
@@ -122,9 +107,13 @@ export function ProfilePage() {
     useState({
       name: '',
       email: '',
-      number: '',
-      location: '',
-      college_id: '',
+      bio: '',
+      college: '',
+      branch: '',
+      yearOfStudy: '',
+      github: '',
+      linkedin: '',
+      portfolio: '',
     });
 
 
@@ -132,36 +121,10 @@ export function ProfilePage() {
   // PROFILE SECTIONS
   // ================================================================
 
-  const [skills, setSkills] =
-    useState(
-      isDemoMode
-        ? mockSkills
-        : []
-    );
-
-
-  const [links, setLinks] =
-    useState(
-      isDemoMode
-        ? mockProfileLinks
-        : []
-    );
-
-
-  const [projects, setProjects] =
-    useState(
-      isDemoMode
-        ? mockProfileProjects
-        : []
-    );
-
-
-  const [certifications, setCertifications] =
-    useState(
-      isDemoMode
-        ? mockProfileCertifications
-        : []
-    );
+  const [skills, setSkills] = useState([]);
+  const [links, setLinks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [certifications, setCertifications] = useState([]);
 
 
   // ================================================================
@@ -271,112 +234,15 @@ export function ProfilePage() {
   // ================================================================
 
   useEffect(() => {
-
-    // --------------------------------------------------------------
-    // DEMO MODE
-    // --------------------------------------------------------------
-
-    if (isDemoMode) {
-
-      const demoProfile = {
-        ...mockUser,
-        ...mockProfileData,
-        ...(authUser || {}),
-      };
-
-
-      setProfile(
-        demoProfile
-      );
-
-
-      setEditForm({
-        name:
-          demoProfile.name ||
-          '',
-
-        email:
-          demoProfile.email ||
-          '',
-
-        number:
-          demoProfile.number ||
-          '',
-
-        location:
-          demoProfile.location ||
-          '',
-
-        college_id:
-          demoProfile.college_id ||
-          '',
-      });
-
-
-      setSkills(
-        mockSkills
-      );
-
-
-      setLinks(
-        mockProfileLinks
-      );
-
-
-      setProjects(
-        mockProfileProjects
-      );
-
-
-      setCertifications(
-        mockProfileCertifications
-      );
-
-
-      setMyJugaads(
-        []
-      );
-
-
-      /*
-       * Demo mode uses mock statistics.
-       */
-      setMyProposals(
-        []
-      );
-
-
-      setLoading(
-        false
-      );
-
-
-      return;
-    }
-
-
-    // --------------------------------------------------------------
-    // NOT AUTHENTICATED
-    // --------------------------------------------------------------
-
     if (!isAuthenticated) {
-
       setProfile({});
-
       setSkills([]);
-
       setLinks([]);
-
       setProjects([]);
-
       setCertifications([]);
-
       setMyJugaads([]);
-
       setMyProposals([]);
-
       setLoading(false);
-
       return;
     }
 
@@ -462,25 +328,15 @@ export function ProfilePage() {
 
 
           setEditForm({
-            name:
-              loadedProfile.name ||
-              '',
-
-            email:
-              loadedProfile.email ||
-              '',
-
-            number:
-              loadedProfile.number ||
-              '',
-
-            location:
-              loadedProfile.location ||
-              '',
-
-            college_id:
-              loadedProfile.college_id ||
-              '',
+            name: loadedProfile.name || '',
+            email: loadedProfile.email || '',
+            bio: loadedProfile.bio || '',
+            college: loadedProfile.college || '',
+            branch: loadedProfile.branch || '',
+            yearOfStudy: loadedProfile.yearOfStudy || '',
+            github: loadedProfile.github || '',
+            linkedin: loadedProfile.linkedin || '',
+            portfolio: loadedProfile.portfolio || '',
           });
 
         } else {
@@ -806,31 +662,7 @@ export function ProfilePage() {
   };
 
 
-  const stats =
-    isDemoMode
-      ? {
-
-          jugaadsPosted:
-            mockProfileStats.jugaadsPosted,
-
-          jugaadsCompleted:
-            mockProfileStats.jugaadsCompleted,
-
-          jugaadsAccepted:
-            mockProfileStats.jugaadsAccepted,
-
-          rating:
-            mockProfileStats.rating,
-
-          totalEarnings:
-            mockProfileStats.totalEarnings,
-
-          score:
-            profile.jugaadScore,
-
-        }
-
-      : realStats;
+  const stats = realStats;
 
 
   const collegeName =
@@ -847,13 +679,15 @@ export function ProfilePage() {
 
 
   const year =
+    profile?.yearOfStudy ??
     profile?.year ??
     'Not added yet';
 
 
   const location =
     profile?.location ??
-    'Not added yet';
+    profile?.college ??
+    'Campus';
 
 
   const bio =
@@ -895,29 +729,16 @@ export function ProfilePage() {
 
 
       setEditForm({
-
-        name:
-          profile?.name ||
-          '',
-
-        email:
-          profile?.email ||
-          '',
-
-        number:
-          profile?.number ||
-          '',
-
-        location:
-          profile?.location ||
-          '',
-
-        college_id:
-          profile?.college_id ||
-          '',
-
+        name: profile?.name || '',
+        email: profile?.email || '',
+        bio: profile?.bio || '',
+        college: profile?.college || '',
+        branch: profile?.branch || '',
+        yearOfStudy: profile?.yearOfStudy || '',
+        github: profile?.github || '',
+        linkedin: profile?.linkedin || '',
+        portfolio: profile?.portfolio || '',
       });
-
 
       setIsEditing(
         true
@@ -933,36 +754,20 @@ export function ProfilePage() {
         false
       );
 
-
       setSaveError('');
 
       setSaveSuccess('');
 
-
       setEditForm({
-
-        name:
-          profile?.name ||
-          '',
-
-        email:
-          profile?.email ||
-          '',
-
-        number:
-          profile?.number ||
-          '',
-
-        location:
-          profile?.location ||
-          '',
-
-        college_id:
-          profile?.college_id ||
-          '',
-
+        name: profile?.name || '',
+        email: profile?.email || '',
+        bio: profile?.bio || '',
+        college: profile?.college || '',
+        branch: profile?.branch || '',
+        yearOfStudy: profile?.yearOfStudy || '',
+        github: profile?.github || '',
+        linkedin: profile?.linkedin || '',
       });
-
     };
 
 
@@ -987,79 +792,29 @@ export function ProfilePage() {
       try {
 
         const payload = {
-
-          name:
-            editForm.name.trim(),
-
-          email:
-            editForm.email.trim(),
-
-          number:
-            editForm.number.trim(),
-
-          location:
-            editForm.location.trim(),
-
-          college_id:
-            Number(
-              editForm.college_id
-            ),
-
+          name: editForm.name.trim(),
+          bio: editForm.bio ? editForm.bio.trim() : '',
+          college: editForm.college ? editForm.college.trim() : '',
+          branch: editForm.branch ? editForm.branch.trim() : '',
+          yearOfStudy: editForm.yearOfStudy ? editForm.yearOfStudy.trim() : '',
+          github: editForm.github ? editForm.github.trim() : '',
+          linkedin: editForm.linkedin ? editForm.linkedin.trim() : '',
+          portfolio: editForm.portfolio ? editForm.portfolio.trim() : '',
         };
 
-
-        if (
-          !payload.name ||
-          payload.name.length <
-            2
-        ) {
-
-          throw new Error(
-            'Name must be at least 2 characters.'
-          );
-
+        if (!payload.name || payload.name.length < 2) {
+          throw new Error('Name must be at least 2 characters.');
         }
-
-
-        if (
-          !/^\d{10}$/.test(
-            payload.number
-          )
-        ) {
-
-          throw new Error(
-            'Phone number must contain exactly 10 digits.'
-          );
-
-        }
-
-
-        if (
-          !Number.isFinite(
-            payload.college_id
-          ) ||
-          payload.college_id <=
-            0
-        ) {
-
-          throw new Error(
-            'Please enter a valid college ID.'
-          );
-
-        }
-
 
         const result =
           await api.updateProfile(
             payload
           );
 
-
         const updatedProfile =
           result?.data ||
           result?.user ||
           result;
-
 
         setProfile(
           (current) => ({
@@ -1068,31 +823,17 @@ export function ProfilePage() {
           })
         );
 
-
         setEditForm({
-
-          name:
-            updatedProfile.name ||
-            payload.name,
-
-          email:
-            updatedProfile.email ||
-            payload.email,
-
-          number:
-            updatedProfile.number ||
-            payload.number,
-
-          location:
-            updatedProfile.location ||
-            payload.location,
-
-          college_id:
-            updatedProfile.college_id ||
-            payload.college_id,
-
+          name: updatedProfile.name || payload.name,
+          email: updatedProfile.email || editForm.email,
+          bio: updatedProfile.bio || payload.bio,
+          college: updatedProfile.college || payload.college,
+          branch: updatedProfile.branch || payload.branch,
+          yearOfStudy: updatedProfile.yearOfStudy || payload.yearOfStudy,
+          github: updatedProfile.github || payload.github,
+          linkedin: updatedProfile.linkedin || payload.linkedin,
+          portfolio: updatedProfile.portfolio || payload.portfolio,
         });
-
 
         setSaveSuccess(
           'Profile updated successfully.'
@@ -2490,7 +2231,7 @@ export function ProfilePage() {
 
               style={{
                 border:
-                  '1px solid rgba(214,138,60,.25)',
+                  '1px solid rgba(34,197,94,.35)',
               }}
 
             >
@@ -2680,7 +2421,7 @@ export function ProfilePage() {
 
                   ? mockProfileData.completionHint
 
-                  : 'Profile information comes from your CampusVault account.'}
+                  : 'Profile information comes from your Campusvault account.'}
 
               </p>
 
@@ -2881,77 +2622,63 @@ export function ProfilePage() {
 
 
               <ProfileInput
+                id="profile-bio"
+                label="BIO"
+                name="bio"
+                value={editForm.bio}
+                onChange={handleEditChange}
+                placeholder="Tell other students about yourself..."
+                maxLength={500}
+              />
 
-                id="profile-number"
+              <ProfileInput
+                id="profile-college"
+                label="COLLEGE"
+                name="college"
+                value={editForm.college}
+                onChange={handleEditChange}
+                placeholder="e.g. IIT Bombay"
+                maxLength={100}
+              />
 
-                label="PHONE NUMBER"
+              <ProfileInput
+                id="profile-branch"
+                label="BRANCH"
+                name="branch"
+                value={editForm.branch}
+                onChange={handleEditChange}
+                placeholder="e.g. Computer Science"
+                maxLength={100}
+              />
 
-                name="number"
-
-                type="tel"
-
-                inputMode="numeric"
-
-                value={
-                  editForm.number
-                }
-
-                onChange={
-                  handleEditChange
-                }
-
-                required
-
+              <ProfileInput
+                id="profile-year"
+                label="YEAR OF STUDY"
+                name="yearOfStudy"
+                value={editForm.yearOfStudy}
+                onChange={handleEditChange}
+                placeholder="e.g. 1st, 2nd, 3rd, 4th"
                 maxLength={10}
-
-                pattern="[0-9]{10}"
-
               />
 
-
               <ProfileInput
-
-                id="profile-location"
-
-                label="LOCATION"
-
-                name="location"
-
-                value={
-                  editForm.location
-                }
-
-                onChange={
-                  handleEditChange
-                }
-
+                id="profile-github"
+                label="GITHUB URL"
+                name="github"
+                value={editForm.github}
+                onChange={handleEditChange}
+                placeholder="https://github.com/..."
                 maxLength={200}
-
               />
 
-
               <ProfileInput
-
-                id="profile-college-id"
-
-                label="COLLEGE ID"
-
-                name="college_id"
-
-                type="number"
-
-                min="1"
-
-                value={
-                  editForm.college_id
-                }
-
-                onChange={
-                  handleEditChange
-                }
-
-                required
-
+                id="profile-linkedin"
+                label="LINKEDIN URL"
+                name="linkedin"
+                value={editForm.linkedin}
+                onChange={handleEditChange}
+                placeholder="https://linkedin.com/in/..."
+                maxLength={200}
               />
 
 
@@ -3010,8 +2737,7 @@ export function ProfilePage() {
       >
 
         <StatBlock
-
-          label="JUGAADS POSTED"
+          label="GIGS POSTED"
 
           value={
             stats.jugaadsPosted
@@ -4711,68 +4437,7 @@ export function ProfilePage() {
             <EmptyState
               text="No certifications added yet."
             />
-
           )}
-
-
-          {isDemoMode &&
-
-            mockAchievements
-              .filter(
-                (achievement) =>
-                  achievement.unlocked
-              )
-              .map(
-                (achievement) => (
-
-                  <div
-
-                    key={
-                      achievement.id
-                    }
-
-                    className="surface-metal rounded-xl p-3 flex items-center gap-3 mt-2"
-
-                  >
-
-                    <span>
-
-                      {
-                        achievement.emoji
-                      }
-
-                    </span>
-
-
-                    <div>
-
-                      <p
-                        className="font-technical text-[9px]"
-                      >
-
-                        {
-                          achievement.title
-                        }
-
-                      </p>
-
-
-                      <p
-                        className="font-mono text-[8px] text-ink-3"
-                      >
-
-                        {
-                          achievement.desc
-                        }
-
-                      </p>
-
-                    </div>
-
-                  </div>
-
-                )
-              )}
 
         </section>
 
@@ -4822,115 +4487,31 @@ export function ProfilePage() {
             <p
               className="font-display text-xl text-amber mt-1"
             >
-
-              ₹
-
-              {isDemoMode
-
-                ? mockEarnings.totalEarned.toLocaleString()
-
-                : '0'}
-
+              ₹{stats.totalEarnings || 0}
             </p>
-
           </div>
-
 
           <div
             className="surface-panel rounded-xl p-3"
           >
-
             <p
               className="font-technical text-[7px] text-ink-3"
             >
-
               THIS MONTH
-
             </p>
-
 
             <p
               className="font-display text-xl text-mint mt-1"
             >
-
-              ₹
-
-              {isDemoMode
-
-                ? mockEarnings.thisMonth.toLocaleString()
-
-                : '0'}
-
+              ₹0
             </p>
-
           </div>
-
         </div>
-
-
-        {isDemoMode &&
-
-          mockEarnings.recent.map(
-            (earning) => (
-
-              <div
-
-                key={
-                  earning.id
-                }
-
-                className="flex items-center gap-2.5 surface-panel rounded-lg px-3 py-2 mt-2"
-
-              >
-
-                <span>
-
-                  {
-                    earning.emoji
-                  }
-
-                </span>
-
-
-                <span
-                  className="font-mono text-[10px] text-ink-1 flex-1"
-                >
-
-                  {
-                    earning.text
-                  }
-
-                </span>
-
-
-                <span
-                  className="font-mono text-[10px] text-mint"
-                >
-
-                  +₹
-                  {
-                    earning.amount
-                  }
-
-                </span>
-
-              </div>
-
-            )
-          )}
-
-
-        {!isDemoMode && (
-
-          <p
-            className="font-mono text-[8px] text-paper/60 mt-3"
-          >
-
-            No earnings recorded yet.
-
-          </p>
-
-        )}
+        <p
+          className="font-mono text-[8px] text-paper/60 mt-3"
+        >
+          No earnings recorded yet.
+        </p>
 
       </section>
 

@@ -5,7 +5,7 @@ import { api } from '@/services/api';
 import { TactileButton } from '@/components/primitives/TactileButton';
 import { LED, Rivet } from '@/components/primitives/Details';
 import {
-  ArrowRight, User, Mail, Lock, Phone, MapPin, Building2,
+  ArrowRight, User, Mail, Lock, Building2, GraduationCap, BookOpen,
   AlertTriangle, CheckCircle2, Loader2,
 } from 'lucide-react';
 
@@ -14,10 +14,9 @@ export function SignupPage() {
   const navigate = useNavigate();
 
   const [colleges, setColleges] = useState([]);
-  const [collegesLoading, setCollegesLoading] = useState(true);
 
   const [form, setForm] = useState({
-    name: '', email: '', password: '', number: '', location: '', college_id: '',
+    name: '', email: '', password: '', college: '', branch: '', yearOfStudy: '',
   });
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
@@ -28,12 +27,11 @@ export function SignupPage() {
     api
       .getColleges()
       .then((data) => {
-        const list = data.colleges || data.data || data || [];
+        const list = data?.colleges || data?.data || data || [];
         setColleges(Array.isArray(list) ? list : []);
-        setCollegesLoading(false);
       })
       .catch(() => {
-        setCollegesLoading(false);
+        setColleges([]);
       });
   }, []);
 
@@ -47,8 +45,7 @@ export function SignupPage() {
     if (form.name.trim().length < 2) e.name = 'Name must be at least 2 characters.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Enter a valid email address.';
     if (form.password.length < 6) e.password = 'Password must be at least 6 characters.';
-    if (!/^\d{10}$/.test(form.number.replace(/\s/g, ''))) e.number = 'Phone number must be exactly 10 digits.';
-    if (!form.college_id) e.college_id = 'Select your college.';
+    if (!form.college.trim()) e.college = 'Enter your college name.';
     return e;
   };
 
@@ -67,9 +64,9 @@ export function SignupPage() {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
-        number: form.number.replace(/\s/g, ''),
-        location: form.location.trim() || undefined,
-        college_id: form.college_id,
+        college: form.college.trim(),
+        branch: form.branch.trim() || undefined,
+        yearOfStudy: form.yearOfStudy || undefined,
       });
       setPhase('success');
       await new Promise((r) => setTimeout(r, 900));
@@ -101,7 +98,18 @@ export function SignupPage() {
     <div className="relative min-h-screen overflow-hidden grain preserve-3d flex items-stretch">
       {/* ===== Background ===== */}
       <div className="absolute inset-0 tech-diagram pointer-events-none" />
-      <div className="bg-lettering">JOIN</div>
+
+      {/* Large background logo watermark with reduced transparency */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden select-none z-0">
+        <img
+          src="/logo.svg"
+          alt=""
+          aria-hidden="true"
+          className="w-[520px] sm:w-[750px] lg:w-[1000px] max-w-none object-contain logo-watermark"
+        />
+      </div>
+
+      <div className="bg-lettering opacity-[0.02]">JOIN</div>
       <div className="absolute inset-0 haze pointer-events-none" />
       <div className="absolute inset-0 depth-fog pointer-events-none" />
 
@@ -111,7 +119,7 @@ export function SignupPage() {
       />
       <div
         className="absolute bottom-[5%] left-[10%] w-[500px] h-[400px] rounded-full anim-breathe pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(214,138,60,0.08), transparent 60%)', filter: 'blur(60px)', animationDelay: '1s' }}
+        style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.14), transparent 60%)', filter: 'blur(60px)', animationDelay: '1s' }}
       />
 
       {/* ===== LEFT — editorial ===== */}
@@ -134,7 +142,7 @@ export function SignupPage() {
           </h1>
 
           <p className="mt-6 max-w-sm text-sm text-ink-2 leading-relaxed anim-reveal" style={{ animationDelay: '0.3s' }}>
-            Your skills can solve someone else's problem. Register and start your Jugaad.
+            Your skills can solve someone else's problem. Register and join Campusvault.
           </p>
 
           <div className="mt-12 anim-reveal" style={{ animationDelay: '0.45s' }}>
@@ -202,65 +210,68 @@ export function SignupPage() {
                 error={errors.password}
               />
               <TerminalField
-                label="PHONE NUMBER" type="tel" value={form.number}
-                onChange={(v) => update('number', v)}
-                onFocus={() => setFocused('number')} onBlur={() => setFocused(null)}
-                active={focused === 'number'} icon={<Phone size={14} />}
-                placeholder="10-digit mobile" disabled={busy}
-                error={errors.number}
+                label="COLLEGE" type="text" value={form.college}
+                onChange={(v) => update('college', v)}
+                onFocus={() => setFocused('college')} onBlur={() => setFocused(null)}
+                active={focused === 'college'} icon={<Building2 size={14} />}
+                placeholder="Your college name" disabled={busy}
+                error={errors.college}
+                list="college-suggestions"
               />
+              {colleges.length > 0 && (
+                <datalist id="college-suggestions">
+                  {colleges.map((c, i) => (
+                    <option key={i} value={typeof c === 'string' ? c : (c.name || c.college_name || c.label || c)} />
+                  ))}
+                </datalist>
+              )}
               <TerminalField
-                label="LOCATION (OPTIONAL)" type="text" value={form.location}
-                onChange={(v) => update('location', v)}
-                onFocus={() => setFocused('location')} onBlur={() => setFocused(null)}
-                active={focused === 'location'} icon={<MapPin size={14} />}
-                placeholder="City, State" disabled={busy}
-                error={errors.location}
+                label="BRANCH (OPTIONAL)" type="text" value={form.branch}
+                onChange={(v) => update('branch', v)}
+                onFocus={() => setFocused('branch')} onBlur={() => setFocused(null)}
+                active={focused === 'branch'} icon={<BookOpen size={14} />}
+                placeholder="e.g. Computer Science" disabled={busy}
               />
 
-              {/* College selector */}
+              {/* Year of Study selector */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <LED color={focused === 'college' ? 'mint' : 'off'} pulse={focused === 'college'} size={5} />
+                  <LED color={focused === 'year' ? 'mint' : 'off'} pulse={focused === 'year'} size={5} />
                   <span
                     className="font-technical text-[8px] transition-colors duration-300"
-                    style={{ color: focused === 'college' ? 'var(--mint-soft)' : 'var(--text-3)' }}
+                    style={{ color: focused === 'year' ? 'var(--mint-soft)' : 'var(--text-3)' }}
                   >
-                    COLLEGE {focused === 'college' && '· ACTIVE'}
+                    YEAR OF STUDY (OPTIONAL) {focused === 'year' && '· ACTIVE'}
                   </span>
                 </div>
                 <div
                   className="relative flex items-center rounded-lg transition-all duration-300"
                   style={{
                     background: 'var(--bg-1)',
-                    border: `1px solid ${focused === 'college' ? 'rgba(93,184,154,0.4)' : 'rgba(82,74,66,0.5)'}`,
-                    boxShadow: focused === 'college' ? 'inset 0 0 12px rgba(93,184,154,0.06)' : 'inset 0 1px 4px rgba(0,0,0,0.3)',
+                    border: `1px solid ${focused === 'year' ? 'rgba(93,184,154,0.4)' : 'rgba(82,74,66,0.5)'}`,
+                    boxShadow: focused === 'year' ? 'inset 0 0 12px rgba(93,184,154,0.06)' : 'inset 0 1px 4px rgba(0,0,0,0.3)',
                   }}
                 >
-                  <span className="pl-3 text-ink-2" style={{ color: focused === 'college' ? 'var(--mint)' : undefined }}>
-                    <Building2 size={14} />
+                  <span className="pl-3 text-ink-2" style={{ color: focused === 'year' ? 'var(--mint)' : undefined }}>
+                    <GraduationCap size={14} />
                   </span>
                   <select
-                    value={form.college_id}
-                    onChange={(e) => update('college_id', e.target.value)}
-                    onFocus={() => setFocused('college')}
+                    value={form.yearOfStudy}
+                    onChange={(e) => update('yearOfStudy', e.target.value)}
+                    onFocus={() => setFocused('year')}
                     onBlur={() => setFocused(null)}
                     disabled={busy}
                     className="w-full bg-transparent px-3 py-3 text-sm text-ink-0 font-mono outline-none appearance-none cursor-pointer"
-                    style={{ color: form.college_id ? 'var(--text-0)' : 'var(--text-3)' }}
+                    style={{ color: form.yearOfStudy ? 'var(--text-0)' : 'var(--text-3)' }}
                   >
-                    <option value="" className="bg-bg-2 text-ink-3">Select your college</option>
-                    {collegesLoading && <option value="" disabled className="bg-bg-2 text-ink-3">Loading colleges...</option>}
-                    {colleges.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-bg-2 text-ink-0">
-                        {c.name || c.college_name || c.label}
-                      </option>
-                    ))}
+                    <option value="" className="bg-bg-2 text-ink-3">Select year</option>
+                    <option value="1st" className="bg-bg-2 text-ink-0">1st Year</option>
+                    <option value="2nd" className="bg-bg-2 text-ink-0">2nd Year</option>
+                    <option value="3rd" className="bg-bg-2 text-ink-0">3rd Year</option>
+                    <option value="4th" className="bg-bg-2 text-ink-0">4th Year</option>
+                    <option value="5th+" className="bg-bg-2 text-ink-0">5th+ Year</option>
                   </select>
                 </div>
-                {errors.college_id && (
-                  <p className="mt-1.5 font-mono text-[9px] text-coral-soft">{errors.college_id}</p>
-                )}
               </div>
 
               {/* Submit error */}
@@ -281,8 +292,8 @@ export function SignupPage() {
                 <span className="ctrl-led" />
                 <span className="flex items-center gap-2">
                   {phase === 'registering' ? (<><Loader2 size={14} className="animate-spin" /> REGISTERING...</>) :
-                   phase === 'success' ? (<><CheckCircle2 size={14} /> JUGAAD PROFILE CREATED</>) :
-                   (<><ArrowRight size={14} /> START YOUR JUGAAD</>)}
+                   phase === 'success' ? (<><CheckCircle2 size={14} /> OPERATOR PROFILE CREATED</>) :
+                   (<><ArrowRight size={14} /> ENTER CAMPUSVAULT</>)}
                 </span>
               </button>
             </form>
@@ -312,7 +323,7 @@ export function SignupPage() {
   );
 }
 
-function TerminalField({ label, type, value, onChange, onFocus, onBlur, active, icon, placeholder, disabled, error }) {
+function TerminalField({ label, type, value, onChange, onFocus, onBlur, active, icon, placeholder, disabled, error, list }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
@@ -328,7 +339,7 @@ function TerminalField({ label, type, value, onChange, onFocus, onBlur, active, 
         className="relative flex items-center rounded-lg transition-all duration-300"
         style={{
           background: 'var(--bg-1)',
-          border: `1px solid ${active ? 'rgba(93,184,154,0.4)' : error ? 'rgba(199,93,93,0.35)' : 'rgba(82,74,66,0.5)'}`,
+          border: `1px solid ${active ? 'rgba(93,184,154,0.4)' : error ? 'rgba(251,113,133,0.45)' : 'rgba(82,74,66,0.5)'}`,
           boxShadow: active ? 'inset 0 0 12px rgba(93,184,154,0.06)' : 'inset 0 1px 4px rgba(0,0,0,0.3)',
         }}
       >
@@ -344,6 +355,7 @@ function TerminalField({ label, type, value, onChange, onFocus, onBlur, active, 
           placeholder={placeholder}
           disabled={disabled}
           className="w-full bg-transparent px-3 py-3 text-sm text-ink-0 placeholder:text-ink-2/80 font-mono outline-none"
+          list={list}
         />
       </div>
       {error && <p className="mt-1.5 font-mono text-[9px] text-coral-soft">{error}</p>}

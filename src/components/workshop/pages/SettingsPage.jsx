@@ -16,14 +16,75 @@ import { api } from '@/services/api';
 
 import { LED } from '@/components/primitives/Details';
 
-import {
-  mockSettings,
-  PREFERRED_CATEGORIES,
-  BUDGET_RANGES,
-  WORK_TYPES,
-  NOTIF_FREQUENCIES,
-  PROFILE_VISIBILITY_OPTIONS,
-} from '@/data/jugaadMockData';
+const mockSettings = {
+  notifications: {
+    jugaadRecommendations: true,
+    newInterestRequests: true,
+    requestAccepted: true,
+    requestRejected: true,
+    bargainOffers: true,
+    counterOffers: true,
+    messages: true,
+    jugaadUpdates: true,
+    completionNotifications: true,
+    emailNotifications: false,
+    inAppNotifications: true,
+  },
+  privacy: {
+    profileVisibility: 'campus-only',
+    showEmail: false,
+    showPhone: false,
+    showSocialLinks: true,
+    showSkills: true,
+    showCompletedJugaads: true,
+    allowInterestRequests: true,
+    allowMessagesAfterAcceptance: true,
+  },
+  appearance: {
+    theme: 'dark',
+    reduceMotion: false,
+  },
+  preferences: {
+    preferredCategories: ['CODE', 'DESIGN', 'ACADEMICS'],
+    preferredSkills: ['React', 'Python', 'UI Design'],
+    preferredWorkType: 'remote',
+    preferredBudgetRange: '500-1000',
+    notificationFrequency: 'instant',
+  },
+  accessibility: {
+    largerText: false,
+    highContrast: false,
+    keyboardNavigation: true,
+  },
+};
+
+const PREFERRED_CATEGORIES = [
+  'CODE', 'DESIGN', 'ACADEMICS', 'PRESENTATION', 'VIDEO', 'OTHER',
+];
+
+const BUDGET_RANGES = [
+  { value: 'under-500', label: 'Under ₹500' },
+  { value: '500-1000', label: '₹500 – ₹1000' },
+  { value: '1000+', label: '₹1000+' },
+];
+
+const WORK_TYPES = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'on-campus', label: 'On Campus' },
+  { value: 'either', label: 'Either' },
+];
+
+const NOTIF_FREQUENCIES = [
+  { value: 'instant', label: 'Instant' },
+  { value: 'daily', label: 'Daily Digest' },
+  { value: 'weekly', label: 'Weekly Digest' },
+];
+
+const PROFILE_VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Public' },
+  { value: 'campus-only', label: 'Campus Only' },
+  { value: 'private', label: 'Private' },
+];
 
 import {
   User,
@@ -52,10 +113,10 @@ import {
 // ================================================================
 
 const SETTINGS_KEY =
-  'campusjugaad_settings';
+  'campvault_settings';
 
 const THEME_KEY =
-  'campusjugaad_theme';
+  'campvault_theme';
 
 
 // ================================================================
@@ -841,7 +902,7 @@ export function SettingsPage() {
 
         <p className="mt-3 text-sm text-ink-2 max-w-lg">
 
-          Manage your CampusVault account,
+          Manage your Campusvault account,
           security, preferences, privacy,
           and accessibility.
 
@@ -897,7 +958,7 @@ export function SettingsPage() {
                     style={{
                       background:
                         isActive
-                          ? 'rgba(214,138,60,0.08)'
+                          ? 'rgba(34,197,94,0.14)'
                           : 'transparent',
                     }}
 
@@ -2202,14 +2263,14 @@ function ActionRow({
 
       <div className="flex-1">
 
-        <p className="font-mono text-[11px] text-ink-1">
+        <p className="font-display text-sm sm:text-base font-semibold text-ink-0">
 
           {label}
 
         </p>
 
 
-        <p className="font-mono text-[9px] text-ink-3 mt-0.5">
+        <p className="font-sans text-xs sm:text-sm text-ink-2 mt-0.5 leading-relaxed">
 
           {desc}
 
@@ -2250,7 +2311,7 @@ function NotificationsPanel({
     [
       'interestRequestNotifications',
       'Interest Request Notifications',
-      'When someone is interested in your Jugaad',
+      'When someone applies for your gig',
     ],
 
     [
@@ -2285,8 +2346,8 @@ function NotificationsPanel({
 
     [
       'jugaadTaskNotifications',
-      'Jugaad / Task Notifications',
-      'Status changes on your Jugaads and tasks',
+      'Gig & Task Notifications',
+      'Status changes on your gigs and tasks',
     ],
 
   ];
@@ -2377,7 +2438,7 @@ function NotificationsPanel({
                 )
               }
               label="In-App Notifications"
-              desc="Show notifications inside CampusVault"
+              desc="Show notifications inside Campusvault"
             />
 
           </div>
@@ -2607,9 +2668,9 @@ function PrivacyPanel({
             )
           }
 
-          label="Show Completed Jugaads"
+          label="Show Completed Gigs"
 
-          desc="Display your completed Jugaads"
+          desc="Display your completed gigs"
 
         />
 
@@ -2633,7 +2694,7 @@ function PrivacyPanel({
 
           label="Allow Interest Requests"
 
-          desc="Let students send interest requests on your Jugaads"
+          desc="Let students send applications for your gigs"
 
         />
 
@@ -2810,7 +2871,7 @@ function AppearancePanel({
 
         title="Appearance"
 
-        desc="Customize how CampusVault looks and feels."
+        desc="Customize how Campusvault looks and feels."
 
       />
 
@@ -3377,7 +3438,7 @@ function DataPanel({
 
           label="Download My Data"
 
-          desc="Export a copy of your CampusVault data"
+          desc="Export a copy of your Campusvault data"
 
           onClick={() => {
 
@@ -3413,7 +3474,7 @@ function DataPanel({
               url;
 
             anchor.download =
-              'campusjugaad-data.json';
+              'campusvault-data.json';
 
             anchor.click();
 
@@ -3505,7 +3566,7 @@ function DataPanel({
               url;
 
             anchor.download =
-              'campusjugaad-profile.json';
+              'campusvault-profile.json';
 
             anchor.click();
 
@@ -3806,16 +3867,16 @@ function DataAction({
       </span>
 
 
-      <div>
+      <div className="flex-1">
 
-        <p className="font-mono text-[11px] text-ink-1">
+        <p className="font-display text-sm sm:text-base font-semibold text-ink-0">
 
           {label}
 
         </p>
 
 
-        <p className="font-mono text-[9px] text-ink-3 mt-0.5">
+        <p className="font-sans text-xs sm:text-sm text-ink-2 mt-0.5 leading-relaxed">
 
           {desc}
 

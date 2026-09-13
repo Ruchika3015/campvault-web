@@ -3,11 +3,27 @@ import { Link } from 'react-router-dom';
 
 import { LED } from '@/components/primitives/Details';
 
-import {
-  mockMyPostedJugaads,
-  JUGAAD_STATUS,
-  timeAgo,
-} from '@/data/jugaadMockData';
+const GIG_STATUS = {
+  'open': { color: 'coral', label: 'OPEN' },
+  'receiving-requests': { color: 'amber', label: 'RECEIVING PROPOSALS' },
+  'assigned': { color: 'mint', label: 'ASSIGNED' },
+  'in-progress': { color: 'amber', label: 'IN PROGRESS' },
+  'in_progress': { color: 'amber', label: 'IN PROGRESS' },
+  'work_submitted': { color: 'mint', label: 'WORK SUBMITTED' },
+  'completed': { color: 'mint', label: 'COMPLETED' },
+  'cancelled': { color: 'coral', label: 'CANCELLED' },
+};
+
+const JUGAAD_STATUS = GIG_STATUS;
+
+function timeAgo(date) {
+  if (!date) return '';
+  const diff = Math.floor((new Date() - new Date(date)) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -74,8 +90,11 @@ function getValidConversationId(source) {
     source?.conversationId ??
     source?.conversation_id ??
     source?.conversation?.id ??
+    source?.conversation?._id ??
     source?.conversation?.conversationId ??
     source?.conversation?.conversation_id ??
+    source?._id ??
+    source?.id ??
     null;
 
   if (
@@ -86,8 +105,7 @@ function getValidConversationId(source) {
   }
 
   const value = String(rawId).trim();
-
-  if (!/^\d+$/.test(value)) {
+  if (!value || value === 'null' || value === 'undefined') {
     return null;
   }
 
@@ -97,9 +115,13 @@ function getValidConversationId(source) {
 
 function getProposalJugaadId(proposal) {
   return (
+    proposal?.gig?._id ??
+    (typeof proposal?.gig === 'string' ? proposal?.gig : null) ??
+    proposal?.gig?.id ??
     proposal?.jugaadId ??
     proposal?.jugaad_id ??
     proposal?.jugaad?.id ??
+    proposal?.jugaad?._id ??
     proposal?.jugaad?.jugaadId ??
     null
   );
@@ -139,6 +161,7 @@ function normalizeProposal(proposal) {
   }
 
   const helper =
+    proposal?.applicant ||
     proposal?.helper ||
     proposal?.student ||
     proposal?.user ||
@@ -159,6 +182,7 @@ function normalizeProposal(proposal) {
     'pending';
 
   const amount =
+    proposal?.expectedBudget ??
     proposal?.proposedPrice ??
     proposal?.proposed_price ??
     proposal?.amount ??
@@ -166,34 +190,30 @@ function normalizeProposal(proposal) {
 
   return {
     ...proposal,
+    id: proposal?._id ?? proposal?.id,
+    proposal_message: proposal?.proposal || proposal?.proposal_message || proposal?.explanation || '',
 
     helper: {
       ...helper,
-
       id:
+        helper?._id ??
         helper?.id ??
         proposal?.helperId ??
         proposal?.helper_id ??
         null,
-
       name,
     },
 
     helperId:
+      helper?._id ??
+      helper?.id ??
       proposal?.helperId ??
       proposal?.helper_id ??
-      helper?.id ??
       null,
 
-    helperName:
-      proposal?.helperName ??
-      proposal?.helper_name ??
-      name,
+    helperName: name,
 
-    proposedPrice:
-      proposal?.proposedPrice ??
-      proposal?.proposed_price ??
-      amount,
+    proposedPrice: amount,
 
     status,
 
@@ -233,16 +253,14 @@ export function MyJugaadsPage() {
     jugaadsList,
     setJugaadsList,
   ] = useState(
-    isDemoMode
-      ? mockMyPostedJugaads
-      : []
+    []
   );
 
   const [
     loading,
     setLoading,
   ] = useState(
-    !isDemoMode
+    true
   );
 
   const [
@@ -273,17 +291,6 @@ export function MyJugaadsPage() {
   const fetchMyJugaads =
     useCallback(
       async () => {
-
-        if (isDemoMode) {
-          setJugaadsList(
-            mockMyPostedJugaads
-          );
-
-          setLoading(false);
-
-          return;
-        }
-
 
         if (!isAuthenticated) {
           setJugaadsList([]);
@@ -415,39 +422,39 @@ export function MyJugaadsPage() {
         ? jugaadsList
         : []
     ).map(
-      x => ({
-        ...x,
-
-        amount:
-          x?.budget ??
-          x?.amount ??
-          x?.price ??
-          0,
-
-        budget:
-          x?.budget ??
-          x?.amount ??
-          x?.price ??
-          0,
-
-        postedAt:
-          x?.created_at ??
-          x?.createdAt ??
-          x?.posted_at ??
-          x?.postedAt ??
-          null,
-
-        status:
-          status[x?.id] ??
-          x?.status ??
-          'open',
-
-        interestedStudents:
-          x?.interestedStudents ??
-          x?.interested_students ??
-          x?.requests ??
-          [],
-      })
+      x => {
+        const itemId = x?._id ?? x?.id ?? x?.jugaadId;
+        return {
+          ...x,
+          id: itemId,
+          amount:
+            x?.budget ??
+            x?.amount ??
+            x?.price ??
+            0,
+          budget:
+            x?.budget ??
+            x?.amount ??
+            x?.price ??
+            0,
+          postedAt:
+            x?.created_at ??
+            x?.createdAt ??
+            x?.posted_at ??
+            x?.postedAt ??
+            null,
+          status:
+            status[itemId] ??
+            status[x?.id] ??
+            x?.status ??
+            'open',
+          interestedStudents:
+            x?.interestedStudents ??
+            x?.interested_students ??
+            x?.requests ??
+            [],
+        };
+      }
     );
 
 
@@ -461,8 +468,8 @@ export function MyJugaadsPage() {
       <div>
 
         <Header
-          title="MY JUGAADS"
-          sub="The work you put into the exchange."
+          title="MY GIGS"
+          sub="The requirements you posted on the exchange."
           icon={
             <ClipboardList />
           }
@@ -471,7 +478,7 @@ export function MyJugaadsPage() {
         <div className="surface-metal-brushed rounded-2xl p-12 text-center">
 
           <p className="font-mono text-xs text-ink-3">
-            LOADING YOUR JUGAADS...
+            LOADING YOUR GIGS...
           </p>
 
         </div>
@@ -655,8 +662,8 @@ export function MyJugaadsPage() {
     <div>
 
       <Header
-        title="MY JUGAADS"
-        sub="The work you put into the exchange."
+        title="MY GIGS"
+        sub="The requirements you posted on the exchange."
         icon={
           <ClipboardList />
         }
@@ -666,12 +673,12 @@ export function MyJugaadsPage() {
       <div className="flex items-center justify-between mb-4">
 
         <p className="font-mono text-[9px] text-ink-3">
-          {items.length} posted opportunities
+          {items.length} posted gigs
         </p>
 
 
         <Link
-          to="/dashboard/post-jugaad"
+          to="/dashboard/post-gig"
           className="machine-control machine-control--primary"
           style={{
             padding:
@@ -681,7 +688,7 @@ export function MyJugaadsPage() {
 
           <span className="ctrl-led" />
 
-          POST NEW
+          POST NEW GIG
 
         </Link>
 
@@ -704,17 +711,16 @@ export function MyJugaadsPage() {
           />
 
           <p className="font-display text-xl text-ink-0">
-            NO POSTED JUGAADS
+            NO POSTED GIGS
           </p>
 
           <p className="font-mono text-xs text-ink-2 mt-2 max-w-sm mx-auto">
-            You haven't posted any tasks yet.
-            Drop a task into the exchange to
-            get help from campus students.
+            You haven't posted any requirements yet.
+            Publish a gig on the exchange to get help from campus peers.
           </p>
 
           <Link
-            to="/dashboard/post-jugaad"
+            to="/dashboard/post-gig"
             className="machine-control machine-control--primary inline-flex mt-6"
             style={{
               padding:
@@ -724,7 +730,7 @@ export function MyJugaadsPage() {
 
             <span className="ctrl-led" />
 
-            POST YOUR FIRST JUGAAD
+            POST YOUR FIRST GIG
 
           </Link>
 
@@ -754,10 +760,10 @@ export function MyJugaadsPage() {
 
 
               const statusConfig =
-                JUGAAD_STATUS[
+                GIG_STATUS[
                   item.status
                 ] ||
-                JUGAAD_STATUS.open;
+                GIG_STATUS.open;
 
 
               /*
@@ -802,11 +808,11 @@ export function MyJugaadsPage() {
 
                     <div>
 
-                      <p className="font-display text-lg">
+                      <p className="font-display text-lg sm:text-xl font-bold">
                         {item.title}
                       </p>
 
-                      <p className="font-mono text-[9px] text-ink-3 mt-1">
+                      <p className="font-mono text-xs sm:text-sm text-ink-2 mt-1">
                         {item.id} ·{' '}
                         {
                           item.skillRequired ||
@@ -818,7 +824,7 @@ export function MyJugaadsPage() {
 
 
                     <span
-                      className="font-technical text-[7px] px-2 py-1 rounded"
+                      className="font-technical text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded"
                       style={{
                         color:
                           `var(--${statusConfig.color})`,
@@ -835,14 +841,14 @@ export function MyJugaadsPage() {
                   </div>
 
 
-                  <p className="font-mono text-[10px] text-ink-2 mt-4 line-clamp-2">
+                  <p className="font-sans text-xs sm:text-sm text-ink-1 mt-3 leading-relaxed line-clamp-2">
                     {item.description}
                   </p>
 
 
                   <div className="flex items-center gap-3 mt-4">
 
-                    <span className="font-display text-lg text-amber">
+                    <span className="font-display text-xl sm:text-2xl font-bold text-amber">
                       ₹
                       {Number(
                         item.amount
@@ -852,7 +858,7 @@ export function MyJugaadsPage() {
                     </span>
 
 
-                    <span className="font-mono text-[9px] text-ink-3">
+                    <span className="font-mono text-xs sm:text-sm text-ink-2">
                       {requestCount}{' '}
                       requests
                     </span>
@@ -861,7 +867,7 @@ export function MyJugaadsPage() {
                     {itemProposals.length >
                       0 && (
 
-                      <span className="font-technical text-[7px] text-amber px-1.5 py-0.5 rounded bg-amber/10">
+                      <span className="font-technical text-xs text-amber px-2 py-0.5 rounded bg-amber/10">
                         {
                           itemProposals.length
                         }{' '}
@@ -1283,10 +1289,10 @@ function Detail({
 
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 font-technical text-[8px] text-ink-3 hover:text-ink-0 mb-5"
+          className="flex items-center gap-2 font-technical text-xs sm:text-sm text-ink-2 hover:text-amber mb-5 transition-colors"
         >
-          <ArrowLeft size={12} />
-          BACK TO MY JUGAADS
+          <ArrowLeft size={16} />
+          BACK TO MY GIGS
         </button>
 
 
@@ -1298,21 +1304,21 @@ function Detail({
 
               <LED
                 color={
-                  JUGAAD_STATUS[
+                  GIG_STATUS[
                     item?.status
                   ]?.color || 'amber'
                 }
                 pulse
-                size={5}
+                size={7}
               />
 
 
               <span
-                className="font-technical text-[8px]"
+                className="font-technical text-xs font-semibold px-2 py-0.5 rounded"
                 style={{
                   color:
                     `var(--${
-                      JUGAAD_STATUS[
+                      GIG_STATUS[
                         item?.status
                       ]?.color ||
                       'amber'
@@ -1320,7 +1326,7 @@ function Detail({
                 }}
               >
                 {
-                  JUGAAD_STATUS[
+                  GIG_STATUS[
                     item?.status
                   ]?.label ||
                     item?.status
@@ -1335,7 +1341,7 @@ function Detail({
             </h1>
 
 
-            <p className="font-mono text-[9px] text-ink-3 mt-2">
+            <p className="font-mono text-xs sm:text-sm text-ink-2 mt-2">
 
               {item?.id} ·{' '}
 
@@ -1359,11 +1365,11 @@ function Detail({
 
           <div className="surface-panel rounded-xl px-5 py-3">
 
-            <p className="font-technical text-[7px] text-ink-3">
+            <p className="font-technical text-xs font-bold tracking-wider text-ink-3">
               BUDGET
             </p>
 
-            <p className="font-display text-2xl text-amber">
+            <p className="font-display text-2xl sm:text-3xl font-bold text-amber">
               ₹
               {Number(
                 item?.budget ??
@@ -1389,19 +1395,19 @@ function Detail({
 
         <div className="surface-panel rounded-2xl p-5">
 
-          <p className="font-technical text-[9px] mb-3">
-            JUGAAD DETAILS
+          <p className="font-technical text-xs sm:text-sm font-bold tracking-wider mb-3">
+            GIG DETAILS
           </p>
 
 
-          <p className="font-mono text-xs text-ink-2 leading-relaxed">
+          <p className="font-sans text-sm sm:text-base text-ink-1 leading-relaxed">
             {item?.description}
           </p>
 
 
           <div className="mt-5 pt-4 border-t border-metal-1/40">
 
-            <p className="font-technical text-[8px] text-ink-3">
+            <p className="font-technical text-xs font-bold tracking-wider text-ink-3">
               ASSIGNMENT STATUS
             </p>
 
@@ -1429,15 +1435,15 @@ function Detail({
                       )
                     }
 
-                    className={`px-2.5 py-2 rounded-md font-technical text-[7px] ${
+                    className={`px-3 py-2 rounded-md font-technical text-xs font-semibold transition-colors ${
                       item?.status ===
                       currentStatus
                         ? 'bg-amber text-bg-0'
-                        : 'bg-bg-2 text-ink-3 border border-metal-1'
+                        : 'bg-bg-2 text-ink-3 border border-metal-1 hover:text-ink-0'
                     }`}
                   >
                     {
-                      JUGAAD_STATUS[
+                      GIG_STATUS[
                         currentStatus
                       ]?.label ||
                         currentStatus
@@ -1471,12 +1477,12 @@ function Detail({
 
               <div className="flex items-center justify-between mb-4">
 
-                <p className="font-technical text-[9px] text-amber">
+                <p className="font-technical text-xs sm:text-sm font-bold text-amber">
                   PROPOSALS RECEIVED
                 </p>
 
 
-                <span className="font-mono text-[8px] text-ink-3">
+                <span className="font-mono text-xs text-ink-2">
                   {
                     enrichedProposals.length
                   }{' '}
@@ -1538,12 +1544,12 @@ function Detail({
 
             <div className="flex items-center justify-between mb-4">
 
-              <p className="font-technical text-[9px]">
+              <p className="font-technical text-xs sm:text-sm font-bold text-ink-1">
                 INTERESTED STUDENTS
               </p>
 
 
-              <span className="font-mono text-[8px] text-ink-3">
+              <span className="font-mono text-xs text-ink-2">
                 {
                   realInterestedStudents.length
                 }{' '}
@@ -1558,7 +1564,7 @@ function Detail({
               {realInterestedStudents.length ===
               0 ? (
 
-                <p className="font-mono text-[9px] text-ink-3 py-2">
+                <p className="font-mono text-xs sm:text-sm text-ink-3 py-2">
                   No direct student requests yet.
                 </p>
 
@@ -1708,7 +1714,7 @@ function ProposalDetailCard({
 
       <div className="flex items-start gap-3">
 
-        <span className="grid place-items-center w-9 h-9 rounded-full bg-amber text-bg-0 font-display text-[9px] shrink-0">
+        <span className="grid place-items-center w-10 h-10 rounded-full bg-amber text-bg-0 font-display text-xs font-bold shrink-0">
 
           {
             normalized?.helper
@@ -1725,13 +1731,13 @@ function ProposalDetailCard({
 
           <div className="flex flex-wrap items-center gap-2">
 
-            <p className="font-display text-sm">
+            <p className="font-display text-base font-bold">
               {helperName}
             </p>
 
 
             <span
-              className="font-technical text-[7px] px-1.5 py-0.5 rounded"
+              className="font-technical text-xs px-2 py-0.5 rounded"
               style={{
                 color:
                   `var(--${cfg.color})`,
@@ -1752,9 +1758,9 @@ function ProposalDetailCard({
             normalized.skills.length >
               0 && (
 
-              <p className="font-mono text-[8px] text-ink-3 mt-1 flex items-center gap-1">
+              <p className="font-mono text-xs text-ink-2 mt-1 flex items-center gap-1.5">
 
-                <Tag size={10} />
+                <Tag size={12} />
 
                 {
                   normalized.skills.join(
@@ -1772,7 +1778,7 @@ function ProposalDetailCard({
             normalized?.proposalMessage
           ) && (
 
-            <p className="font-mono text-[10px] text-ink-2 mt-2 leading-relaxed">
+            <p className="font-sans text-xs sm:text-sm text-ink-1 mt-2 leading-relaxed italic">
 
               "
               {
@@ -1787,9 +1793,9 @@ function ProposalDetailCard({
           )}
 
 
-          <div className="flex flex-wrap items-center gap-3 mt-2 text-[9px] font-mono text-ink-3">
+          <div className="flex flex-wrap items-center gap-3 mt-3 text-xs font-mono text-ink-2">
 
-            <span className="font-display text-base text-amber">
+            <span className="font-display text-lg font-bold text-amber">
 
               ₹
               {
@@ -1810,7 +1816,7 @@ function ProposalDetailCard({
 
               <span className="flex items-center gap-1">
 
-                <Clock size={11} />
+                <Clock size={13} />
 
                 {
                   normalized?.completionTime ||
@@ -1840,10 +1846,10 @@ function ProposalDetailCard({
 
             <Link
               to={`/dashboard/messages/${conversationId}`}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px] hover:bg-mint/25 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors"
             >
               <MessageSquare
-                size={12}
+                size={14}
               />
 
               MESSAGE
@@ -1852,9 +1858,9 @@ function ProposalDetailCard({
 
           ) : (
 
-            <span className="flex items-center gap-1 px-3 py-2 rounded-lg bg-bg-2 text-ink-3 font-technical text-[8px]">
+            <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-bg-2 text-ink-3 font-technical text-xs">
               <MessageSquare
-                size={12}
+                size={14}
               />
               CONVERSATION UNAVAILABLE
             </span>
@@ -1874,16 +1880,16 @@ function ProposalDetailCard({
         !isRejected &&
         !isWithdrawn && (
 
-        <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-metal-1/40">
 
           <button
             type="button"
             onClick={
               onAccept
             }
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px]"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors"
           >
-            <Check size={12} />
+            <Check size={14} />
             ACCEPT
           </button>
 
@@ -1893,9 +1899,9 @@ function ProposalDetailCard({
             onClick={
               onReject
             }
-            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px]"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-coral/10 text-coral font-technical text-xs font-semibold hover:bg-coral/20 transition-colors"
           >
-            <X size={12} />
+            <X size={14} />
             REJECT
           </button>
 
@@ -1905,10 +1911,10 @@ function ProposalDetailCard({
             onClick={
               onCounter
             }
-            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-amber/30 text-amber font-technical text-[8px]"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-amber/30 text-amber font-technical text-xs font-semibold hover:bg-amber/10 transition-colors"
           >
             <HandCoins
-              size={12}
+              size={14}
             />
             COUNTER
           </button>
@@ -1963,7 +1969,7 @@ function StudentRequest({
 
       <div className="flex items-start gap-3">
 
-        <span className="grid place-items-center w-9 h-9 rounded-full bg-amber text-bg-0 font-display text-[9px] shrink-0">
+        <span className="grid place-items-center w-10 h-10 rounded-full bg-amber text-bg-0 font-display text-xs font-bold shrink-0">
 
           {
             student?.initials ||
@@ -1977,14 +1983,14 @@ function StudentRequest({
 
           <div className="flex items-center gap-2">
 
-            <p className="font-display text-sm">
+            <p className="font-display text-base font-bold">
               {name}
             </p>
 
 
             {isBargain && (
 
-              <span className="font-technical text-[7px] text-amber px-1.5 py-0.5 rounded bg-amber/10">
+              <span className="font-technical text-xs text-amber px-2 py-0.5 rounded bg-amber/10">
                 BARGAIN
               </span>
 
@@ -1993,7 +1999,7 @@ function StudentRequest({
           </div>
 
 
-          <p className="font-mono text-[8px] text-ink-3 mt-1">
+          <p className="font-mono text-xs text-ink-2 mt-1">
 
             {
               skills.length >
@@ -2016,7 +2022,7 @@ function StudentRequest({
 
           {student?.message && (
 
-            <p className="font-mono text-[10px] text-ink-2 mt-2">
+            <p className="font-sans text-xs sm:text-sm text-ink-1 mt-2 italic leading-relaxed">
               "{student.message}"
             </p>
 
@@ -2025,7 +2031,7 @@ function StudentRequest({
         </div>
 
 
-        <span className="font-technical text-[7px] text-amber">
+        <span className="font-technical text-xs font-semibold text-amber">
 
           {isBargain
             ? `OFFER ₹${proposedAmount}`
@@ -2041,22 +2047,22 @@ function StudentRequest({
           BECAUSE IT HAS NO PROPOSAL.
       ======================================================== */}
 
-      <div className="flex gap-2 mt-3 pt-3 border-t border-metal-1/40">
+      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-metal-1/40">
 
         <button
           type="button"
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-[8px]"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors"
         >
-          <Check size={12} />
+          <Check size={14} />
           ACCEPT
         </button>
 
 
         <button
           type="button"
-          className="flex items-center gap-1 px-3 py-2 rounded-lg bg-coral/10 text-coral font-technical text-[8px]"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-coral/10 text-coral font-technical text-xs font-semibold hover:bg-coral/20 transition-colors"
         >
-          <X size={12} />
+          <X size={14} />
           REJECT
         </button>
 
@@ -2067,4 +2073,5 @@ function StudentRequest({
 }
 
 
+export const MyGigsPage = MyJugaadsPage;
 export default MyJugaadsPage;

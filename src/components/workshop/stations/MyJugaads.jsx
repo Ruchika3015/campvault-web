@@ -163,7 +163,7 @@ function ListView({ tasks }) {
               padding: '14px 16px',
             }}
           >
-            <span className="absolute -top-1.5 left-4 w-3 h-3 rounded-full" style={{ background: 'radial-gradient(circle at 35% 30%, #c75d5d, #8a3030)', boxShadow: '0 2px 4px rgba(0,0,0,0.4)' }} />
+            <span className="absolute -top-1.5 left-4 w-3 h-3 rounded-full" style={{ background: 'radial-gradient(circle at 35% 30%, #fb7185, #be123c)', boxShadow: '0 2px 4px rgba(0,0,0,0.4)' }} />
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2 flex-1">
                 <span className="text-base leading-none mt-0.5">{task.emoji}</span>

@@ -1,11 +1,37 @@
+import { useState, useEffect } from 'react';
 import { LED, Rivet } from '@/components/primitives/Details';
-import { mockActivity } from '@/data/workshopMockData';
+import { api } from '@/services/api';
 import { Radio } from 'lucide-react';
 
-/**
- * Live Exchange — subtle machine messages, not a social media feed.
- */
+const DEFAULT_ACTIVITY = [
+  { id: '1', emoji: '🟢', text: 'Exchange network online', time: 'live' },
+  { id: '2', emoji: '🔒', text: 'Secure OTP verification ready', time: 'live' },
+  { id: '3', emoji: '⚡', text: 'Direct peer-to-peer messaging ready', time: 'live' },
+];
+
 export function LiveExchange() {
+  const [activities, setActivities] = useState(DEFAULT_ACTIVITY);
+
+  useEffect(() => {
+    let mounted = true;
+    api.getGigs()
+      .then((res) => {
+        if (!mounted) return;
+        const list = Array.isArray(res) ? res : res?.gigs || res?.data?.gigs || [];
+        if (list.length > 0) {
+          const mapped = list.slice(0, 5).map((g) => ({
+            id: g._id,
+            emoji: '💼',
+            text: `Gig: ${g.title}`,
+            time: `₹${g.budget || 'Open'}`,
+          }));
+          setActivities(mapped);
+        }
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <div className="surface-panel rounded-2xl p-5 relative overflow-hidden">
       <Rivet size={7} className="absolute top-2 left-2" />
@@ -21,7 +47,7 @@ export function LiveExchange() {
         </div>
       </div>
       <div className="space-y-3">
-        {mockActivity.map((activity, i) => (
+        {activities.map((activity, i) => (
           <div key={activity.id} className="flex items-center gap-2.5" style={{ opacity: 1 - i * 0.08 }}>
             <span className="text-sm leading-none">{activity.emoji}</span>
             <div className="flex-1 min-w-0">

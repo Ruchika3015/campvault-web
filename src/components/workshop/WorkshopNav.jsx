@@ -11,10 +11,6 @@ import {
   Rivet,
 } from '@/components/primitives/Details';
 
-import {
-  mockDashboardNotifications,
-} from '@/data/jugaadMockData';
-
 import { api } from '@/services/api';
 
 import {
@@ -31,6 +27,8 @@ import {
   Bell,
   User,
   Settings,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 import {
@@ -51,49 +49,30 @@ const NAV_ITEMS = [
     icon: Home,
     path: '/dashboard',
   },
-
   {
-    id: 'find-jugaad',
-    label: 'FIND A JUGAAD',
+    id: 'gigs',
+    label: 'EXPLORE GIGS',
     icon: Search,
-    path: '/dashboard/find-jugaad',
+    path: '/dashboard/gigs',
   },
-
   {
-    id: 'post-jugaad',
-    label: 'POST A JUGAAD',
+    id: 'post-gig',
+    label: 'POST A GIG',
     icon: Plus,
-    path: '/dashboard/post-jugaad',
+    path: '/dashboard/post-gig',
   },
-
   {
-    id: 'my-jugaads',
-    label: 'MY JUGAADS',
+    id: 'my-gigs',
+    label: 'MY GIGS',
     icon: ClipboardList,
-    path: '/dashboard/my-jugaads',
+    path: '/dashboard/my-gigs',
   },
-
   {
-    id: 'requests',
-    label: 'REQUESTS',
-    icon: Inbox,
-    path: '/dashboard/requests',
-  },
-
-  {
-    id: 'my-requests',
-    label: 'MY REQUESTS',
+    id: 'applications',
+    label: 'APPLICATIONS',
     icon: Send,
-    path: '/dashboard/my-requests',
+    path: '/dashboard/applications',
   },
-
-  {
-    id: 'profile',
-    label: 'PROFILE',
-    icon: User,
-    path: '/profile',
-  },
-
   {
     id: 'settings',
     label: 'SETTINGS',
@@ -141,11 +120,27 @@ export function WorkshopNav() {
   const [
     notifications,
     setNotifications,
-  ] = useState(
-    isDemoMode
-      ? mockDashboardNotifications
-      : []
-  );
+  ] = useState([]);
+
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    return document.documentElement.getAttribute('data-theme') || 'dark';
+  });
+
+  useEffect(() => {
+    const updateTheme = () => {
+      setCurrentTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    };
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const handleToggleTheme = () => {
+    const next = currentTheme === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('campvault_theme', next);
+    setCurrentTheme(next);
+  };
 
 
   /* ==============================================================
@@ -155,19 +150,8 @@ export function WorkshopNav() {
   const fetchNotifications =
     useCallback(
       async () => {
-
-        if (isDemoMode) {
-          setNotifications(
-            mockDashboardNotifications
-          );
-
-          return;
-        }
-
-
         if (!isAuthenticated) {
           setNotifications([]);
-
           return;
         }
 
@@ -550,40 +534,19 @@ export function WorkshopNav() {
 
           <Link
             to="/"
-            className="flex items-center gap-2.5 shrink-0"
+            className="flex items-center gap-2.5 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-lg py-0.5"
+            aria-label="Campusvault home"
           >
-
-            <span
-              className="grid place-items-center w-7 h-7 rounded-lg"
-              style={{
-                background:
-                  'linear-gradient(135deg, var(--amber), var(--amber-deep))',
-              }}
-            >
-
-              <span className="font-display text-bg-0 text-xs leading-none">
-                V
-              </span>
-
-            </span>
-
-
-            <div className="hidden sm:flex flex-col leading-none">
-
-              <span className="font-display text-xs tracking-tight text-ink-0">
-                CAMPUS
-                <span className="text-amber">
-                  VAULT
-                </span>
-              </span>
-
-
-              <span className="font-technical text-[6px] text-ink-3 mt-0.5">
-                WORKSHOP
-              </span>
-
-            </div>
-
+            <img
+              src="/logo.svg"
+              alt="Campusvault logo"
+              className="h-9 sm:h-11 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform"
+            />
+            <img
+              src="/CampusVault.svg"
+              alt="Campusvault"
+              className="h-5 sm:h-6 w-auto object-contain shrink-0 translate-y-[6px] sm:translate-y-[8px]"
+            />
           </Link>
 
 
@@ -591,7 +554,7 @@ export function WorkshopNav() {
               DESKTOP NAV ITEMS
           ======================================================== */}
 
-          <div className="hidden lg:flex items-center gap-0.5">
+          <div className="hidden lg:flex items-center gap-0.5 xl:gap-1 shrink-0">
 
             {NAV_ITEMS.map(
               (item) => {
@@ -615,10 +578,13 @@ export function WorkshopNav() {
                       flex
                       items-center
                       gap-1.5
-                      px-2.5
-                      py-2
+                      px-2
+                      xl:px-2.5
+                      py-1.5
                       rounded-lg
                       transition-colors
+                      whitespace-nowrap
+                      shrink-0
                       ${
                         isActive
                           ? 'text-amber-soft'
@@ -630,11 +596,12 @@ export function WorkshopNav() {
                     {item.icon && (
                       <item.icon
                         size={12}
+                        className="shrink-0"
                       />
                     )}
 
 
-                    <span className="font-technical text-[8px]">
+                    <span className="font-technical text-[10px] xl:text-xs whitespace-nowrap tracking-wide leading-none">
                       {
                         item.label
                       }
@@ -681,7 +648,7 @@ export function WorkshopNav() {
               style={{
                 background:
                   notifOpen
-                    ? 'rgba(214,138,60,0.08)'
+                    ? 'rgba(34,197,94,0.14)'
                     : 'rgba(255,255,255,0.03)',
               }}
               aria-label="Notifications"
@@ -737,6 +704,28 @@ export function WorkshopNav() {
             </Link>
 
 
+            {/* ======================================================
+                THEME TOGGLE
+            ====================================================== */}
+
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              className="grid place-items-center w-8 h-8 rounded-lg text-ink-1 hover:text-amber transition-colors cursor-pointer"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+              }}
+              title={currentTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+              aria-label={currentTheme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+            >
+              {currentTheme === 'light' ? (
+                <Moon size={14} className="text-amber" />
+              ) : (
+                <Sun size={14} className="text-ink-1 hover:text-amber" />
+              )}
+            </button>
+
+
             <div className="w-px h-5 bg-metal-1/40 mx-0.5" />
 
 
@@ -754,7 +743,7 @@ export function WorkshopNav() {
                 background:
                   activeId ===
                   'profile'
-                    ? 'rgba(214,138,60,0.08)'
+                    ? 'rgba(34,197,94,0.14)'
                     : 'rgba(255,255,255,0.03)',
               }}
             >
@@ -780,9 +769,9 @@ export function WorkshopNav() {
                   className="font-technical text-[6px] text-amber px-1.5 py-0.5 rounded"
                   style={{
                     border:
-                      '1px solid rgba(214,138,60,0.4)',
+                      '1px solid rgba(34,197,94,0.45)',
                     background:
-                      'rgba(214,138,60,0.1)',
+                      'rgba(34,197,94,0.14)',
                   }}
                 >
                   DEMO
@@ -1112,6 +1101,25 @@ export function WorkshopNav() {
               </span>
 
             </Link>
+
+
+            <button
+              type="button"
+              onClick={() => {
+                handleToggleTheme();
+                setMobileOpen(false);
+              }}
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-ink-0 hover:text-amber w-full text-left cursor-pointer"
+            >
+              {currentTheme === 'light' ? (
+                <Moon size={14} className="text-amber" />
+              ) : (
+                <Sun size={14} className="text-ink-1" />
+              )}
+              <span className="font-technical text-[10px]">
+                {currentTheme === 'light' ? 'DARK THEME' : 'LIGHT THEME'}
+              </span>
+            </button>
 
 
             <Link

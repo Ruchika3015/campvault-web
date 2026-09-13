@@ -3,36 +3,36 @@
 @tailwind utilities;
 
 :root {
-  /* Base environment — very dark warm brown/black */
-  --bg-0: #0c0a08;
-  --bg-1: #110f0d;
-  --bg-2: #181410;
-  --bg-3: #211c17;
+  /* Base environment — lighter warm dark charcoal for clear card differentiation */
+  --bg-0: #1d1a17;
+  --bg-1: #24201d;
+  --bg-2: #2c2824;
+  --bg-3: #36312b;
 
-  /* Metal / surface tones — warm-tinted dark steel */
-  --metal-0: #2a2622;
-  --metal-1: #3a342e;
-  --metal-2: #524a42;
-  --metal-edge: #6b6258;
+  /* Metal / surface tones — warm-tinted steel with clear elevation */
+  --metal-0: #302b25;
+  --metal-1: #403932;
+  --metal-2: #5a5146;
+  --metal-edge: #7b7061;
 
   /* Paper / note tones — aged warm paper */
   --paper: #ede4cf;
   --paper-line: #d4cab0;
   --paper-ink: #2a2418;
 
-  /* Warm accent — muted amber (machine indicator, not neon) */
-  --amber: #d68a3c;
-  --amber-soft: #e8a458;
-  --amber-deep: #a05c1a;
+  /* Primary brand accent — vibrant logo green (high contrast for dark background) */
+  --amber: #22c55e;
+  --amber-soft: #4ade80;
+  --amber-deep: #15803d;
 
   /* Cool accent — subtle muted green/signal */
   --mint: #5db89a;
   --mint-soft: #7fc9ac;
   --mint-deep: #2d8a6e;
 
-  /* Signal — muted coral (problem / alert) */
-  --coral: #c75d5d;
-  --coral-soft: #d98080;
+  /* Signal — eye-pleasing soft rose coral (problem / alert / deadline) */
+  --coral: #fb7185;
+  --coral-soft: #fda4af;
 
   /* Text — warm cream (brightened for readability on dark surfaces) */
   --text-0: #f5f0e7;
@@ -40,10 +40,10 @@
   --text-2: #b0a89c;
   --text-3: #9e968a;
 
-  /* LED glows — restrained, like indicator lights */
-  --glow-amber: 0 0 8px rgba(214, 138, 60, 0.4), 0 0 16px rgba(214, 138, 60, 0.15);
+  /* LED glows — vibrant green indicators */
+  --glow-amber: 0 0 10px rgba(34, 197, 94, 0.45), 0 0 20px rgba(34, 197, 94, 0.18);
   --glow-mint: 0 0 8px rgba(93, 184, 154, 0.35), 0 0 16px rgba(93, 184, 154, 0.12);
-  --glow-coral: 0 0 8px rgba(199, 93, 93, 0.35), 0 0 16px rgba(199, 93, 93, 0.12);
+  --glow-coral: 0 0 10px rgba(251, 113, 133, 0.4), 0 0 20px rgba(251, 113, 133, 0.15);
 }
 
 * {
@@ -99,7 +99,7 @@ body {
 
 .font-technical {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -124,32 +124,35 @@ body {
 
 .surface-metal {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.18)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.18)),
     linear-gradient(135deg, var(--metal-1), var(--metal-0));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
     inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 18px 40px -12px rgba(0, 0, 0, 0.7);
+    0 12px 28px -10px rgba(0, 0, 0, 0.55);
 }
 
 .surface-metal-brushed {
   background:
     repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 4px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.2)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2)),
     linear-gradient(135deg, var(--metal-1), var(--metal-0));
+  border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    0 22px 50px -14px rgba(0, 0, 0, 0.75);
+    0 18px 40px -14px rgba(0, 0, 0, 0.65);
 }
 
 .surface-panel {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%),
     linear-gradient(160deg, var(--bg-2), var(--bg-1));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 22px 50px -18px rgba(0, 0, 0, 0.8);
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 16px 36px -12px rgba(0, 0, 0, 0.6);
 }
 
 .surface-paper {
@@ -198,7 +201,7 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 80% 50% at 50% 40%, rgba(214,138,60,0.05), transparent 70%),
+    radial-gradient(ellipse 80% 50% at 50% 40%, rgba(34,197,94,0.08), transparent 70%),
     radial-gradient(ellipse 60% 40% at 80% 70%, rgba(93,184,154,0.03), transparent 70%);
   mix-blend-mode: screen;
 }
@@ -345,7 +348,7 @@ body {
   outline-offset: 2px;
 }
 .machine-control--primary {
-  border-color: rgba(214,138,60,0.35);
+  border-color: rgba(34,197,94,0.4);
 }
 .machine-control--primary:hover {
   border-color: var(--amber);
@@ -516,11 +519,12 @@ body {
 .surface-wood {
   background:
     repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0 1px, transparent 1px 3px),
-    linear-gradient(180deg, #2a2118 0%, #1f1812 100%);
+    linear-gradient(180deg, #32271c 0%, #241c14 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    inset 0 1px 0 rgba(255,200,150,0.06),
+    inset 0 1px 0 rgba(255,200,150,0.08),
     inset 0 -2px 4px rgba(0,0,0,0.4),
-    0 18px 40px -12px rgba(0,0,0,0.7);
+    0 18px 40px -12px rgba(0,0,0,0.6);
 }
 
 .surface-shelf {
@@ -601,39 +605,47 @@ body {
 
 /* ---------- Light theme overrides ---------- */
 :root[data-theme="light"] {
-  --bg-0: #f5f1ea;
-  --bg-1: #efe9e0;
-  --bg-2: #e6dfd3;
-  --bg-3: #d9d0c2;
+  /* Canvas — luminous warm alabaster / stone */
+  --bg-0: #faf8f5;
+  --bg-1: #ffffff;
+  --bg-2: #f3eee4;
+  --bg-3: #e6dfd1;
 
-  --metal-0: #d0c7b8;
-  --metal-1: #c4baa8;
-  --metal-2: #b0a594;
-  --metal-edge: #8a8074;
+  /* Surfaces & metals — crisp pearl & defined stone */
+  --metal-0: #ffffff;
+  --metal-1: #cfc6b6;
+  --metal-2: #a89f91;
+  --metal-edge: #78716c;
 
-  --paper: #fffdf7;
-  --paper-line: #e8e0cd;
-  --paper-ink: #3a3225;
+  /* Paper */
+  --paper: #ffffff;
+  --paper-line: #dcd5c7;
+  --paper-ink: #1c1917;
 
-  --amber: #b06820;
-  --amber-soft: #c97a2e;
-  --amber-deep: #8a4f18;
+  /* Brand accent — vibrant logo green with high WCAG contrast on light surfaces */
+  --amber: #16a34a;
+  --amber-soft: #22c55e;
+  --amber-deep: #15803d;
 
-  --mint: #2d8a6e;
-  --mint-soft: #3da080;
-  --mint-deep: #1f6e56;
+  /* Cool signal */
+  --mint: #0d9488;
+  --mint-soft: #14b8a6;
+  --mint-deep: #0f766e;
 
-  --coral: #b04545;
-  --coral-soft: #c96060;
+  /* Eye-pleasing rose coral signal */
+  --coral: #e11d48;
+  --coral-soft: #fb7185;
 
-  --text-0: #2a2418;
-  --text-1: #3a3328;
-  --text-2: #5a5244;
-  --text-3: #7a7062;
+  /* Text — deep, sharp, high-contrast charcoal */
+  --text-0: #1c1917;
+  --text-1: #292524;
+  --text-2: #44403c;
+  --text-3: #57534e;
 
-  --glow-amber: 0 0 6px rgba(176, 104, 32, 0.25), 0 0 12px rgba(176, 104, 32, 0.1);
-  --glow-mint: 0 0 6px rgba(45, 138, 110, 0.2), 0 0 12px rgba(45, 138, 110, 0.08);
-  --glow-coral: 0 0 6px rgba(176, 69, 69, 0.2), 0 0 12px rgba(176, 69, 69, 0.08);
+  /* Glows */
+  --glow-amber: 0 0 8px rgba(22, 163, 74, 0.25), 0 0 16px rgba(22, 163, 74, 0.1);
+  --glow-mint: 0 0 8px rgba(13, 148, 136, 0.2), 0 0 16px rgba(13, 148, 136, 0.08);
+  --glow-coral: 0 0 8px rgba(225, 29, 72, 0.2), 0 0 16px rgba(225, 29, 72, 0.08);
 }
 
 :root[data-theme="light"] body {
@@ -643,6 +655,168 @@ body {
 
 :root[data-theme="light"] html {
   background: var(--bg-0);
+}
+
+/* Light mode: remove dark atmospheric fog and muddy screen haze */
+:root[data-theme="light"] .depth-fog {
+  display: none !important;
+}
+
+:root[data-theme="light"] .haze {
+  display: none !important;
+}
+
+:root[data-theme="light"] .tech-diagram {
+  opacity: 0.035;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(80, 70, 60, 0.12) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(90deg, rgba(80, 70, 60, 0.12) 0 1px, transparent 1px 64px);
+}
+
+:root[data-theme="light"] .bg-lettering {
+  opacity: 0.03;
+  color: #1c1917;
+}
+
+/* Surface Panel in light mode — clean elevated card */
+:root[data-theme="light"] .surface-panel {
+  background: #ffffff;
+  border: 1px solid rgba(60, 50, 40, 0.2);
+  box-shadow:
+    0 4px 16px -3px rgba(60, 50, 40, 0.07),
+    0 1px 3px rgba(60, 50, 40, 0.04);
+}
+
+/* Surface Metal Brushed in light mode — crisp luminous pearl card */
+:root[data-theme="light"] .surface-metal-brushed {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.01) 0 2px, transparent 2px 4px),
+    linear-gradient(180deg, #ffffff 0%, #faf6ef 100%);
+  border: 1px solid rgba(60, 50, 40, 0.22);
+  box-shadow:
+    0 8px 24px -5px rgba(60, 50, 40, 0.08),
+    0 2px 6px -1px rgba(60, 50, 40, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Surface Metal & Heavy in light mode */
+:root[data-theme="light"] .surface-metal,
+:root[data-theme="light"] .surface-metal-heavy {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f3eb 100%);
+  border: 1px solid rgba(60, 50, 40, 0.2);
+  box-shadow:
+    0 4px 14px -3px rgba(60, 50, 40, 0.06),
+    0 1px 3px rgba(60, 50, 40, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Surface Wood in light mode — warm architectural birch card */
+:root[data-theme="light"] .surface-wood {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.015) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #ffffff 0%, #f6f1e8 100%);
+  border: 1px solid rgba(60, 50, 40, 0.2);
+  box-shadow:
+    0 8px 24px -5px rgba(60, 50, 40, 0.08),
+    0 2px 6px -1px rgba(60, 50, 40, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Form input styling for light theme to ensure dark text & prominent borders */
+:root[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="light"] textarea,
+:root[data-theme="light"] select {
+  border-color: rgba(60, 50, 40, 0.28) !important;
+  color: #1c1917 !important;
+}
+
+:root[data-theme="light"] input::placeholder,
+:root[data-theme="light"] textarea::placeholder {
+  color: #78716c !important;
+  opacity: 0.85 !important;
+}
+
+:root[data-theme="light"] input:focus,
+:root[data-theme="light"] textarea:focus {
+  border-color: var(--amber) !important;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2) !important;
+}
+
+/* Ensure text inside surface-wood and user badge is dark and crisp in light mode */
+:root[data-theme="light"] .surface-wood .text-paper,
+:root[data-theme="light"] .surface-wood [class*="text-paper"],
+:root[data-theme="light"] .surface-metal-heavy .text-paper,
+:root[data-theme="light"] .surface-metal-heavy [class*="text-paper"] {
+  color: var(--text-0) !important;
+}
+
+:root[data-theme="light"] .surface-wood .border-paper\/10,
+:root[data-theme="light"] .surface-wood .border-paper\/20 {
+  border-color: rgba(60, 50, 40, 0.1) !important;
+}
+
+/* Keep top navigation console dark & grounded so white in logo and text stays high-contrast */
+:root[data-theme="light"] header nav.surface-metal-brushed {
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 4px),
+    linear-gradient(180deg, #2a2521 0%, #1e1a16 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    0 12px 32px -8px rgba(30, 25, 20, 0.22),
+    0 4px 12px -2px rgba(30, 25, 20, 0.14) !important;
+  color: #f5f0e7;
+}
+
+:root[data-theme="light"] header nav.surface-metal-brushed * {
+  --text-0: #f5f0e7;
+  --text-1: #d8d0c4;
+  --text-2: #b0a89c;
+  --text-3: #9e968a;
+  --amber: #22c55e;
+}
+
+/* Header nav machine controls and tactile buttons — always high-contrast on the dark console */
+header nav .machine-control {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+header nav .machine-control:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  color: #ffffff !important;
+}
+
+header nav .machine-control--primary {
+  background: #16a34a !important;
+  border-color: #22c55e !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 14px rgba(22, 163, 74, 0.45) !important;
+}
+
+header nav .machine-control--primary:hover {
+  background: #22c55e !important;
+  color: #000000 !important;
+}
+
+header nav .machine-control--primary .ctrl-led {
+  background: #ffffff !important;
+  box-shadow: 0 0 8px #ffffff !important;
+}
+
+header nav .machine-control--ghost {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+}
+
+header nav .machine-control--ghost:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
 }
 
 /* Reduce motion user preference (settings-driven) */
@@ -678,3 +852,47 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   GLOBAL MINIMUM LEGIBILITY FLOOR
+   Scales up microscopic technical/monospace sizes (which were 
+   7px-11px and virtually unreadable) to comfortable, responsive, 
+   crisp sizes across the entire website without breaking layout.
+============================================================ */
+
+.text-\[6px\],
+.text-\[7px\],
+.text-\[8px\] {
+  font-size: 0.725rem !important; /* ~11.6px */
+  line-height: 1.15rem !important;
+}
+
+.text-\[9px\] {
+  font-size: 0.775rem !important; /* ~12.4px */
+  line-height: 1.2rem !important;
+}
+
+.text-\[10px\] {
+  font-size: 0.8125rem !important; /* 13px */
+  line-height: 1.25rem !important;
+}
+
+.text-\[11px\] {
+  font-size: 0.85rem !important; /* ~13.6px */
+  line-height: 1.3rem !important;
+}
+
+/* Big background logo with high opaqueness / bold visibility */
+.logo-watermark {
+  opacity: 0.32;
+  filter: drop-shadow(0 0 40px rgba(34, 197, 94, 0.35));
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+:root[data-theme="light"] .logo-watermark {
+  opacity: 0.26;
+  filter: invert(1) hue-rotate(180deg) drop-shadow(0 0 30px rgba(22, 163, 74, 0.25));
+}
+

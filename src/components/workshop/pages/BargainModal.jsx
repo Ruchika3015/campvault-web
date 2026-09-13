@@ -39,6 +39,7 @@ export function BargainModal({
     'Student';
 
   const jugaadId =
+    item?._id ??
     item?.id ??
     item?.jugaad_id ??
     item?.jugaadId;
@@ -47,9 +48,9 @@ export function BargainModal({
     setError('');
 
     if (!jugaadId) {
-      setError('Jugaad ID is missing.');
+      setError('Gig ID is missing.');
       console.error(
-        'PROPOSAL: Jugaad ID missing:',
+        'PROPOSAL: Gig ID missing:',
         item
       );
       return;
@@ -62,30 +63,28 @@ export function BargainModal({
 
     const proposedPrice = Number(amount);
 
-    if (
-      !Number.isFinite(proposedPrice) ||
-      proposedPrice <= 0
-    ) {
+    if (isNaN(proposedPrice) || proposedPrice <= 0) {
       setError(
         'Please enter a valid positive amount.'
       );
       return;
     }
 
-    const proposalMessage =
-      message.trim() ||
-      (
-        isInterest
-          ? `I am interested in helping with this Jugaad for ₹${proposedPrice}.`
-          : `I would like to offer ₹${proposedPrice} for this Jugaad.`
-      );
+    setSending(true);
 
     try {
-      setSending(true);
+      const proposalMessage =
+        message.trim() ||
+        (
+          isInterest
+            ? `I am interested in delivering on this gig for ₹${proposedPrice}.`
+            : `I would like to offer ₹${proposedPrice} for this gig.`
+        );
 
       const payload = {
-        item,
         jugaadId,
+        gigId: jugaadId,
+        item,
 
         proposal_message: proposalMessage,
 
@@ -189,7 +188,7 @@ export function BargainModal({
                 </p>
 
                 <p className="font-mono text-[9px] text-ink-3 mt-1">
-                  {item?.title || 'Jugaad'}
+                  {item?.title || 'Gig'}
                 </p>
               </div>
             </div>

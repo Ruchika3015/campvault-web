@@ -2,15 +2,16 @@ import { DepthLayer } from '@/components/primitives/DepthLayer';
 import { LED, Rivet } from '@/components/primitives/Details';
 import { Github, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 const COLUMNS = [
   {
     title: 'Platform',
     links: [
-      { label: 'Find a Jugaad', action: 'find' },
-      { label: 'Post a Jugaad', action: 'post' },
-      { label: 'Explore', action: 'explore' },
-      { label: 'How it works', action: 'how-it-works' },
+      { label: 'Explore Gigs', to: '/dashboard/gigs' },
+      { label: 'Post a Gig', to: '/dashboard/post-gig' },
+      { label: 'Exchange Engine', action: 'engine' },
+      { label: 'How it works', action: 'explore' },
     ],
   },
   {
@@ -34,19 +35,29 @@ const SOCIAL_LINKS = [
 export function Footer() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const handleAction = (action) => {
-    if (action === 'find' || action === 'post') {
-      navigate('/signup');
+    if (action === 'explore') {
+      if (location.pathname === '/') {
+        document.getElementById('explore')?.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        navigate('/#explore');
+      }
       return;
     }
-    const target = action === 'explore' ? 'explore' : 'story-problem';
-    if (location.pathname === '/') {
-      document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      navigate(`/#${target}`);
+    if (action === 'engine') {
+      if (location.pathname === '/') {
+        document.getElementById('engine')?.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        navigate('/#engine');
+      }
+      return;
     }
   };
+
+  const handleFind = () => navigate(isAuthenticated ? '/dashboard/gigs' : '/login');
+  const handlePost = () => navigate(isAuthenticated ? '/dashboard/post-gig' : '/login');
 
   return (
     <footer className="relative overflow-hidden grain border-t border-metal-2/30 preserve-3d">
@@ -69,15 +80,25 @@ export function Footer() {
                   <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink-2">Ready when you are</span>
                 </div>
                 <h3 className="font-display text-2xl sm:text-3xl text-ink-0 leading-tight">
-                  Got a problem? <span className="text-amber">There&apos;s a Jugaad for that.</span>
+                  Got a requirement? <span className="text-amber">Find the skill on Campusvault.</span>
                 </h3>
               </div>
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => handleAction('find')} className="font-display text-sm uppercase tracking-tight px-5 py-3 rounded-xl text-bg-0 cursor-pointer transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber" style={{ background: 'linear-gradient(180deg, var(--amber-soft), var(--amber) 55%, var(--amber-deep))', boxShadow: 'var(--glow-amber), inset 0 1px 0 rgba(255,255,255,0.3)' }}>
-                  Find a Jugaad
+                <button
+                  type="button"
+                  onClick={handleFind}
+                  className="font-display text-sm uppercase tracking-tight px-5 py-3 rounded-xl text-bg-0 cursor-pointer transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                  style={{ background: 'linear-gradient(180deg, var(--amber-soft), var(--amber) 55%, var(--amber-deep))', boxShadow: 'var(--glow-amber), inset 0 1px 0 rgba(255,255,255,0.3)' }}
+                >
+                  Explore Gigs
                 </button>
-                <button type="button" onClick={() => handleAction('post')} className="font-display text-sm uppercase tracking-tight px-5 py-3 rounded-xl text-bg-0 cursor-pointer transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint" style={{ background: 'linear-gradient(180deg, var(--mint-soft), var(--mint) 55%, var(--mint-deep))', boxShadow: 'var(--glow-mint), inset 0 1px 0 rgba(255,255,255,0.3)' }}>
-                  Post a Jugaad
+                <button
+                  type="button"
+                  onClick={handlePost}
+                  className="font-display text-sm uppercase tracking-tight px-5 py-3 rounded-xl text-bg-0 cursor-pointer transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+                  style={{ background: 'linear-gradient(180deg, var(--mint-soft), var(--mint) 55%, var(--mint-deep))', boxShadow: 'var(--glow-mint), inset 0 1px 0 rgba(255,255,255,0.3)' }}
+                >
+                  Post a Gig
                 </button>
               </div>
             </div>
@@ -86,13 +107,23 @@ export function Footer() {
 
         <div className="grid md:grid-cols-[1.5fr_1fr_1fr] gap-10 mb-12">
           <div>
-            <div className="flex items-center gap-2.5 mb-4">
-              <span className="grid place-items-center w-9 h-9 rounded-lg" style={{ background: 'linear-gradient(135deg, var(--amber), var(--amber-deep))', boxShadow: 'var(--glow-amber)' }}>
-                <span className="font-display text-bg-0 text-base">J</span>
-              </span>
-              <span className="font-display text-lg text-ink-0">CAMPUS<span className="text-amber">VAULT</span></span>
-            </div>
-            <p className="text-sm text-ink-2 leading-relaxed max-w-xs">A student-to-student exchange. Your problem. Someone&apos;s skill. That&apos;s a Jugaad.</p>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2.5 mb-4 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-lg"
+              aria-label="Campusvault home"
+            >
+              <img
+                src="/logo.svg"
+                alt="Campusvault logo"
+                className="h-10 sm:h-12 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform"
+              />
+              <img
+                src="/CampusVault.svg"
+                alt="Campusvault"
+                className="h-6 sm:h-7 w-auto object-contain shrink-0 translate-y-[7px] sm:translate-y-[9px]"
+              />
+            </Link>
+            <p className="text-sm text-ink-2 leading-relaxed max-w-xs">A student-to-student micro-gig platform. Your problem. Someone&apos;s skill. That&apos;s Campusvault.</p>
             <div className="flex items-center gap-3 mt-5">
               {SOCIAL_LINKS.map(({ Icon, label, href }) => (
                 href ? (
@@ -100,7 +131,6 @@ export function Footer() {
                     <Icon size={15} />
                   </a>
                 ) : (
-                  /* TODO: Add the official CampusVault URL when available. */
                   <span key={label} title={`${label} link coming soon`} aria-label={`${label} link coming soon`} className="grid place-items-center w-9 h-9 rounded-lg text-ink-2/80" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(107,118,137,0.3)' }}>
                     <Icon size={15} />
                   </span>
@@ -127,8 +157,8 @@ export function Footer() {
         </div>
 
         <div className="pt-8 border-t border-metal-2/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="font-mono text-[11px] text-ink-3">© 2026 CampusVault · Built by students, for students</p>
-          <p className="font-mono text-[11px] text-ink-3">The Jugaad Exchange · v2.4</p>
+          <p className="font-mono text-[11px] text-ink-3">© 2026 Campusvault · Built by students, for students</p>
+          <p className="font-mono text-[11px] text-ink-3">The Campus Gig Exchange · v2.6</p>
         </div>
       </div>
     </footer>

@@ -151,7 +151,7 @@ export function ProfileStation({ open, onClose }) {
         <div className="space-y-2 mb-3">
           {notes.map((n) => (
             <div key={n.id} className="group flex items-center gap-2.5 surface-paper paper-fiber rounded-lg px-3 py-2.5" style={{ clipPath: 'polygon(1% 0, 97% 1%, 100% 5%, 99% 95%, 96% 100%, 4% 99%, 0 93%, 2% 3%)' }}>
-              <span className="absolute -top-1 left-3 w-2 h-2 rounded-full" style={{ background: 'radial-gradient(circle at 35% 30%, #c75d5d, #8a3030)' }} />
+              <span className="absolute -top-1 left-3 w-2 h-2 rounded-full" style={{ background: 'radial-gradient(circle at 35% 30%, #fb7185, #be123c)' }} />
               <span className="font-editorial text-sm text-paper-ink flex-1">{n.text}</span>
               <button onClick={() => removeNote(n.id)} className="text-paper-ink/40 hover:text-coral-soft transition-colors" aria-label="Delete note">
                 <Trash2 size={12} />

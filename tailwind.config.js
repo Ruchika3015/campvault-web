@@ -49,9 +49,9 @@ export default {
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
-        glow: '0 0 8px rgba(214,138,60,0.4), 0 0 16px rgba(214,138,60,0.15)',
+        glow: '0 0 10px rgba(34,197,94,0.45), 0 0 20px rgba(34,197,94,0.18)',
         'glow-mint': '0 0 8px rgba(93,184,154,0.35), 0 0 16px rgba(93,184,154,0.12)',
-        'glow-coral': '0 0 8px rgba(199,93,93,0.35), 0 0 16px rgba(199,93,93,0.12)',
+        'glow-coral': '0 0 10px rgba(251,113,133,0.4), 0 0 20px rgba(251,113,133,0.15)',
       },
     },
   },

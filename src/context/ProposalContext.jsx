@@ -6,11 +6,6 @@ import {
   useEffect,
 } from 'react';
 
-import {
-  mockMyRequests,
-  mockConversations,
-} from '@/data/jugaadMockData';
-
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
 
@@ -28,6 +23,7 @@ const ProposalContext = createContext({
   acceptCounter: async () => {},
   rejectCounter: async () => {},
   withdrawProposal: async () => {},
+  withdrawApplication: async () => {},
 
   getProposalForJugaad: () => null,
   getProposalsForJugaad: () => [],
@@ -359,13 +355,8 @@ export function ProposalProvider({ children }) {
   const [receivedProposals, setReceivedProposals] =
     useState([]);
 
-  const [myRequests, setMyRequests] = useState(
-    isDemoMode ? mockMyRequests : []
-  );
-
-  const [conversations, setConversations] = useState(
-    isDemoMode ? mockConversations : []
-  );
+  const [myRequests, setMyRequests] = useState([]);
+  const [conversations, setConversations] = useState([]);
 
   const [loading, setLoading] = useState(false);
 
@@ -374,12 +365,6 @@ export function ProposalProvider({ children }) {
   ============================================================ */
 
   const refreshData = useCallback(async () => {
-    if (isDemoMode) {
-      setMyRequests(mockMyRequests);
-      setConversations(mockConversations);
-      return;
-    }
-
     if (!isAuthenticated) {
       setMyRequests([]);
       setReceivedProposals([]);
@@ -408,7 +393,7 @@ export function ProposalProvider({ children }) {
       if (myProposalsResult.status === 'fulfilled') {
         const list = extractList(
           myProposalsResult.value,
-          ['proposals', 'myProposals']
+          ['applications', 'proposals', 'myProposals']
         );
 
         setProposals(list);
@@ -422,7 +407,7 @@ export function ProposalProvider({ children }) {
       if (receivedResult.status === 'fulfilled') {
         const list = extractList(
           receivedResult.value,
-          ['proposals', 'receivedProposals']
+          ['applications', 'proposals', 'receivedProposals']
         );
 
         setReceivedProposals(list);
@@ -481,14 +466,6 @@ export function ProposalProvider({ children }) {
   ============================================================ */
 
   useEffect(() => {
-    if (isDemoMode) {
-      setMyRequests(mockMyRequests);
-      setConversations(mockConversations);
-      setProposals([]);
-      setReceivedProposals([]);
-      return;
-    }
-
     if (isAuthenticated) {
       refreshData();
     } else {
@@ -497,11 +474,7 @@ export function ProposalProvider({ children }) {
       setConversations([]);
       setProposals([]);
     }
-  }, [
-    isDemoMode,
-    isAuthenticated,
-    refreshData,
-  ]);
+  }, [isAuthenticated, refreshData]);
 
   /* ============================================================
      SEND PROPOSAL
@@ -895,20 +868,27 @@ export function ProposalProvider({ children }) {
           );
         }
 
-        if (isDemoMode) {
-          setProposals((current) =>
-            current.map(
-              (proposal) =>
-                proposal.id === proposalId
-                  ? {
-                      ...proposal,
-                      status:
-                        'withdrawn',
-                    }
-                  : proposal
-            )
-          );
+        const matchId = (item) =>
+          item && (item._id === proposalId || item.id === proposalId || item.proposalId === proposalId || item.proposal_id === proposalId);
 
+        // Optimistic UI update
+        setProposals((current) =>
+          current.map((proposal) =>
+            matchId(proposal)
+              ? { ...proposal, status: 'withdrawn' }
+              : proposal
+          )
+        );
+
+        setMyRequests((current) =>
+          current.map((req) =>
+            matchId(req)
+              ? { ...req, status: 'withdrawn' }
+              : req
+          )
+        );
+
+        if (isDemoMode) {
           return;
         }
 
@@ -1025,6 +1005,7 @@ export function ProposalProvider({ children }) {
         acceptCounter,
         rejectCounter,
         withdrawProposal,
+        withdrawApplication: withdrawProposal,
 
         getProposalForJugaad,
         getProposalsForJugaad,

@@ -45,7 +45,7 @@ const CATEGORY_COLORS = {
 };
 
 
-const JUGAAD_STATUS_COLORS = {
+const GIG_STATUS_COLORS = {
   open: 'mint',
   assigned: 'amber',
   in_progress: 'amber',
@@ -231,8 +231,8 @@ function getStatusColor(
   status
 ) {
   return (
-    JUGAAD_STATUS_COLORS[status] ||
-    'amber'
+    GIG_STATUS_COLORS[status] ||
+    'mint'
   );
 }
 
@@ -379,6 +379,7 @@ export function DashboardHome() {
             getList(
               discoveryResult.value,
               [
+                'gigs',
                 'jugaads',
                 'results',
                 'items',
@@ -399,7 +400,7 @@ export function DashboardHome() {
 
 
         /* ------------------------------------------------------------
-           MY JUGAADS
+           MY GIGS
         ------------------------------------------------------------ */
 
         if (
@@ -410,7 +411,7 @@ export function DashboardHome() {
             getList(
               myJugaadsResult.value,
               [
-                'jugaads',
+                'gigs',
                 'results',
                 'items',
               ]
@@ -423,7 +424,7 @@ export function DashboardHome() {
           setMyPostedJugaads([]);
 
           console.error(
-            'Failed to load my Jugaads:',
+            'Failed to load my Gigs:',
             myJugaadsResult.reason
           );
         }
@@ -441,6 +442,7 @@ export function DashboardHome() {
             getList(
               myRequestsResult.value,
               [
+                'applications',
                 'proposals',
                 'requests',
                 'results',
@@ -473,6 +475,7 @@ export function DashboardHome() {
             getList(
               receivedProposalsResult.value,
               [
+                'applications',
                 'proposals',
                 'requests',
                 'results',
@@ -729,7 +732,7 @@ export function DashboardHome() {
     ],
 
     [
-      'MY ACTIVE JUGAADS',
+      'MY ACTIVE GIGS',
       activeJugaads.length,
       ClipboardList,
       'coral',
@@ -801,13 +804,13 @@ export function DashboardHome() {
               size={7}
             />
 
-            <span className="font-technical text-[9px] text-ink-2">
-              01 — YOUR JUGAAD WORKSPACE
+            <span className="font-technical text-xs sm:text-sm text-ink-2">
+              01 — YOUR WORKSPACE
             </span>
 
             <span className="h-px w-10 bg-metal-2" />
 
-            <span className="font-technical text-[9px] text-mint">
+            <span className="font-technical text-xs sm:text-sm text-mint">
               STATUS // ONLINE
             </span>
 
@@ -827,7 +830,7 @@ export function DashboardHome() {
           </h1>
 
 
-          <p className="mt-4 max-w-xl text-sm text-ink-2 leading-relaxed">
+          <p className="mt-4 max-w-xl text-sm sm:text-base text-ink-2 leading-relaxed">
             Find the next opportunity, post something
             you need solved, and make something useful
             with people on campus.
@@ -836,22 +839,10 @@ export function DashboardHome() {
         </div>
 
 
-        {/* ==========================================================
-            WORKSPACE CARD
-        ========================================================== */}
-
+        {/* User badge */}
         <div
-          className="surface-wood rounded-xl p-4 min-w-[230px] relative"
-          style={{
-            transform:
-              'rotate(1deg)',
-          }}
+          className="surface-metal-heavy rounded-2xl p-5 relative min-w-[240px] border border-metal-1"
         >
-
-          <Rivet
-            size={6}
-            className="absolute top-1.5 left-1.5"
-          />
 
           <Rivet
             size={6}
@@ -859,9 +850,9 @@ export function DashboardHome() {
           />
 
 
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2.5 mb-2">
 
-            <span className="grid place-items-center w-8 h-8 rounded-full bg-amber text-bg-0 font-display text-[10px]">
+            <span className="grid place-items-center w-9 h-9 rounded-full bg-amber text-bg-0 font-display text-xs font-bold shrink-0">
               {user?.name
                 ?.slice(0, 2)
                 .toUpperCase() ||
@@ -871,13 +862,13 @@ export function DashboardHome() {
 
             <div>
 
-              <p className="font-mono text-[10px] text-paper">
+              <p className="font-mono text-xs sm:text-sm font-semibold text-paper">
                 {user?.name ||
                   'Your workspace'}
               </p>
 
 
-              <p className="font-technical text-[7px] text-paper/70">
+              <p className="font-technical text-xs text-paper/70">
                 {getRoleLabel(user)}
               </p>
 
@@ -894,7 +885,7 @@ export function DashboardHome() {
               size={5}
             />
 
-            <span className="font-mono text-[8px] text-paper/80">
+            <span className="font-mono text-xs text-paper/80">
               The room is yours.
             </span>
 
@@ -952,11 +943,11 @@ export function DashboardHome() {
       <section className="grid md:grid-cols-2 gap-4 mb-8">
 
         <Link
-          to="/dashboard/find-jugaad"
+          to="/dashboard/gigs"
           className="surface-metal-brushed rounded-2xl p-6 group hover:border-amber/50 transition-all"
           style={{
             border:
-              '1px solid rgba(214,138,60,.25)',
+              '1px solid rgba(34,197,94,.35)',
           }}
         >
 
@@ -974,17 +965,17 @@ export function DashboardHome() {
           </div>
 
 
-          <p className="font-display text-2xl mt-6">
-            FIND A JUGAAD
+          <p className="font-display text-2xl sm:text-3xl font-bold mt-6">
+            EXPLORE GIGS
           </p>
 
 
-          <p className="font-mono text-[10px] text-ink-2 mt-2">
+          <p className="font-sans text-sm text-ink-2 mt-2">
             Opportunities selected for your skills.
           </p>
 
 
-          <p className="font-technical text-[8px] text-amber mt-5">
+          <p className="font-technical text-xs sm:text-sm font-bold text-amber mt-5">
             {loading
               ? 'LOADING...'
               : `${discoveryFeed.length} OPEN OPPORTUNITIES →`}
@@ -994,7 +985,7 @@ export function DashboardHome() {
 
 
         <Link
-          to="/dashboard/post-jugaad"
+          to="/dashboard/post-gig"
           className="surface-metal-brushed rounded-2xl p-6 group hover:border-mint/50 transition-all"
           style={{
             border:
@@ -1016,18 +1007,18 @@ export function DashboardHome() {
           </div>
 
 
-          <p className="font-display text-2xl mt-6">
-            POST A JUGAAD
+          <p className="font-display text-2xl sm:text-3xl font-bold mt-6">
+            POST A GIG
           </p>
 
 
-          <p className="font-mono text-[10px] text-ink-2 mt-2">
+          <p className="font-sans text-sm text-ink-2 mt-2">
             Ask the campus to help you get it done.
           </p>
 
 
-          <p className="font-technical text-[8px] text-mint mt-5">
-            CREATE AN OPPORTUNITY →
+          <p className="font-technical text-xs sm:text-sm font-bold text-mint mt-5">
+            CREATE A NEW GIG →
           </p>
 
         </Link>
@@ -1105,11 +1096,11 @@ export function DashboardHome() {
 
             <div>
 
-              <p className="font-technical text-[9px] text-ink-0">
+              <p className="font-technical text-xs sm:text-sm font-bold text-ink-0">
                 RECOMMENDED FOR YOU
               </p>
 
-              <p className="font-mono text-[9px] text-ink-3 mt-1">
+              <p className="font-mono text-xs sm:text-sm text-ink-2 mt-1">
                 Fresh opportunities from the campus.
               </p>
 
@@ -1117,8 +1108,8 @@ export function DashboardHome() {
 
 
             <Link
-              to="/dashboard/find-jugaad"
-              className="font-technical text-[8px] text-amber"
+              to="/dashboard/gigs"
+              className="font-technical text-xs sm:text-sm font-bold text-amber hover:underline"
             >
               VIEW ALL →
             </Link>
@@ -1148,7 +1139,7 @@ export function DashboardHome() {
             ) : (
 
               <EmptyState
-                text="No Jugaads available right now."
+                text="No gigs available right now."
               />
 
             )}
@@ -1165,21 +1156,21 @@ export function DashboardHome() {
         <div className="space-y-4">
 
           {/* ========================================================
-              MY ACTIVE JUGAADS
+              MY ACTIVE GIGS
           ======================================================== */}
 
           <div className="surface-wood rounded-2xl p-5">
 
             <div className="flex items-center justify-between mb-4">
 
-              <p className="font-technical text-[9px] text-paper/90">
-                MY ACTIVE JUGAADS
+              <p className="font-technical text-xs sm:text-sm font-bold text-paper/90">
+                MY ACTIVE GIGS
               </p>
 
 
               <Link
-                to="/dashboard/my-jugaads"
-                className="font-technical text-[8px] text-paper/60"
+                to="/dashboard/my-gigs"
+                className="font-technical text-xs sm:text-sm font-bold text-paper/70 hover:text-paper"
               >
                 VIEW →
               </Link>
@@ -1189,8 +1180,8 @@ export function DashboardHome() {
 
             {loading ? (
 
-              <p className="font-mono text-[9px] text-paper/60">
-                Loading your Jugaads...
+              <p className="font-mono text-xs text-paper/60">
+                Loading your gigs...
               </p>
 
             ) : recentActiveJugaads.length > 0 ? (
@@ -1198,13 +1189,13 @@ export function DashboardHome() {
               recentActiveJugaads.map(
                 (item) => (
                   <Link
-                    to="/dashboard/my-jugaads"
+                    to="/dashboard/my-gigs"
                     key={getId(item)}
                     className="flex items-center gap-2.5 py-2 border-b border-paper/10 last:border-0"
                   >
 
                     <span
-                      className="w-2 h-2 rounded-full shrink-0"
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{
                         background:
                           `var(--${getStatusColor(
@@ -1214,13 +1205,13 @@ export function DashboardHome() {
                     />
 
 
-                    <span className="font-editorial text-sm text-paper flex-1 truncate">
+                    <span className="font-editorial text-sm sm:text-base text-paper flex-1 truncate font-medium">
                       {item.title ||
-                        'Untitled Jugaad'}
+                        'Untitled Gig'}
                     </span>
 
 
-                    <span className="font-mono text-[8px] text-paper/50">
+                    <span className="font-mono text-xs sm:text-sm font-bold text-paper/80">
                       ₹
                       {getAmount(item)}
                     </span>
@@ -1231,8 +1222,8 @@ export function DashboardHome() {
 
             ) : (
 
-              <p className="font-mono text-[9px] text-paper/60">
-                You haven't posted any active Jugaads yet.
+              <p className="font-mono text-xs text-paper/60">
+                You haven't posted any active gigs yet.
               </p>
 
             )}
@@ -1250,14 +1241,14 @@ export function DashboardHome() {
 
               <div>
 
-                <p className="font-technical text-[9px]">
+                <p className="font-technical text-xs sm:text-sm font-bold text-ink-1">
                   RECENT ACTIVITY
                 </p>
 
 
                 {unreadNotifications.length >
                   0 && (
-                  <p className="font-mono text-[7px] text-amber mt-1">
+                  <p className="font-mono text-xs font-bold text-amber mt-1">
                     {
                       unreadNotifications.length
                     }{' '}
@@ -1327,13 +1318,13 @@ export function DashboardHome() {
 
                       <div className="min-w-0">
 
-                        <p className="font-mono text-[9px] text-ink-1 leading-snug">
+                        <p className="font-sans text-xs sm:text-sm text-ink-1 leading-snug">
                           {message}
                         </p>
 
 
                         {timestamp && (
-                          <p className="font-mono text-[7px] text-ink-3 mt-1">
+                          <p className="font-mono text-xs text-ink-3 mt-1">
                             {formatRelativeTime(
                               timestamp
                             )}
@@ -1484,7 +1475,7 @@ function OpportunityRow({
 
   return (
     <Link
-      to="/dashboard/find-jugaad"
+      to="/dashboard/gigs"
       className="flex items-center gap-3 rounded-xl p-3 surface-metal hover:border-amber/30 transition-colors"
       style={{
         border:
@@ -1506,7 +1497,7 @@ function OpportunityRow({
           {item.category
             ?.slice(0, 1)
             .toUpperCase() ||
-            'J'}
+            'G'}
         </span>
 
       </span>
@@ -1514,13 +1505,13 @@ function OpportunityRow({
 
       <div className="min-w-0 flex-1">
 
-        <p className="font-editorial text-sm text-ink-0 truncate">
+        <p className="font-editorial text-base sm:text-lg font-bold text-ink-0 truncate">
           {item.title ||
-            'Untitled Jugaad'}
+            'Untitled Gig'}
         </p>
 
 
-        <p className="font-mono text-[8px] text-ink-3 mt-1 truncate">
+        <p className="font-mono text-xs sm:text-sm text-ink-2 mt-1 truncate">
           {skill} · {posterName}
 
           {postedAt
@@ -1535,13 +1526,13 @@ function OpportunityRow({
 
       <div className="text-right shrink-0">
 
-        <p className="font-display text-sm text-amber">
+        <p className="font-display text-base sm:text-lg font-bold text-amber">
           ₹{amount}
         </p>
 
 
         {item.deadline && (
-          <p className="font-mono text-[8px] text-coral">
+          <p className="font-mono text-xs text-coral font-medium">
             {formatDeadline(
               item.deadline
             )}

@@ -22,24 +22,19 @@ export function DashboardPage() {
       <div className="absolute inset-0 depth-fog pointer-events-none" />
       <div
         className="absolute top-[20%] left-[30%] w-[700px] h-[500px] rounded-full anim-breathe pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(214,138,60,0.10), transparent 60%)', filter: 'blur(70px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.14), transparent 60%)', filter: 'blur(70px)' }}
       />
 
       {/* Top bar */}
       <header className="relative z-10 flex items-center justify-between px-6 sm:px-12 lg:px-20 pt-8">
         <div className="flex items-center gap-3">
-          <span
-            className="grid place-items-center w-8 h-8 rounded-lg shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--amber), var(--amber-deep))' }}
-          >
-            <span className="font-display text-bg-0 text-sm leading-none">J</span>
-          </span>
-          <div className="flex flex-col leading-none">
-            <span className="font-display text-sm tracking-tight text-ink-0">
-              CAMPUS<span className="text-amber">VAULT</span>
-            </span>
-            <span className="font-technical text-[7px] text-ink-3 mt-0.5">WORKSHOP</span>
-          </div>
+          <Link to="/" aria-label="Campusvault home" className="group shrink-0">
+            <img
+              src="/logo.svg"
+              alt="Campusvault"
+              className="h-10 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform"
+            />
+          </Link>
         </div>
         <TactileButton variant="ghost" onClick={handleLogout} className="!py-2 !px-3.5">
           <LogOut size={14} />
@@ -52,7 +47,7 @@ export function DashboardPage() {
         <div className="max-w-2xl w-full">
           <div className="flex items-center gap-3 mb-8 anim-reveal">
             <LED color="mint" pulse size={7} />
-            <span className="font-technical text-[10px] text-ink-2">04 — The Jugaad Workshop</span>
+            <span className="font-technical text-[10px] text-ink-2">04 — The Campusvault Workshop</span>
             <span className="h-px w-12 bg-metal-2" />
             <span className="font-technical text-[10px] text-mint">ONLINE</span>
           </div>
@@ -63,8 +58,8 @@ export function DashboardPage() {
           </h1>
 
           <p className="mt-6 max-w-md text-sm text-ink-2 leading-relaxed anim-reveal" style={{ animationDelay: '0.3s' }}>
-            The Jugaad Workshop is being assembled. Soon you'll be able to post problems, find skills,
-            and manage your exchanges from here.
+            The Campusvault Workshop is active. Explore live campus gigs, post requirements,
+            and manage your exchanges directly from here.
           </p>
 
           {/* Temporary station panel */}

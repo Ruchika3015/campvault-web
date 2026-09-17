@@ -553,10 +553,10 @@ export function ConversationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b0908] px-6 py-16 text-[#f4efe7]">
+      <div className="min-h-screen bg-bg-0 px-6 py-16 text-ink-0">
         <div className="mx-auto max-w-[1180px]">
 
-          <div className="font-technical text-[10px] uppercase tracking-[0.28em] text-[#7fe0c0]">
+          <div className="font-technical text-[10px] uppercase tracking-[0.28em] text-mint-soft">
             LOADING CONVERSATION
           </div>
 
@@ -575,7 +575,7 @@ export function ConversationPage() {
   ================================================================ */
 
   return (
-    <div className="min-h-screen bg-[#0b0908] px-6 py-12 text-[#f4efe7] md:px-10">
+    <div className="min-h-screen bg-bg-0 px-6 py-12 text-ink-0 md:px-10">
       <div className="mx-auto max-w-[1180px]">
 
         {/* =========================================================
@@ -589,7 +589,7 @@ export function ConversationPage() {
               '/dashboard/messages'
             )
           }
-          className="mb-8 font-technical text-[10px] uppercase tracking-[0.22em] text-[#aaa39a] transition hover:text-white"
+          className="mb-8 font-technical text-[10px] uppercase tracking-[0.22em] text-ink-2 transition hover:text-ink-0"
         >
           ← All messages
         </button>
@@ -601,7 +601,7 @@ export function ConversationPage() {
 
         <div className="mb-8 flex items-center gap-4">
 
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#62d5b1] text-lg font-black text-[#07110d]">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-black" style={{ background: 'linear-gradient(135deg, var(--mint), var(--mint-deep))', color: 'var(--bg-0)' }}>
             {initials}
           </div>
 
@@ -611,7 +611,7 @@ export function ConversationPage() {
               {personName}
             </h1>
 
-            <p className="mt-1 truncate text-sm text-[#aaa39a]">
+            <p className="mt-1 truncate text-sm text-ink-2">
               {jugaadTitle}
             </p>
 
@@ -625,7 +625,7 @@ export function ConversationPage() {
         ========================================================= */}
 
         {error && (
-          <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
+          <div className="mb-5 rounded-2xl border border-coral/20 bg-coral/10 px-5 py-4 text-sm text-coral-soft">
             {error}
           </div>
         )}
@@ -641,7 +641,7 @@ export function ConversationPage() {
               CHAT
           ======================================================= */}
 
-          <section className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.06]">
+          <section className="overflow-hidden rounded-[22px] border border-metal-1/40 bg-bg-1">
 
             {/* =====================================================
                 MESSAGES
@@ -650,7 +650,7 @@ export function ConversationPage() {
             <div className="min-h-[480px] max-h-[600px] overflow-y-auto p-6">
 
               {messages.length === 0 ? (
-                <div className="flex min-h-[430px] items-center justify-center text-center text-sm text-[#aaa39a]">
+                <div className="flex min-h-[430px] items-center justify-center text-center text-sm text-ink-2">
                   No messages yet. Start the conversation!
                 </div>
               ) : (
@@ -754,15 +754,15 @@ export function ConversationPage() {
                                 resolvedIsMine
                                   ? `
                                     rounded-br-md
-                                    bg-[#62d5b1]
-                                    text-[#07110d]
+                                    bg-mint
+                                    text-bg-0
                                   `
                                   : `
                                     rounded-bl-md
                                     border
-                                    border-white/10
-                                    bg-[#292725]
-                                    text-[#f4efe7]
+                                    border-metal-1/40
+                                    bg-bg-2
+                                    text-ink-0
                                   `
                               }
                             `}
@@ -792,11 +792,11 @@ export function ConversationPage() {
                                     resolvedIsMine
                                       ? `
                                         justify-end
-                                        text-[#07110d]/60
+                                        text-bg-0/60
                                       `
                                       : `
                                         justify-start
-                                        text-[#aaa39a]
+                                        text-ink-2
                                       `
                                   }
                                 `}
@@ -816,8 +816,8 @@ export function ConversationPage() {
                                   <span
                                     className={
                                       isRead
-                                        ? 'font-bold text-[#1685ff]'
-                                        : 'font-bold text-[#07110d]/60'
+                                        ? 'font-bold text-blue-400'
+                                        : 'font-bold text-bg-0/60'
                                     }
                                     title={
                                       isRead
@@ -853,7 +853,7 @@ export function ConversationPage() {
               onSubmit={
                 handleSend
               }
-              className="flex gap-3 border-t border-white/10 p-5"
+              className="flex gap-3 border-t border-metal-1/40 p-5"
             >
 
               <input
@@ -866,7 +866,7 @@ export function ConversationPage() {
                 }
                 placeholder="Write a message..."
                 disabled={sending}
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-[#777] focus:border-[#62d5b1]/60"
+                className="min-w-0 flex-1 rounded-xl border border-metal-1/40 bg-bg-2 px-4 py-3 text-sm text-ink-0 outline-none placeholder:text-ink-3 focus:border-mint/60"
               />
 
               <button
@@ -875,7 +875,7 @@ export function ConversationPage() {
                   sending ||
                   !text.trim()
                 }
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#62d5b1] text-xl text-[#07110d] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-mint text-xl text-bg-0 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Send message"
               >
                 {sending
@@ -892,9 +892,9 @@ export function ConversationPage() {
               SIDE PANEL
           ======================================================= */}
 
-          <aside className="h-fit rounded-[22px] border border-white/10 bg-white/[0.04] p-6">
+          <aside className="h-fit rounded-[22px] border border-metal-1/40 bg-bg-1 p-6">
 
-            <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-[#62d5b1]">
+            <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-mint">
               ● Connected
             </div>
 
@@ -903,7 +903,7 @@ export function ConversationPage() {
 
             <div className="mt-7">
 
-              <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-[#777]">
+              <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-ink-3">
                 Gig
               </div>
 
@@ -914,14 +914,14 @@ export function ConversationPage() {
             </div>
 
 
-            <div className="my-7 h-px bg-white/10" />
+            <div className="my-7 h-px bg-metal-1/30" />
 
 
             {/* PERSON */}
 
             <div>
 
-              <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-[#777]">
+              <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-ink-3">
                 Person
               </div>
 
@@ -930,7 +930,7 @@ export function ConversationPage() {
               </div>
 
               {personEmail && (
-                <div className="mt-1 break-all text-xs text-[#aaa39a]">
+                <div className="mt-1 break-all text-xs text-ink-2">
                   {personEmail}
                 </div>
               )}
@@ -938,18 +938,18 @@ export function ConversationPage() {
             </div>
 
 
-            <div className="my-7 h-px bg-white/10" />
+            <div className="my-7 h-px bg-metal-1/30" />
 
 
             {/* STATUS */}
 
             <div>
 
-              <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-[#777]">
+              <div className="font-technical text-[9px] uppercase tracking-[0.25em] text-ink-3">
                 Status
               </div>
 
-              <div className="mt-2 flex items-center gap-2 text-sm text-[#62d5b1]">
+              <div className="mt-2 flex items-center gap-2 text-sm text-mint">
                 <span>✓</span>
 
                 <span>

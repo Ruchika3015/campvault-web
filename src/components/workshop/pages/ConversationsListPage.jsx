@@ -130,9 +130,9 @@ export function ConversationsListPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b0908] px-6 py-16 text-[#f4efe7]">
+      <div className="min-h-screen bg-bg-0 px-6 py-16 text-ink-0">
         <div className="mx-auto max-w-[1180px]">
-          <div className="mb-3 font-technical text-[10px] uppercase tracking-[0.28em] text-[#7fe0c0]">
+          <div className="mb-3 font-technical text-[10px] uppercase tracking-[0.28em] text-mint-soft">
             06 — ACCEPTED COLLABORATIONS
           </div>
 
@@ -140,7 +140,7 @@ export function ConversationsListPage() {
             Messages.
           </h1>
 
-          <p className="mt-5 max-w-2xl text-base leading-7 text-[#aaa39a]">
+          <p className="mt-5 max-w-2xl text-base leading-7 text-ink-2">
             Loading your accepted collaborations...
           </p>
         </div>
@@ -149,11 +149,11 @@ export function ConversationsListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0908] px-6 py-16 text-[#f4efe7]">
+    <div className="min-h-screen bg-bg-0 px-6 py-16 text-ink-0">
       <div className="mx-auto max-w-[1180px]">
 
         {/* HEADER */}
-        <div className="mb-3 font-technical text-[10px] uppercase tracking-[0.28em] text-[#7fe0c0]">
+        <div className="mb-3 font-technical text-[10px] uppercase tracking-[0.28em] text-mint-soft">
           06 — ACCEPTED COLLABORATIONS
         </div>
 
@@ -161,26 +161,26 @@ export function ConversationsListPage() {
           Messages.
         </h1>
 
-        <p className="mt-5 max-w-2xl text-base leading-7 text-[#aaa39a]">
+        <p className="mt-5 max-w-2xl text-base leading-7 text-ink-2">
           Conversations unlock only when a poster accepts your
           request. Every thread belongs to one gig.
         </p>
 
         {/* ERROR */}
         {error && (
-          <div className="mt-8 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
+          <div className="mt-8 rounded-2xl border border-coral/20 bg-coral/10 px-5 py-4 text-sm text-coral-soft">
             {error}
           </div>
         )}
 
         {/* EMPTY */}
         {!error && visibleConversations.length === 0 && (
-          <div className="mt-10 rounded-3xl border border-white/10 bg-white/[0.04] p-8">
-            <p className="text-lg font-semibold">
+          <div className="mt-10 rounded-3xl border border-metal-1/30 bg-bg-1 p-8">
+            <p className="text-lg font-semibold text-ink-0">
               No accepted collaborations yet.
             </p>
 
-            <p className="mt-2 text-sm text-[#aaa39a]">
+            <p className="mt-2 text-sm text-ink-2">
               Once a proposal is accepted, the other person will
               appear here.
             </p>
@@ -251,10 +251,13 @@ export function ConversationsListPage() {
                 onClick={() =>
                   openConversation(conversation)
                 }
-                className="group flex w-full items-center gap-5 rounded-[22px] border border-white/10 bg-white/[0.06] px-5 py-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-white/20 hover:bg-white/[0.09] md:px-6"
+                className="group flex w-full items-center gap-5 rounded-[22px] border border-metal-1/40 bg-bg-1 px-5 py-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-metal-2/60 hover:bg-bg-2 md:px-6"
               >
                 {/* AVATAR */}
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#62d5b1] text-lg font-black text-[#07110d]">
+                <div
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-black"
+                  style={{ background: 'linear-gradient(135deg, var(--mint), var(--mint-deep))', color: 'var(--bg-0)' }}
+                >
                   {initials}
                 </div>
 
@@ -262,12 +265,12 @@ export function ConversationsListPage() {
                 <div className="min-w-0 flex-1">
 
                   {/* PERSON */}
-                  <div className="truncate text-xl font-bold text-[#f4efe7]">
+                  <div className="truncate text-xl font-bold text-ink-0">
                     {personName}
                   </div>
 
                   {/* JUGAAD */}
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#aaa39a]">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-2">
                     <span>
                       {jugaadTitle}
                     </span>
@@ -284,7 +287,7 @@ export function ConversationsListPage() {
                   </div>
 
                   {/* MESSAGE */}
-                  <div className="mt-3 truncate text-sm text-[#aaa39a]">
+                  <div className="mt-3 truncate text-sm text-ink-2">
                     {lastMessage}
                   </div>
 
@@ -293,7 +296,7 @@ export function ConversationsListPage() {
                     jugaadId ||
                     proposalId ||
                     personEmail) && (
-                    <div className="mt-2 hidden text-[10px] text-white/30">
+                    <div className="mt-2 hidden text-[10px] text-ink-3">
                       user: {personId} · gig: {jugaadId} ·
                       proposal: {proposalId} · {personEmail}
                     </div>
@@ -301,7 +304,7 @@ export function ConversationsListPage() {
                 </div>
 
                 {/* ARROW */}
-                <div className="shrink-0 text-2xl text-[#aaa39a] transition group-hover:translate-x-1 group-hover:text-white">
+                <div className="shrink-0 text-2xl text-ink-2 transition group-hover:translate-x-1 group-hover:text-ink-0">
                   →
                 </div>
               </button>

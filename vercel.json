@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/__clerk",
+      "destination": "/api/__clerk"
+    },
+    {
+      "source": "/__clerk/:path*",
+      "destination": "/api/__clerk"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

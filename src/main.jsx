@@ -30,10 +30,21 @@ function applyInitialTheme() {
 }
 applyInitialTheme();
 
+// Determine proxy URL for production vercel.app domain
+const PROXY_URL =
+  import.meta.env.VITE_CLERK_PROXY_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')
+    ? `${window.location.origin}/__clerk`
+    : undefined);
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+      <ClerkProvider
+        publishableKey={PUBLISHABLE_KEY}
+        proxyUrl={PROXY_URL}
+        afterSignOutUrl="/"
+      >
         <App />
       </ClerkProvider>
     </ErrorBoundary>

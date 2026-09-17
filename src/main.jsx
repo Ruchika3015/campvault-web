@@ -30,10 +30,10 @@ function applyInitialTheme() {
 }
 applyInitialTheme();
 
-// Determine proxy URL for production vercel.app domain
+// Determine proxy URL for production custom domain
 const PROXY_URL =
   import.meta.env.VITE_CLERK_PROXY_URL ||
-  (typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')
+  (typeof window !== 'undefined' && window.location.hostname === 'campusvault.co.in'
     ? `${window.location.origin}/__clerk`
     : undefined);
 

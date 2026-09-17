@@ -1,4 +1,4 @@
-// Vercel Edge Function to proxy Clerk Frontend API traffic for campusvault.vercel.app
+// Vercel Edge Function to proxy Clerk Frontend API traffic for campusvault.co.in
 export const config = {
   runtime: 'edge',
 };
@@ -19,7 +19,7 @@ export default async function handler(req) {
   const targetUrl = new URL(`https://frontend-api.clerk.dev${subPath}${url.search}`);
 
   const headers = new Headers(req.headers);
-  headers.set('Clerk-Proxy-Url', 'https://campusvault.vercel.app/__clerk');
+  headers.set('Clerk-Proxy-Url', 'https://campusvault.co.in/__clerk');
   
   if (process.env.CLERK_SECRET_KEY) {
     headers.set('Clerk-Secret-Key', process.env.CLERK_SECRET_KEY);
@@ -30,7 +30,7 @@ export default async function handler(req) {
     headers.set('X-Forwarded-For', clientIp);
   }
 
-  headers.set('Origin', 'https://campusvault.vercel.app');
+  headers.set('Origin', 'https://campusvault.co.in');
   headers.delete('host');
 
   try {

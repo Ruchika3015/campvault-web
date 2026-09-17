@@ -19,23 +19,32 @@ function getInitials(name) {
 }
 
 function extractConversations(response) {
+  let list = [];
+
   if (Array.isArray(response)) {
-    return response;
+    list = response;
+  } else if (Array.isArray(response?.conversations)) {
+    list = response.conversations;
+  } else if (Array.isArray(response?.data)) {
+    list = response.data;
+  } else if (Array.isArray(response?.data?.conversations)) {
+    list = response.data.conversations;
   }
 
-  if (Array.isArray(response?.conversations)) {
-    return response.conversations;
-  }
-
-  if (Array.isArray(response?.data)) {
-    return response.data;
-  }
-
-  if (Array.isArray(response?.data?.conversations)) {
-    return response.data.conversations;
-  }
-
-  return [];
+  // Normalize backend field names to what the UI expects.
+  // Backend sends: { conversationId, user: { name, email, _id }, gigTitle, gigId }
+  // UI expects:    { _id, other_user_name, other_user_email, other_user_id, gig_title }
+  return list.map((conv) => ({
+    ...conv,
+    // ID — prefer _id (already set), fall back to conversationId
+    _id:             conv._id             ?? conv.conversationId,
+    // Other person
+    other_user_name:  conv.other_user_name  ?? conv.user?.name  ?? 'User',
+    other_user_email: conv.other_user_email ?? conv.user?.email ?? '',
+    other_user_id:    conv.other_user_id    ?? conv.user?._id   ?? '',
+    // Gig
+    gig_title:        conv.gig_title        ?? conv.gigTitle    ?? 'Gig',
+  }));
 }
 
 function formatLastMessage(conversation) {

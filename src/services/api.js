@@ -748,23 +748,40 @@ export const api = {
 
   // ================================================================
   // MESSAGES / CONVERSATIONS
-  // Backend: /api/messages
+  // Backend: /api/messages (inbox list) + /api/chat (send/receive)
   // ================================================================
 
+  // GET /api/messages/inbox — list of conversations for the sidebar
   getConversations: () =>
     apiRequest(
       '/api/messages/inbox'
     ),
 
 
+  // GET /api/chat/messages/:conversationId — messages in a specific conversation
   getConversationMessages: (
-    receiverId
+    conversationId
   ) =>
     apiRequest(
-      `/api/messages/${receiverId}`
+      `/api/chat/messages/${conversationId}`
     ),
 
 
+  // POST /api/chat/conversation/send — send a message inside a conversation
+  sendMessage: (
+    conversationId,
+    text
+  ) =>
+    apiRequest(
+      `/api/chat/conversation/${conversationId}/message`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }
+    ),
+
+
+  // PUT /api/messages/:receiverId/read — mark messages as read (uses old endpoint with receiverId)
   markConversationAsRead: (
     receiverId
   ) =>
@@ -772,14 +789,12 @@ export const api = {
       `/api/messages/${receiverId}/read`,
       {
         method: 'PUT',
-
-        body:
-          JSON.stringify({}),
+        body: JSON.stringify({}),
       }
     ),
 
 
-  // Chat (REST + Socket.IO hybrid)
+  // Chat — create conversation + legacy getChatMessages alias
   createConversation: (
     payload
   ) =>
@@ -787,11 +802,7 @@ export const api = {
       '/api/chat/conversation',
       {
         method: 'POST',
-
-        body:
-          JSON.stringify(
-            payload
-          ),
+        body: JSON.stringify(payload),
       }
     ),
 

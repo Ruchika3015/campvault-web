@@ -2875,68 +2875,34 @@ export function ProfilePage() {
           className="surface-panel rounded-2xl p-5"
         >
 
-          <div
-            className="flex items-center gap-2 mb-4"
-          >
-
-            <span
-              style={{
-                color:
-                  'var(--amber)',
-              }}
-            >
-
+          <SectionHeader
+            icon={
               <User
                 size={13}
               />
-
-            </span>
-
-
-            <span
-              className="font-technical text-[9px] text-ink-0"
-            >
-
-              SKILLS
-
-            </span>
-
-
-            <span
-              className="h-px flex-1 bg-metal-1/30"
-            />
-
-
-            {!isDemoMode && (
-
-              <button
-
-                type="button"
-
-                onClick={
-                  openAddSkill
-                }
-
-                className="machine-control"
-
-                style={{
-                  padding:
-                    '5px 8px',
-                }}
-
-              >
-
-                <Plus
-                  size={11}
-                />
-
-                ADD
-
-              </button>
-
-            )}
-
-          </div>
+            }
+            label="SKILLS"
+            action={
+              !isDemoMode && (
+                <button
+                  type="button"
+                  onClick={
+                    openAddSkill
+                  }
+                  className="machine-control"
+                  style={{
+                    padding:
+                      '5px 8px',
+                  }}
+                >
+                  <Plus
+                    size={11}
+                  />
+                  ADD
+                </button>
+              )
+            }
+          />
 
 
           {skillError && (
@@ -3294,46 +3260,33 @@ export function ProfilePage() {
         >
 
           <SectionHeader
-
             icon={
               <Link2
                 size={13}
               />
             }
-
             label="LINKS & PROFILES"
-
+            action={
+              !isDemoMode && (
+                <button
+                  type="button"
+                  onClick={
+                    openAddLink
+                  }
+                  className="machine-control"
+                  style={{
+                    padding:
+                      '5px 8px',
+                  }}
+                >
+                  <Plus
+                    size={11}
+                  />
+                  ADD
+                </button>
+              )
+            }
           />
-
-
-          {!isDemoMode && (
-
-            <button
-
-              type="button"
-
-              onClick={
-                openAddLink
-              }
-
-              className="machine-control mb-3"
-
-              style={{
-                padding:
-                  '5px 8px',
-              }}
-
-            >
-
-              <Plus
-                size={11}
-              />
-
-              ADD
-
-            </button>
-
-          )}
 
 
           {linkError && (
@@ -3606,46 +3559,33 @@ export function ProfilePage() {
         >
 
           <SectionHeader
-
             icon={
               <Briefcase
                 size={13}
               />
             }
-
             label="MY PROJECTS"
-
+            action={
+              !isDemoMode && (
+                <button
+                  type="button"
+                  onClick={
+                    openAddProject
+                  }
+                  className="machine-control"
+                  style={{
+                    padding:
+                      '5px 8px',
+                  }}
+                >
+                  <Plus
+                    size={11}
+                  />
+                  ADD
+                </button>
+              )
+            }
           />
-
-
-          {!isDemoMode && (
-
-            <button
-
-              type="button"
-
-              onClick={
-                openAddProject
-              }
-
-              className="machine-control mb-3"
-
-              style={{
-                padding:
-                  '5px 8px',
-              }}
-
-            >
-
-              <Plus
-                size={11}
-              />
-
-              ADD
-
-            </button>
-
-          )}
 
 
           {projectError && (
@@ -4081,46 +4021,33 @@ export function ProfilePage() {
         >
 
           <SectionHeader
-
             icon={
               <Award
                 size={13}
               />
             }
-
             label="CERTIFICATIONS & ACHIEVEMENTS"
-
+            action={
+              !isDemoMode && (
+                <button
+                  type="button"
+                  onClick={
+                    openAddCertification
+                  }
+                  className="machine-control"
+                  style={{
+                    padding:
+                      '5px 8px',
+                  }}
+                >
+                  <Plus
+                    size={11}
+                  />
+                  ADD
+                </button>
+              )
+            }
           />
-
-
-          {!isDemoMode && (
-
-            <button
-
-              type="button"
-
-              onClick={
-                openAddCertification
-              }
-
-              className="machine-control mb-3"
-
-              style={{
-                padding:
-                  '5px 8px',
-              }}
-
-            >
-
-              <Plus
-                size={11}
-              />
-
-              ADD
-
-            </button>
-
-          )}
 
 
           {certificationError && (
@@ -4625,6 +4552,7 @@ function SectionHeader({
   icon,
   label,
   color = 'amber',
+  action,
 }) {
 
   return (
@@ -4657,6 +4585,8 @@ function SectionHeader({
       <span
         className="h-px flex-1 bg-metal-1/30"
       />
+
+      {action}
 
     </div>
 

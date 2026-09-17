@@ -4,9 +4,10 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from 'react';
-
-import { api } from '@/services/api';
+import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
+import { setTokenFactory, api } from '@/services/api';
 
 
 /* ================================================================
@@ -29,37 +30,22 @@ const DEMO_USER = {
 
 
 /* ================================================================
-   STORAGE KEYS
-================================================================ */
-
-const DEMO_TOKEN_KEY =
-  'cj_demo_token';
-
-const DEMO_USER_KEY =
-  'cj_demo_user';
-
-const REAL_TOKEN_KEY =
-  'cj_token';
-
-const REAL_USER_KEY =
-  'cj_user';
-
-
-/* ================================================================
-   AUTH CONTEXT
+   AUTH CONTEXT — shape preserved so all consumers are unchanged
 ================================================================ */
 
 const AuthContext = createContext({
-  user: null,
-  token: null,
+  user:            null,
+  token:           null,
   isAuthenticated: false,
-  isDemoMode: false,
-  loading: true,
+  isDemoMode:      false,
+  loading:         true,
+  profileComplete: false,
+  appUser:         null, // MongoDB profile (superset of Clerk user data)
 
-  login: async () => {},
-  register: async () => {},
+  login:     async () => {},  // kept for API surface compat (no-op — Clerk handles login)
+  register:  async () => {},  // kept for API surface compat (no-op — Clerk handles signup)
   demoLogin: () => {},
-  logout: () => {},
+  logout:    () => {},
 });
 
 
@@ -68,9 +54,7 @@ const AuthContext = createContext({
 ================================================================ */
 
 export function useAuth() {
-  return useContext(
-    AuthContext
-  );
+  return useContext(AuthContext);
 }
 
 
@@ -78,726 +62,222 @@ export function useAuth() {
    AUTH PROVIDER
 ================================================================ */
 
-export function AuthProvider({
-  children,
-}) {
-  const [
-    user,
-    setUser,
-  ] = useState(null);
+export function AuthProvider({ children }) {
 
-  const [
-    token,
-    setToken,
-  ] = useState(null);
+  /* ── Clerk state ────────────────────────────────────────────────────────── */
+  const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
+  const { user: clerkUser } = useUser();
 
-  const [
-    isDemoMode,
-    setIsDemoMode,
-  ] = useState(false);
+  /* ── App-level state ────────────────────────────────────────────────────── */
+  const [appUser,          setAppUser]          = useState(null);  // MongoDB profile
+  const [profileComplete,  setProfileComplete]  = useState(false);
+  const [isDemoMode,       setIsDemoMode]       = useState(false);
+  const [demoUser,         setDemoUser]         = useState(null);
+  const [demoToken,        setDemoToken]        = useState(null);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  // Whether we have finished the sync call (not just whether Clerk loaded)
+  const [syncDone,   setSyncDone]   = useState(false);
+  const syncInFlight = useRef(false);
 
 
-  /* ==============================================================
-     RESTORE SESSION ON PAGE LOAD
-  ============================================================== */
-
+  /* ── Provide the Clerk token factory to api.js ──────────────────────────── */
+  // api.js is a plain module — it can't call hooks. We give it a callback here
+  // so apiRequest() can get a fresh Clerk session token for every request.
   useEffect(() => {
-    let mounted = true;
-
-
-    const restoreSession =
-      async () => {
-        try {
-
-          /* ========================================================
-             REAL SESSION
-          ======================================================== */
-
-          const storedToken =
-            sessionStorage.getItem(REAL_TOKEN_KEY) ||
-            localStorage.getItem(REAL_TOKEN_KEY) ||
-            sessionStorage.getItem('campvault_token') ||
-            localStorage.getItem('campvault_token');
-
-          const storedUserString =
-            sessionStorage.getItem(REAL_USER_KEY) ||
-            localStorage.getItem(REAL_USER_KEY) ||
-            sessionStorage.getItem('campvault_user') ||
-            localStorage.getItem('campvault_user');
-
-
-          if (storedToken) {
-
-            /*
-             * Restore cached user first.
-             */
-
-            let cachedUser = null;
-
-
-            if (storedUserString) {
-
-              try {
-                cachedUser =
-                  JSON.parse(
-                    storedUserString
-                  );
-              } catch (error) {
-
-                console.error(
-                  'Invalid cached user:',
-                  error
-                );
-
-                sessionStorage.removeItem(
-                  REAL_USER_KEY
-                );
-              }
-            }
-
-
-            if (!mounted) {
-              return;
-            }
-
-
-            /*
-             * Restore authentication immediately.
-             */
-
-            setToken(
-              storedToken
-            );
-
-            setIsDemoMode(
-              false
-            );
-
-
-            if (cachedUser) {
-              setUser(
-                cachedUser
-              );
-            }
-
-
-            /*
-             * Ask backend for the latest
-             * profile information.
-             */
-
-            try {
-
-              const profileResponse =
-                await api.getProfile();
-
-
-              if (!mounted) {
-                return;
-              }
-
-
-              // Backend returns the user object directly (has _id),
-              // not wrapped in { data } or { user }
-              const profileUser =
-                profileResponse?._id
-                  ? profileResponse
-                  : profileResponse?.data ||
-                    profileResponse?.user ||
-                    null;
-
-
-              /*
-               * IMPORTANT:
-               *
-               * DO NOT replace the cached
-               * full user with a partial
-               * profile response.
-               *
-               * Merge them instead.
-               */
-
-              if (profileUser) {
-
-                const mergedUser = {
-                  ...(cachedUser || {}),
-                  ...profileUser,
-                };
-
-
-                setUser(
-                  mergedUser
-                );
-
-
-                /*
-                 * Save the merged user so
-                 * refresh works again.
-                 */
-
-                sessionStorage.setItem(
-                  REAL_USER_KEY,
-                  JSON.stringify(
-                    mergedUser
-                  )
-                );
-                localStorage.setItem(
-                  REAL_USER_KEY,
-                  JSON.stringify(
-                    mergedUser
-                  )
-                );
-              }
-
-            } catch (error) {
-
-              console.error(
-                'Failed to refresh user profile:',
-                error
-              );
-
-
-              /*
-               * IMPORTANT:
-               *
-               * If we already have a cached
-               * valid-looking user, keep the
-               * session instead of turning
-               * the user into Guest.
-               */
-
-              if (!cachedUser) {
-
-                sessionStorage.removeItem(
-                  REAL_TOKEN_KEY
-                );
-
-                sessionStorage.removeItem(
-                  REAL_USER_KEY
-                );
-
-
-                setToken(null);
-
-                setUser(null);
-
-                setIsDemoMode(false);
-              }
-            }
-
-
-            if (mounted) {
-              setLoading(false);
-            }
-
-
-            return;
-          }
-
-
-          /* ========================================================
-             DEMO SESSION
-          ======================================================== */
-
-          const demoToken =
-            sessionStorage.getItem(
-              DEMO_TOKEN_KEY
-            );
-
-          const demoUserString =
-            sessionStorage.getItem(
-              DEMO_USER_KEY
-            );
-
-
-          if (
-            demoToken &&
-            demoUserString
-          ) {
-
-            try {
-
-              const demoUser =
-                JSON.parse(
-                  demoUserString
-                );
-
-
-              if (!mounted) {
-                return;
-              }
-
-
-              setToken(
-                demoToken
-              );
-
-              setUser(
-                demoUser
-              );
-
-              setIsDemoMode(
-                true
-              );
-
-              setLoading(
-                false
-              );
-
-
-              return;
-
-            } catch (error) {
-
-              console.error(
-                'Invalid demo session:',
-                error
-              );
-
-
-              sessionStorage.removeItem(
-                DEMO_TOKEN_KEY
-              );
-
-              sessionStorage.removeItem(
-                DEMO_USER_KEY
-              );
-            }
-          }
-
-
-          /* ========================================================
-             NO SESSION
-          ======================================================== */
-
-          if (mounted) {
-
-            setToken(null);
-
-            setUser(null);
-
-            setIsDemoMode(false);
-
-            setLoading(false);
-          }
-
-        } catch (error) {
-
-          console.error(
-            'Failed to restore authentication session:',
-            error
-          );
-
-
-          sessionStorage.removeItem(
-            REAL_TOKEN_KEY
-          );
-
-          sessionStorage.removeItem(
-            REAL_USER_KEY
-          );
-
-          sessionStorage.removeItem(
-            DEMO_TOKEN_KEY
-          );
-
-          sessionStorage.removeItem(
-            DEMO_USER_KEY
-          );
-
-
-          if (mounted) {
-
-            setToken(null);
-
-            setUser(null);
-
-            setIsDemoMode(false);
-
-            setLoading(false);
-          }
-        }
-      };
-
-
-    restoreSession();
-
-
-    return () => {
-      mounted = false;
-    };
-
+    if (isDemoMode) {
+      // In demo mode provide a fake token factory
+      setTokenFactory(() => Promise.resolve(`demo-session-${Date.now()}`));
+    } else if (isSignedIn) {
+      setTokenFactory(() => getToken());
+    } else {
+      setTokenFactory(() => Promise.resolve(null));
+    }
+  }, [isSignedIn, isDemoMode, getToken]);
+  /* ── Restore demo session on page load ─────────────────────────────────── */
+  useEffect(() => {
+    const storedDemo  = sessionStorage.getItem('cj_demo_token');
+    const storedUser  = sessionStorage.getItem('cj_demo_user');
+    if (storedDemo && storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        setDemoToken(storedDemo);
+        setDemoUser(parsed);
+        setIsDemoMode(true);
+        setSyncDone(true);
+        setTokenFactory(() => Promise.resolve(storedDemo));
+      } catch {
+        sessionStorage.removeItem('cj_demo_token');
+        sessionStorage.removeItem('cj_demo_user');
+        setTokenFactory(() => Promise.resolve(null));
+      }
+    } else {
+      setTokenFactory(() => Promise.resolve(null));
+    }
   }, []);
 
 
-  /* ==============================================================
-     REAL LOGIN
-  ============================================================== */
+  /* ── Sync MongoDB profile after Clerk signs in ──────────────────────────── */
+  useEffect(() => {
+    if (!isLoaded)            return; // Wait for Clerk to initialise
+    if (isDemoMode)           return; // Demo mode — nothing to sync
+    if (!isSignedIn) {
+      // User signed out — clear local state
+      setAppUser(null);
+      setProfileComplete(false);
+      setSyncDone(true);
+      setTokenFactory(() => Promise.resolve(null));
+      return;
+    }
+    if (syncInFlight.current) return; // Already syncing
 
-  const login =
-    useCallback(
-      async (
-        email,
-        password
-      ) => {
+    syncInFlight.current = true;
 
-        const data =
-          await api.login({
-            email,
-            password,
-          });
+    const doSync = async () => {
+      try {
+        // ── Step 1: Set token factory BEFORE any API call ──────────────────
+        // This guarantees the Authorization header is present even if the
+        // separate setTokenFactory effect hasn't run yet (React effect order
+        // is not guaranteed between two independent useEffect calls).
+        setTokenFactory(() => getToken());
 
-
-        const newToken =
-          data?.token;
-
-        const newUser =
-          data?.user ||
-          data?.data;
-
-
-        if (!newToken) {
-
-          throw {
-            status: 500,
-            message:
-              'Authentication failed. No token received.',
-          };
+        // ── Step 2: Verify Clerk actually has a token ───────────────────────
+        const token = await getToken();
+        if (!token) {
+          // Clerk says isSignedIn=true but has no token yet — edge case on
+          // first load. Let syncDone fire so we don't hang, and the next
+          // navigation will re-trigger this effect.
+          setSyncDone(true);
+          syncInFlight.current = false;
+          return;
         }
 
+        // ── Step 3: Sync MongoDB profile ───────────────────────────────────
+        const data = await api.syncProfile();
+
+        const profile = data?.data || data;
+        setProfileComplete(Boolean(profile?.profileComplete));
+        setAppUser(profile || null);
+      } catch (err) {
+        // If sync fails (e.g. network error), still mark done so the UI doesn't hang.
+        // The protect middleware will enforce the profile state on the next API call.
+        console.error('[AuthContext] Profile sync failed:', err);
+        setProfileComplete(false);
+        setAppUser(null);
+      } finally {
+        setSyncDone(true);
+        syncInFlight.current = false;
+      }
+    };
+
+    doSync();
+  }, [isLoaded, isSignedIn, isDemoMode, getToken]); // re-run whenever sign-in state changes
+
+
+  /* ── Refresh app user after profile completion ──────────────────────────── */
+  const refreshAppUser = useCallback(async () => {
+    try {
+      const data = await api.syncProfile();
+      const profile = data?.data || data;
+      setProfileComplete(Boolean(profile?.profileComplete));
+      setAppUser(profile || null);
+    } catch (err) {
+      console.error('[AuthContext] refreshAppUser failed:', err);
+    }
+  }, []);
+
+
+  /* ── Loading state ──────────────────────────────────────────────────────── */
+  // Show loading until:
+  //   1. Clerk has finished loading, AND
+  //   2. We have finished the /api/auth/sync call (or detected no session)
+  const loading = !isLoaded || (!syncDone && !isDemoMode);
+
+
+  /* ── Derived values ─────────────────────────────────────────────────────── */
+  // The "user" exposed to consumers combines Clerk identity + MongoDB profile.
+  // We prefer the MongoDB profile when available (it has app-specific fields).
+  const effectiveUser = isDemoMode
+    ? demoUser
+    : (appUser || (clerkUser ? {
+        id:    clerkUser.id,
+        name:  clerkUser.fullName || clerkUser.firstName || '',
+        email: clerkUser.primaryEmailAddress?.emailAddress || '',
+      } : null));
+
+  const isAuthenticated = isDemoMode ? true : Boolean(isSignedIn && syncDone);
+
+  // Expose a token-like value for any legacy code that reads context.token
+  // (in Clerk, the token is obtained async; this is a best-effort sync snapshot)
+  const [tokenSnapshot, setTokenSnapshot] = useState(null);
+  useEffect(() => {
+    if (!isSignedIn || isDemoMode) { setTokenSnapshot(isDemoMode ? demoToken : null); return; }
+    getToken().then(setTokenSnapshot).catch(() => setTokenSnapshot(null));
+  }, [isSignedIn, isDemoMode, demoToken, getToken]);
+
+
+  /* ── Demo login ─────────────────────────────────────────────────────────── */
+  const demoLogin = useCallback(() => {
+    const token = `demo-session-${Date.now()}`;
+    sessionStorage.setItem('cj_demo_token', token);
+    sessionStorage.setItem('cj_demo_user', JSON.stringify(DEMO_USER));
+    setDemoToken(token);
+    setDemoUser(DEMO_USER);
+    setIsDemoMode(true);
+    setSyncDone(true);
+  }, []);
+
+
+  /* ── Logout ─────────────────────────────────────────────────────────────── */
+  const logout = useCallback(async () => {
+    // Clear demo session
+    sessionStorage.removeItem('cj_demo_token');
+    sessionStorage.removeItem('cj_demo_user');
+    localStorage.removeItem('cj_demo_token');
+    localStorage.removeItem('cj_demo_user');
+
+    setDemoToken(null);
+    setDemoUser(null);
+    setIsDemoMode(false);
+    setAppUser(null);
+    setProfileComplete(false);
+    setSyncDone(false);
+    syncInFlight.current = false;
+
+    if (isSignedIn) {
+      await signOut();
+    }
+  }, [isSignedIn, signOut]);
+
+
+  /* ── no-op stubs for legacy consumers (Clerk handles actual login/register) */
+  const login    = useCallback(async () => {}, []);
+  const register = useCallback(async () => {}, []);
 
-        if (!newUser) {
 
-          throw {
-            status: 500,
-            message:
-              'Authentication failed. User information was not received.',
-          };
-        }
-
-
-        /*
-         * Remove demo session.
-         */
-
-        sessionStorage.removeItem(
-          DEMO_TOKEN_KEY
-        );
-
-        sessionStorage.removeItem(
-          DEMO_USER_KEY
-        );
-
-
-        /*
-         * Save real token.
-         */
-
-        sessionStorage.setItem(
-          REAL_TOKEN_KEY,
-          newToken
-        );
-        localStorage.setItem(
-          REAL_TOKEN_KEY,
-          newToken
-        );
-
-
-        /*
-         * Save complete user.
-         */
-
-        sessionStorage.setItem(
-          REAL_USER_KEY,
-          JSON.stringify(
-            newUser
-          )
-        );
-        localStorage.setItem(
-          REAL_USER_KEY,
-          JSON.stringify(
-            newUser
-          )
-        );
-
-
-        /*
-         * Update React state.
-         */
-
-        setToken(
-          newToken
-        );
-
-        setUser(
-          newUser
-        );
-
-        setIsDemoMode(
-          false
-        );
-
-
-        return newUser;
-      },
-      []
-    );
-
-
-  /* ==============================================================
-     REGISTER
-  ============================================================== */
-
-  const register =
-    useCallback(
-      async (
-        payload
-      ) => {
-
-        const data =
-          await api.register(
-            payload
-          );
-
-
-        if (data?.token) {
-
-          const registeredUser =
-            data?.user ||
-            data?.data ||
-            null;
-
-
-          /*
-           * Remove demo session.
-           */
-
-          sessionStorage.removeItem(
-            DEMO_TOKEN_KEY
-          );
-
-          sessionStorage.removeItem(
-            DEMO_USER_KEY
-          );
-
-
-          /*
-           * Save token.
-           */
-
-          sessionStorage.setItem(
-            REAL_TOKEN_KEY,
-            data.token
-          );
-          localStorage.setItem(
-            REAL_TOKEN_KEY,
-            data.token
-          );
-
-
-          /*
-           * Save user.
-           */
-
-          if (registeredUser) {
-
-            sessionStorage.setItem(
-              REAL_USER_KEY,
-              JSON.stringify(
-                registeredUser
-              )
-            );
-            localStorage.setItem(
-              REAL_USER_KEY,
-              JSON.stringify(
-                registeredUser
-              )
-            );
-          }
-
-
-          setToken(
-            data.token
-          );
-
-          setUser(
-            registeredUser
-          );
-
-          setIsDemoMode(
-            false
-          );
-        }
-
-
-        return data;
-      },
-      []
-    );
-
-
-  /* ==============================================================
-     DEMO LOGIN
-  ============================================================== */
-
-  const demoLogin =
-    useCallback(
-      () => {
-
-        /*
-         * Clear real session.
-         */
-
-        sessionStorage.removeItem(
-          REAL_TOKEN_KEY
-        );
-
-        sessionStorage.removeItem(
-          REAL_USER_KEY
-        );
-
-
-        /*
-         * Create demo session.
-         */
-
-        const demoToken =
-          `demo-session-${Date.now()}`;
-
-
-        sessionStorage.setItem(
-          DEMO_TOKEN_KEY,
-          demoToken
-        );
-
-
-        sessionStorage.setItem(
-          DEMO_USER_KEY,
-          JSON.stringify(
-            DEMO_USER
-          )
-        );
-
-
-        /*
-         * Update state.
-         */
-
-        setToken(
-          demoToken
-        );
-
-        setUser(
-          DEMO_USER
-        );
-
-        setIsDemoMode(
-          true
-        );
-      },
-      []
-    );
-
-
-  /* ==============================================================
-     LOGOUT
-  ============================================================== */
-
-  const logout =
-    useCallback(
-      () => {
-
-        /*
-         * Clear real session.
-         */
-
-        sessionStorage.removeItem(
-          REAL_TOKEN_KEY
-        );
-        localStorage.removeItem(
-          REAL_TOKEN_KEY
-        );
-
-        sessionStorage.removeItem(
-          REAL_USER_KEY
-        );
-        localStorage.removeItem(
-          REAL_USER_KEY
-        );
-
-
-        /*
-         * Clear demo session.
-         */
-
-        sessionStorage.removeItem(
-          DEMO_TOKEN_KEY
-        );
-        localStorage.removeItem(
-          DEMO_TOKEN_KEY
-        );
-
-        sessionStorage.removeItem(
-          DEMO_USER_KEY
-        );
-        localStorage.removeItem(
-          DEMO_USER_KEY
-        );
-
-
-        /*
-         * Clear React state.
-         */
-
-        setToken(null);
-
-        setUser(null);
-
-        setIsDemoMode(false);
-      },
-      []
-    );
-
-
-  /* ==============================================================
-     CONTEXT VALUE
-  ============================================================== */
-
+  /* ── Context value ──────────────────────────────────────────────────────── */
   const value = {
-    user,
-
-    token,
-
-    isAuthenticated:
-      Boolean(token),
-
+    // Core auth
+    user:            effectiveUser,
+    token:           tokenSnapshot,
+    isAuthenticated,
     isDemoMode,
-
     loading,
 
+    // Profile state
+    profileComplete,
+    appUser,
+
+    // Actions
     login,
-
     register,
-
     demoLogin,
-
     logout,
+    refreshAppUser,
   };
 
-
   return (
-    <AuthContext.Provider
-      value={value}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 }
-
-
-export default AuthContext;

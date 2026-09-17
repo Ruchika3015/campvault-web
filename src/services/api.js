@@ -5,6 +5,30 @@ const BASE_URL =
 
 /**
  * ================================================================
+ * TOKEN FACTORY
+ * ================================================================
+ * api.js is a plain module — it cannot call React hooks.
+ * AuthContext calls setTokenFactory() on mount and whenever the
+ * Clerk session changes, providing an async function that returns
+ * the current session token.
+ *
+ * apiRequest() calls this factory before every request so it always
+ * uses a fresh, valid token.
+ */
+
+let _tokenFactory = () => Promise.resolve(null);
+
+/**
+ * Called by AuthContext to inject the Clerk token getter.
+ * @param {() => Promise<string|null>} factory
+ */
+export function setTokenFactory(factory) {
+  _tokenFactory = factory;
+}
+
+
+/**
+ * ================================================================
  * LOW-LEVEL API REQUEST
  * ================================================================
  */
@@ -13,11 +37,9 @@ export async function apiRequest(
   path,
   options = {}
 ) {
-  const token =
-    sessionStorage.getItem('campvault_token') ||
-    localStorage.getItem('campvault_token') ||
-    sessionStorage.getItem('cj_token') ||
-    localStorage.getItem('cj_token');
+  // Get the current Clerk session token (or demo/legacy token).
+  // This is async because Clerk may need to refresh the token.
+  const token = await _tokenFactory();
 
 
   const isFormData =
@@ -183,102 +205,38 @@ export const api = {
 
   // ================================================================
   // AUTH
-  // Backend: /api/auth
   // ================================================================
 
-  register: (
-    payload
-  ) =>
-    apiRequest(
-      '/api/auth/register',
-      {
-        method: 'POST',
+  // POST /api/auth/sync — called after every Clerk sign-in.
+  // Ensures the MongoDB profile exists and returns profileComplete state.
+  syncProfile: () =>
+    apiRequest('/api/auth/sync', { method: 'POST', body: JSON.stringify({}) }),
 
-        body:
-          JSON.stringify(
-            payload
-          ),
-      }
-    ),
+  // POST /api/profile/complete — submits the profile completion form.
+  completeProfile: (payload) =>
+    apiRequest('/api/profile/complete', {
+      method: 'POST',
+      body:   JSON.stringify(payload),
+    }),
 
+  // ── Kept for Android app compatibility (not used by web) ──────────────────
+  register: (payload) =>
+    apiRequest('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
 
-  login: (
-    payload
-  ) =>
-    apiRequest(
-      '/api/auth/login',
-      {
-        method: 'POST',
+  login: (payload) =>
+    apiRequest('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
 
-        body:
-          JSON.stringify(
-            payload
-          ),
-      }
-    ),
+  googleLogin: (payload) =>
+    apiRequest('/api/auth/google', { method: 'POST', body: JSON.stringify(payload) }),
 
+  forgotPassword: (email) =>
+    apiRequest('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
 
-  googleLogin: (
-    payload
-  ) =>
-    apiRequest(
-      '/api/auth/google',
-      {
-        method: 'POST',
+  verifyOtp: (email, otp) =>
+    apiRequest('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, otp }) }),
 
-        body:
-          JSON.stringify(
-            payload
-          ),
-      }
-    ),
-
-
-  forgotPassword: (
-    email
-  ) =>
-    apiRequest(
-      '/api/auth/forgot-password',
-      {
-        method: 'POST',
-
-        body:
-          JSON.stringify({ email }),
-      }
-    ),
-
-
-  verifyOtp: (
-    email,
-    otp
-  ) =>
-    apiRequest(
-      '/api/auth/verify-otp',
-      {
-        method: 'POST',
-
-        body:
-          JSON.stringify({ email, otp }),
-      }
-    ),
-
-
-  resetPassword: (
-    resetToken,
-    newPassword
-  ) =>
-    apiRequest(
-      '/api/auth/reset-password',
-      {
-        method: 'POST',
-
-        body:
-          JSON.stringify({
-            resetToken,
-            newPassword,
-          }),
-      }
-    ),
+  resetPassword: (resetToken, newPassword) =>
+    apiRequest('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ resetToken, newPassword }) }),
 
 
   // ================================================================

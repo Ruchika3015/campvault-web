@@ -1,8 +1,15 @@
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ClerkProvider } from '@clerk/clerk-react';
 import App from './App.jsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary.jsx';
 import './index.css';
+
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env — add it and restart the dev server.');
+}
 
 const THEME_KEY = 'campvault_theme';
 const SETTINGS_KEY = 'campvault_settings';
@@ -26,7 +33,9 @@ applyInitialTheme();
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+        <App />
+      </ClerkProvider>
     </ErrorBoundary>
   </StrictMode>
 );

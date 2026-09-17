@@ -27,7 +27,8 @@ import { ConversationPage } from '@/components/workshop/pages/ConversationPage';
 import { ConversationsListPage } from '@/components/workshop/pages/ConversationsListPage';
 import { ProfilePage } from '@/components/workshop/pages/ProfilePage';
 import { SettingsPage } from '@/components/workshop/pages/SettingsPage';
-import { ProtectedRoute, GuestRoute } from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute, GuestRoute, RequireAuth } from '@/components/auth/ProtectedRoute';
+import { CompleteProfilePage } from '@/components/auth/CompleteProfilePage';
 import { InfoPage } from '@/components/pages/InfoPage';
 
 function LandingPage() {
@@ -59,6 +60,16 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<LandingPage />} />
+              {/* /complete-profile — auth required, but NOT profileComplete required */}
+              <Route
+                path="/complete-profile"
+                element={
+                  <RequireAuth>
+                    <CompleteProfilePage />
+                  </RequireAuth>
+                }
+              />
+
               <Route
                 path="/login"
                 element={

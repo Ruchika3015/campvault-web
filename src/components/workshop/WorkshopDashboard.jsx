@@ -61,7 +61,7 @@ export function DashboardPage() {
               <span className="text-amber">THE WORKSHOP.</span>
             </h1>
             <p className="mt-4 max-w-lg text-sm sm:text-base text-ink-2 leading-relaxed">
-              Your creative control center. Find the skill you need, drop a task into the exchange,
+              Your creative control center. Find the skill you need, post a gig on CampusVault,
               and see what the campus can solve together.
             </p>
           </div>

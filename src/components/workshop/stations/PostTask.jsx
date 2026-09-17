@@ -155,8 +155,8 @@ export function PostTaskStation({ open, onClose }) {
             >
               <span className="ctrl-led" />
               <span className="flex items-center gap-2">
-                {phase === 'dropping' ? (<><Loader2 size={14} className="animate-spin" /> DROPPING INTO EXCHANGE...</>) :
-                 (<><ArrowRight size={14} /> DROP INTO EXCHANGE</>)}
+                {phase === 'dropping' ? (<><Loader2 size={14} className="animate-spin" /> POSTING TO CAMPUSVAULT...</>) :
+                 (<><ArrowRight size={14} /> POST TO CAMPUSVAULT</>)}
               </span>
             </button>
           </form>
@@ -172,7 +172,7 @@ export function PostTaskStation({ open, onClose }) {
               <LED color="amber" blink size={5} />
               <span className="font-technical text-[9px] text-ink-2">STATUS: SEARCHING FOR A JUGAAD</span>
             </div>
-            <p className="mt-4 font-mono text-[9px] text-ink-3">Your request is now in the exchange.</p>
+            <p className="mt-4 font-mono text-[9px] text-ink-3">Your request is now live on CampusVault.</p>
             <button
               onClick={reset}
               className="machine-control machine-control--ghost mt-5"

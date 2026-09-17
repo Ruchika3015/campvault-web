@@ -69,7 +69,7 @@ export function LoginPage() {
             <span className="font-technical text-[9px] text-ink-2 tracking-widest">02 — THE ENTRY TERMINAL</span>
           </div>
           <h1 className="font-display text-5xl xl:text-6xl tracking-tight text-ink-0 leading-none mb-6 anim-reveal" style={{ animationDelay: '0.1s' }}>
-            BACK ON<br />THE <span className="text-amber">EXCHANGE.</span>
+            BACK ON<br />THE <span className="text-amber">CAMPUS<br />VAULT.</span>
           </h1>
           <p className="text-sm text-ink-2 max-w-sm anim-reveal" style={{ animationDelay: '0.2s' }}>
             The campus freelance exchange. Post gigs, land jugaads, build your rep.
@@ -86,7 +86,7 @@ export function LoginPage() {
             <span className="font-technical text-[9px] text-ink-2">02 — The Entry Terminal</span>
           </div>
           <h1 className="font-display text-3xl tracking-tight text-ink-0">
-            BACK ON <span className="text-amber">EXCHANGE?</span>
+            BACK ON <span className="text-amber">CAMPUSVAULT?</span>
           </h1>
         </div>
 
@@ -98,7 +98,7 @@ export function LoginPage() {
         />
 
         <div className="mt-4 flex flex-col items-center justify-center gap-2">
-          <span className="font-technical text-[7px] text-ink-3">AUTHENTICATED BY CAMPUSVAULT EXCHANGE</span>
+          <span className="font-technical text-[7px] text-ink-3">AUTHENTICATED BY CAMPUSVAULT</span>
         </div>
       </div>
     </div>

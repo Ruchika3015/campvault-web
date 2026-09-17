@@ -469,7 +469,7 @@ export function MyJugaadsPage() {
 
         <Header
           title="MY GIGS"
-          sub="The requirements you posted on the exchange."
+          sub="The requirements you posted on CampusVault."
           icon={
             <ClipboardList />
           }
@@ -716,7 +716,7 @@ export function MyJugaadsPage() {
 
           <p className="font-mono text-xs text-ink-2 mt-2 max-w-sm mx-auto">
             You haven't posted any requirements yet.
-            Publish a gig on the exchange to get help from campus peers.
+            Publish a gig on CampusVault to get help from campus peers.
           </p>
 
           <Link

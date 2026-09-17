@@ -68,7 +68,7 @@ export function SignupPage() {
             <span className="font-technical text-[9px] text-ink-2 tracking-widest">01 — REGISTRATION TERMINAL</span>
           </div>
           <h1 className="font-display text-5xl xl:text-6xl tracking-tight text-ink-0 leading-none mb-6 anim-reveal" style={{ animationDelay: '0.1s' }}>
-            JOIN THE<br /><span className="text-mint">EXCHANGE.</span>
+            JOIN<br /><span className="text-mint">CAMPUSVAULT.</span>
           </h1>
           <p className="text-sm text-ink-2 max-w-sm anim-reveal" style={{ animationDelay: '0.2s' }}>
             The campus freelance exchange. Post gigs, land jugaads, build your rep — all within your college ecosystem.
@@ -100,7 +100,7 @@ export function SignupPage() {
         />
 
         <div className="mt-4 flex flex-col items-center justify-center gap-2">
-          <span className="font-technical text-[7px] text-ink-2">CAMPUSVAULT EXCHANGE · STUDENT ROLE ASSIGNED AUTOMATICALLY</span>
+          <span className="font-technical text-[7px] text-ink-2">CAMPUSVAULT · STUDENT ROLE ASSIGNED AUTOMATICALLY</span>
         </div>
       </div>
     </div>

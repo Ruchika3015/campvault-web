@@ -87,7 +87,7 @@ export function CompleteProfilePage() {
       if (err.status === 400) {
         setSubmitError(err.message || 'Please check the form fields.');
       } else if (err.status === 0) {
-        setSubmitError('Exchange unavailable. Check your connection and try again.');
+        setSubmitError('CampusVault is unavailable. Check your connection and try again.');
       } else {
         setSubmitError(err.message || 'Something went wrong. Please try again.');
       }
@@ -127,7 +127,7 @@ export function CompleteProfilePage() {
               SET UP YOUR <span className="text-amber">VAULT</span>
             </h1>
             <p className="text-xs text-ink-2">
-              One-time setup. Your profile powers discovery, applications, and your reputation on the exchange.
+              One-time setup. Your profile powers discovery, applications, and your reputation on CampusVault.
             </p>
           </div>
 
@@ -265,7 +265,7 @@ export function CompleteProfilePage() {
                 {success ? (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    ENTERING EXCHANGE...
+                    ENTERING CAMPUSVAULT...
                   </>
                 ) : busy ? (
                   <>
@@ -274,7 +274,7 @@ export function CompleteProfilePage() {
                   </>
                 ) : (
                   <>
-                    ENTER THE EXCHANGE
+                    ENTER CAMPUSVAULT
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

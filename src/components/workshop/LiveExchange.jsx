@@ -4,7 +4,7 @@ import { api } from '@/services/api';
 import { Radio } from 'lucide-react';
 
 const DEFAULT_ACTIVITY = [
-  { id: '1', emoji: '🟢', text: 'Exchange network online', time: 'live' },
+  { id: '1', emoji: '🟢', text: 'CampusVault is live', time: 'live' },
   { id: '2', emoji: '🔒', text: 'Secure OTP verification ready', time: 'live' },
   { id: '3', emoji: '⚡', text: 'Direct peer-to-peer messaging ready', time: 'live' },
 ];
@@ -39,7 +39,7 @@ export function LiveExchange() {
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-metal-2/30">
         <div className="flex items-center gap-2">
           <Radio size={13} className="text-mint" />
-          <span className="font-technical text-[8px] text-ink-1">LIVE EXCHANGE</span>
+          <span className="font-technical text-[8px] text-ink-1">LIVE — CAMPUSVAULT</span>
         </div>
         <div className="flex items-center gap-1.5">
           <LED color="mint" pulse size={4} />

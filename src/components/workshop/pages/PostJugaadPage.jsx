@@ -610,7 +610,7 @@ export function PostJugaadPage() {
             ) : (
               <>
                 <Plus size={14} />
-                DROP INTO EXCHANGE
+                POST TO CAMPUSVAULT
               </>
             )}
           </button>

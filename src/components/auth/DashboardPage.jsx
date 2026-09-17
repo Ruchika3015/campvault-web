@@ -59,7 +59,7 @@ export function DashboardPage() {
 
           <p className="mt-6 max-w-md text-sm text-ink-2 leading-relaxed anim-reveal" style={{ animationDelay: '0.3s' }}>
             The Campusvault Workshop is active. Explore live campus gigs, post requirements,
-            and manage your exchanges directly from here.
+            and manage your gigs directly from here.
           </p>
 
           {/* Temporary station panel */}
@@ -87,14 +87,14 @@ export function DashboardPage() {
             <div className="mt-6 flex items-center gap-3 surface-panel rounded-xl p-4">
               <Wrench size={20} className="text-amber shrink-0" />
               <span className="font-mono text-xs text-ink-2">
-                Workshop modules arriving soon. The exchange is live.
+                Workshop modules arriving soon. CampusVault is live.
               </span>
             </div>
 
             <div className="mt-6">
               <TactileButton variant="amber" onClick={() => navigate('/')}>
                 <ArrowRight size={14} />
-                Back to Exchange
+                Back to CampusVault
               </TactileButton>
             </div>
           </div>

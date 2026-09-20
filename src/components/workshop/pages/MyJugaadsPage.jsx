@@ -25,7 +25,7 @@ function timeAgo(date) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-import { api } from '@/services/api';
+import { api, apiRequest } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { useProposals } from '@/context/ProposalContext';
 
@@ -1871,11 +1871,120 @@ function ProposalDetailCard({
 
           <button
             type="button"
-            onClick={() =>
-              window.alert(
-                'Payment button clicked'
-              )
-            }
+            onClick={async () => {
+              try {
+                const profileResponse = await api.getProfile();
+                const profile =
+                  profileResponse?.data ||
+                  profileResponse?.user ||
+                  profileResponse ||
+                  {};
+
+                const amount = Number(proposedAmount);
+
+                if (!Number.isFinite(amount) || amount <= 0) {
+                  throw new Error('Invalid payment amount');
+                }
+
+                const orderId = `campusvault_${Date.now()}`;
+                const customerId = String(
+                  profile?._id ||
+                  profile?.id ||
+                  `customer_${Date.now()}`
+                );
+                const customerName =
+                  profile?.name ||
+                  profile?.fullName ||
+                  profile?.username ||
+                  'CampusVault User';
+                const customerEmail =
+                  profile?.email ||
+                  profile?.emailAddress;
+                const customerPhone =
+                  profile?.phone ||
+                  profile?.phoneNumber ||
+                  profile?.mobile;
+
+                if (!customerEmail) {
+                  throw new Error('Your profile email is required for payment');
+                }
+
+                if (!customerPhone) {
+                  throw new Error('Your profile phone number is required for payment');
+                }
+
+                const response = await api.createPaymentOrder({
+  orderId,
+  amount,
+  customerId,
+  customerName,
+  customerEmail,
+  customerPhone: String(customerPhone),
+});
+
+                const paymentSessionId =
+                  response?.data?.payment_session_id ||
+                  response?.payment_session_id;
+
+                if (!paymentSessionId) {
+                  throw new Error('Cashfree payment session was not created');
+                }
+
+                if (!window.Cashfree) {
+                  await new Promise((resolve, reject) => {
+                    const existingScript = document.querySelector(
+                      'script[src=\"https://sdk.cashfree.com/js/v3/cashfree.js\"]'
+                    );
+
+                    if (existingScript) {
+                      existingScript.addEventListener('load', resolve, { once: true });
+                      existingScript.addEventListener('error', reject, { once: true });
+                      return;
+                    }
+
+                    const script = document.createElement('script');
+                    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+                    script.async = true;
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.body.appendChild(script);
+                  });
+                }
+
+                if (!window.Cashfree) {
+                  throw new Error('Cashfree SDK could not be loaded');
+                }
+
+                const cashfree = window.Cashfree({ mode: 'sandbox' });
+
+                await cashfree.checkout({
+                  paymentSessionId,
+                  redirectTarget: '_modal',
+                });
+
+                const statusResponse =
+  await api.getPaymentOrderStatus(orderId);
+
+                const paymentStatus =
+                  statusResponse?.data ||
+                  statusResponse ||
+                  {};
+
+                if (paymentStatus?.order_status === 'PAID') {
+                  window.alert('Payment successful! ✅');
+                } else {
+                  window.alert(
+                    `Payment status: ${paymentStatus?.order_status || 'UNKNOWN'}`
+                  );
+                }
+              } catch (error) {
+                console.error('Cashfree payment error:', error);
+                window.alert(
+                  error?.message ||
+                  'Payment could not be started. Please try again.'
+                );
+              }
+            }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors"
           >
             <HandCoins

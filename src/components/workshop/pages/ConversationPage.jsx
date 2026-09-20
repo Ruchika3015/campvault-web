@@ -82,6 +82,53 @@ function extractMessages(
 }
 
 
+function normalizeConversation(
+  conversation
+) {
+  if (
+    !conversation ||
+    typeof conversation !== 'object'
+  ) {
+    return null;
+  }
+
+  return {
+    ...conversation,
+    id:
+      conversation.id ??
+      conversation.conversationId ??
+      conversation.conversation_id ??
+      conversation._id,
+    other_user_name:
+      conversation.other_user_name ??
+      conversation.otherUser?.name ??
+      conversation.user?.name,
+    other_user_id:
+      conversation.other_user_id ??
+      conversation.otherUser?._id ??
+      conversation.otherUser?.id ??
+      conversation.user?._id ??
+      conversation.user?.id,
+    other_user_email:
+      conversation.other_user_email ??
+      conversation.otherUser?.email ??
+      conversation.user?.email,
+    jugaad_title:
+      conversation.jugaad_title ??
+      conversation.gig_title ??
+      conversation.jugaadTitle ??
+      conversation.gigTitle,
+    jugaad_id:
+      conversation.jugaad_id ??
+      conversation.jugaadId ??
+      conversation.gigId,
+    proposal_id:
+      conversation.proposal_id ??
+      conversation.proposalId,
+  };
+}
+
+
 function getMessageText(
   message
 ) {
@@ -225,19 +272,27 @@ export function ConversationPage() {
           );
 
         const foundConversation =
-          conversations.find(
-            (item) =>
-              String(
-                item?.id ??
-                  item?.conversation_id
-              ) ===
-              String(
-                conversationId
-              )
+          conversations
+            .map(normalizeConversation)
+            .find(
+              (item) =>
+                String(
+                  item?.id
+                ) ===
+                String(
+                  conversationId
+                )
+            );
+
+        const messageConversation =
+          normalizeConversation(
+            messagesResponse?.conversation ??
+              messagesResponse?.data?.conversation
           );
 
         setConversation(
           foundConversation ||
+            messageConversation ||
             null
         );
 

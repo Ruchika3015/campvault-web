@@ -508,6 +508,22 @@ export const api = {
   // Backend: /api/gigs
   // ================================================================
 
+  // ================================================================
+// PAYMENTS
+// Backend: /api/payment
+// ================================================================
+
+createPaymentOrder: (payload) =>
+  apiRequest('/api/payment/create-order', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+
+getPaymentOrderStatus: (orderId) =>
+  apiRequest(
+    `/api/payment/order-status/${encodeURIComponent(orderId)}`
+  ),
+  
   createJugaad: (payload) => {
     const formatted = { ...payload };
     if (!formatted.skillsRequired && formatted.required_skills) {

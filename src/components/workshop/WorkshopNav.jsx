@@ -200,13 +200,29 @@ export function WorkshopNav() {
 
 
   /* ==============================================================
-     INITIAL NOTIFICATION LOAD
+     NOTIFICATION REFRESH
   ============================================================== */
 
   useEffect(() => {
     fetchNotifications();
+
+    if (!isAuthenticated) {
+      return undefined;
+    }
+
+    const intervalId =
+      window.setInterval(
+        fetchNotifications,
+        10000
+      );
+
+    return () =>
+      window.clearInterval(
+        intervalId
+      );
   }, [
     fetchNotifications,
+    isAuthenticated,
   ]);
 
 
@@ -221,6 +237,57 @@ export function WorkshopNav() {
         notification.is_read === false ||
         notification.read === false
     ).length;
+
+
+  /* ==============================================================
+     MARK INDIVIDUAL NOTIFICATION READ
+  ============================================================== */
+
+  const handleNotificationClick =
+    async (
+      notification
+    ) => {
+
+      const isUnread =
+        notification.unread ||
+        notification.is_read === false ||
+        notification.read === false;
+
+      if (isUnread) {
+        setNotifications(
+          (prev) =>
+            prev.map(
+              (item) =>
+                item.id === notification.id
+                  ? {
+                      ...item,
+                      unread: false,
+                      is_read: true,
+                      read: true,
+                    }
+                  : item
+            )
+        );
+      }
+
+      if (isDemoMode) {
+        setNotifOpen(false);
+        return;
+      }
+
+      try {
+        await api.markNotificationRead(
+          notification.id
+        );
+      } catch (error) {
+        console.error(
+          'Failed to mark notification as read:',
+          error
+        );
+      }
+
+      setNotifOpen(false);
+    };
 
 
   /* ==============================================================
@@ -662,16 +729,13 @@ export function WorkshopNav() {
               {unreadNotifs >
                 0 && (
                 <span
-                  className="absolute -top-0.5 -right-0.5 grid place-items-center w-3.5 h-3.5 rounded-full text-[7px] font-bold text-bg-0"
+                  className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
                   style={{
                     background:
                       'var(--coral)',
                   }}
-                >
-                  {
-                    unreadNotifs
-                  }
-                </span>
+                  aria-label="Unread notifications"
+                />
               )}
 
             </button>
@@ -904,8 +968,8 @@ export function WorkshopNav() {
                         )
                       }
                       onClick={() =>
-                        setNotifOpen(
-                          false
+                        handleNotificationClick(
+                          notification
                         )
                       }
                       className="flex items-start gap-2.5 surface-metal rounded-lg p-2.5 hover:border-amber/30 transition-colors"

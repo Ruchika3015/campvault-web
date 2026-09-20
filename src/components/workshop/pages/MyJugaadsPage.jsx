@@ -1900,21 +1900,38 @@ function ProposalDetailCard({
                 const customerEmail =
                   profile?.email ||
                   profile?.emailAddress;
-                const customerPhone = '9999999999';
+                const customerPhone =
+  profile?.number ||
+  profile?.phone ||
+  profile?.phoneNumber ||
+  profile?.mobile;
 
                 if (!customerEmail) {
                   throw new Error('Your profile email is required for payment');
                 }
 
+                if (!customerPhone) {
+  throw new Error(
+    'Please add your phone number in your profile before making a payment'
+  );
+}
                
+const cleanPhone = String(customerPhone)
+  .replace(/\s+/g, '')
+  .replace(/^(\+91|91)/, '');
 
+if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+  throw new Error(
+    'Please enter a valid 10-digit Indian mobile number in your profile'
+  );
+}
                 const response = await api.createPaymentOrder({
   orderId,
   amount,
   customerId,
   customerName,
   customerEmail,
-  customerPhone: String(customerPhone),
+  customerPhone: cleanPhone,
 });
 
                 const paymentSessionId =

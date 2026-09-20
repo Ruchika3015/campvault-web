@@ -1900,18 +1900,13 @@ function ProposalDetailCard({
                 const customerEmail =
                   profile?.email ||
                   profile?.emailAddress;
-                const customerPhone =
-                  profile?.phone ||
-                  profile?.phoneNumber ||
-                  profile?.mobile;
+                const customerPhone = '9999999999';
 
                 if (!customerEmail) {
                   throw new Error('Your profile email is required for payment');
                 }
 
-                if (!customerPhone) {
-                  throw new Error('Your profile phone number is required for payment');
-                }
+               
 
                 const response = await api.createPaymentOrder({
   orderId,

@@ -107,6 +107,7 @@ export function ProfilePage() {
     useState({
       name: '',
       email: '',
+      number: '',
       bio: '',
       college: '',
       branch: '',
@@ -330,6 +331,7 @@ export function ProfilePage() {
           setEditForm({
             name: loadedProfile.name || '',
             email: loadedProfile.email || '',
+            number: loadedProfile.number || '',
             bio: loadedProfile.bio || '',
             college: loadedProfile.college || '',
             branch: loadedProfile.branch || '',
@@ -731,6 +733,7 @@ export function ProfilePage() {
       setEditForm({
         name: profile?.name || '',
         email: profile?.email || '',
+        number: profile?.number || '',
         bio: profile?.bio || '',
         college: profile?.college || '',
         branch: profile?.branch || '',
@@ -761,6 +764,7 @@ export function ProfilePage() {
       setEditForm({
         name: profile?.name || '',
         email: profile?.email || '',
+        number: profile?.number || '',
         bio: profile?.bio || '',
         college: profile?.college || '',
         branch: profile?.branch || '',
@@ -793,7 +797,8 @@ export function ProfilePage() {
 
         const payload = {
           name: editForm.name.trim(),
-          bio: editForm.bio ? editForm.bio.trim() : '',
+            number: editForm.number ? editForm.number.trim() : '',
+            bio: editForm.bio ? editForm.bio.trim() : '',
           college: editForm.college ? editForm.college.trim() : '',
           branch: editForm.branch ? editForm.branch.trim() : '',
           yearOfStudy: editForm.yearOfStudy ? editForm.yearOfStudy.trim() : '',
@@ -804,6 +809,15 @@ export function ProfilePage() {
 
         if (!payload.name || payload.name.length < 2) {
           throw new Error('Name must be at least 2 characters.');
+        }
+
+        if (
+          payload.number &&
+          !/^[6-9]\d{9}$/.test(payload.number)
+        ) {
+          throw new Error(
+            'Phone number must be a valid 10-digit Indian mobile number.'
+          );
         }
 
         const result =
@@ -826,6 +840,7 @@ export function ProfilePage() {
         setEditForm({
           name: updatedProfile.name || payload.name,
           email: updatedProfile.email || editForm.email,
+          number: updatedProfile.number || payload.number,
           bio: updatedProfile.bio || payload.bio,
           college: updatedProfile.college || payload.college,
           branch: updatedProfile.branch || payload.branch,
@@ -2618,6 +2633,20 @@ export function ProfilePage() {
 
                 required
 
+              />
+
+
+              <ProfileInput
+                id="profile-number"
+                label="PHONE NUMBER"
+                name="number"
+                type="tel"
+                value={editForm.number}
+                onChange={handleEditChange}
+                placeholder="10-digit Indian mobile number"
+                inputMode="numeric"
+                pattern="[6-9][0-9]{9}"
+                maxLength={10}
               />
 
 

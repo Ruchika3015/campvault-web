@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import {
+  Link,
+  useNavigate,
+} from 'react-router-dom';
 
 import { LED } from '@/components/primitives/Details';
 
@@ -1501,6 +1504,10 @@ function Detail({
                         proposal.id
                       }
 
+                      item={
+                        item
+                      }
+
                       proposal={
                         proposal
                       }
@@ -1647,11 +1654,24 @@ function Detail({
 ============================================================ */
 
 function ProposalDetailCard({
+  item,
   proposal,
   onAccept,
   onReject,
   onCounter,
 }) {
+  const navigate =
+    useNavigate();
+
+  const [
+    openingConversation,
+    setOpeningConversation,
+  ] = useState(false);
+
+  const [
+    conversationError,
+    setConversationError,
+  ] = useState('');
 
   const normalized =
     normalizeProposal(
@@ -1692,6 +1712,108 @@ function ProposalDetailCard({
     getValidConversationId(
       normalized
     );
+
+  const handleOpenConversation =
+    async () => {
+      const receiverId =
+        normalized?.helperId ??
+        normalized?.helper_id ??
+        normalized?.helper?.id;
+
+      const gigId =
+        item?.id;
+
+      if (
+        !receiverId ||
+        !gigId
+      ) {
+        setConversationError(
+          'Conversation details are unavailable.'
+        );
+
+        return;
+      }
+
+      try {
+        setOpeningConversation(true);
+        setConversationError('');
+
+        const conversationsResponse =
+          await api.getConversations();
+
+        const conversations =
+          Array.isArray(
+            conversationsResponse
+          )
+            ? conversationsResponse
+            : conversationsResponse?.conversations ??
+              conversationsResponse?.data ??
+              [];
+
+        const existingConversation =
+          conversations.find(
+            (candidate) => {
+              const candidateGigId =
+                candidate?.gig?._id ??
+                candidate?.gig?.id ??
+                candidate?.gig ??
+                null;
+
+              const participantIds =
+                Array.isArray(
+                  candidate?.participants
+                )
+                  ? candidate.participants.map(
+                      (participant) =>
+                        participant?._id ??
+                        participant?.id ??
+                        participant
+                    )
+                  : [];
+
+              return (
+                String(candidateGigId) ===
+                  String(gigId) &&
+                participantIds.some(
+                  (participantId) =>
+                    String(participantId) ===
+                    String(receiverId)
+                ) &&
+                Boolean(candidate?._id)
+              );
+            }
+          );
+
+        const conversation =
+          existingConversation ||
+          await api.createConversation({
+            receiverId,
+            gigId,
+          });
+
+        if (!conversation?._id) {
+          throw new Error(
+            'Conversation ID was not returned by the server.'
+          );
+        }
+
+        navigate(
+          `/dashboard/messages/${conversation._id}`
+        );
+      } catch (error) {
+        console.error(
+          'Failed to open conversation:',
+          error
+        );
+
+        setConversationError(
+          error?.message ||
+            'Unable to open this conversation.'
+        );
+      } finally {
+        setOpeningConversation(false);
+      }
+    };
 
 
   const helperName =
@@ -1846,27 +1968,56 @@ function ProposalDetailCard({
 
           {conversationId ? (
 
-            <Link
-              to={`/dashboard/messages/${conversationId}`}
+            <button
+              type="button"
+              onClick={
+                handleOpenConversation
+              }
+              disabled={
+                openingConversation
+              }
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors"
             >
               <MessageSquare
                 size={14}
               />
 
-              MESSAGE
+              {
+                openingConversation
+                  ? 'OPENING...'
+                  : 'MESSAGE'
+              }
 
-            </Link>
+            </button>
 
           ) : (
 
-            <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-bg-2 text-ink-3 font-technical text-xs">
+            <button
+              type="button"
+              onClick={
+                handleOpenConversation
+              }
+              disabled={
+                openingConversation
+              }
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors disabled:opacity-50"
+            >
               <MessageSquare
                 size={14}
               />
-              CONVERSATION UNAVAILABLE
-            </span>
+              {
+                openingConversation
+                  ? 'OPENING...'
+                  : 'MESSAGE'
+              }
+            </button>
 
+          )}
+
+          {conversationError && (
+            <p className="w-full font-mono text-[9px] text-coral">
+              {conversationError}
+            </p>
           )}
 
           <button

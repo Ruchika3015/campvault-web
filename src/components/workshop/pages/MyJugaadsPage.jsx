@@ -1033,7 +1033,6 @@ function Detail({
       ? item.interestedStudents
       : [];
 
-
   /*
    * Remove direct-interest entries that already have
    * a proposal from the same student.
@@ -1708,6 +1707,13 @@ function ProposalDetailCard({
     normalized?.amount ??
     0;
 
+  const formattedProposedAmount =
+    Number(
+      proposedAmount
+    ).toLocaleString(
+      'en-IN'
+    );
+
 
   return (
     <div className="surface-panel rounded-xl p-4">
@@ -1799,11 +1805,7 @@ function ProposalDetailCard({
 
               ₹
               {
-                Number(
-                  proposedAmount
-                ).toLocaleString(
-                  'en-IN'
-                )
+                formattedProposedAmount
               }
 
             </span>
@@ -1866,6 +1868,23 @@ function ProposalDetailCard({
             </span>
 
           )}
+
+          <button
+            type="button"
+            onClick={() =>
+              window.alert(
+                'Payment button clicked'
+              )
+            }
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors"
+          >
+            <HandCoins
+              size={14}
+            />
+
+            PAY ₹
+            {formattedProposedAmount}
+          </button>
 
         </div>
 

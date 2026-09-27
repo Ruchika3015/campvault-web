@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -8,8 +9,9 @@ import {
   useParams,
 } from 'react-router-dom';
 
-import { api } from '@/services/api';
+import EmojiPicker from 'emoji-picker-react';
 
+import { api } from '@/services/api';
 
 /* ================================================================
    HELPERS
@@ -94,34 +96,41 @@ function normalizeConversation(
 
   return {
     ...conversation,
+
     id:
       conversation.id ??
       conversation.conversationId ??
       conversation.conversation_id ??
       conversation._id,
+
     other_user_name:
       conversation.other_user_name ??
       conversation.otherUser?.name ??
       conversation.user?.name,
+
     other_user_id:
       conversation.other_user_id ??
       conversation.otherUser?._id ??
       conversation.otherUser?.id ??
       conversation.user?._id ??
       conversation.user?.id,
+
     other_user_email:
       conversation.other_user_email ??
       conversation.otherUser?.email ??
       conversation.user?.email,
+
     jugaad_title:
       conversation.jugaad_title ??
       conversation.gig_title ??
       conversation.jugaadTitle ??
       conversation.gigTitle,
+
     jugaad_id:
       conversation.jugaad_id ??
       conversation.jugaadId ??
       conversation.gigId,
+
     proposal_id:
       conversation.proposal_id ??
       conversation.proposalId,
@@ -147,7 +156,11 @@ function getSenderId(
   return (
     message?.sender?._id ??
     message?.sender?.id ??
-    (typeof message?.sender === 'string' ? message?.sender : null) ??
+    (
+      typeof message?.sender === 'string'
+        ? message?.sender
+        : null
+    ) ??
     message?.sender_id ??
     message?.senderId ??
     message?.user_id ??
@@ -168,6 +181,101 @@ function getMessageId(
     message?.id ??
     message?.message_id ??
     `message-${index}`
+  );
+}
+
+
+function getMessageDate(
+  message
+) {
+  const value =
+    message?.created_at ||
+    message?.createdAt ||
+    message?.sent_at ||
+    message?.sentAt;
+
+  if (!value) {
+    return null;
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+
+function getDateKey(
+  date
+) {
+  if (!date) {
+    return '';
+  }
+
+  return [
+    date.getFullYear(),
+    String(
+      date.getMonth() + 1
+    ).padStart(2, '0'),
+    String(
+      date.getDate()
+    ).padStart(2, '0'),
+  ].join('-');
+}
+
+
+function getDateLabel(
+  date
+) {
+  if (!date) {
+    return '';
+  }
+
+  const today =
+    new Date();
+
+  const todayKey =
+    getDateKey(today);
+
+  const dateKey =
+    getDateKey(date);
+
+  if (
+    dateKey ===
+    todayKey
+  ) {
+    return 'TODAY';
+  }
+
+  const yesterday =
+    new Date(today);
+
+  yesterday.setDate(
+    yesterday.getDate() - 1
+  );
+
+  if (
+    dateKey ===
+    getDateKey(yesterday)
+  ) {
+    return 'YESTERDAY';
+  }
+
+  return date.toLocaleDateString(
+    [],
+    {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }
   );
 }
 
@@ -243,6 +351,17 @@ export function ConversationPage() {
     setError,
   ] = useState('');
 
+  const [
+    showEmojiPicker,
+    setShowEmojiPicker,
+  ] = useState(false);
+
+  const messagesEndRef =
+    useRef(null);
+
+  const emojiPickerRef =
+    useRef(null);
+
 
   /* ==============================================================
      LOAD CONVERSATION
@@ -273,7 +392,9 @@ export function ConversationPage() {
 
         const foundConversation =
           conversations
-            .map(normalizeConversation)
+            .map(
+              normalizeConversation
+            )
             .find(
               (item) =>
                 String(
@@ -287,13 +408,13 @@ export function ConversationPage() {
         const messageConversation =
           normalizeConversation(
             messagesResponse?.conversation ??
-              messagesResponse?.data?.conversation
+            messagesResponse?.data?.conversation
           );
 
         setConversation(
           foundConversation ||
-            messageConversation ||
-            null
+          messageConversation ||
+          null
         );
 
         setMessages(
@@ -309,7 +430,7 @@ export function ConversationPage() {
 
         setError(
           err?.message ||
-            'Unable to load this conversation.'
+          'Unable to load this conversation.'
         );
       } finally {
         setLoading(false);
@@ -434,6 +555,52 @@ export function ConversationPage() {
 
 
   /* ==============================================================
+     AUTO SCROLL TO LATEST MESSAGE
+  ============================================================== */
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth',
+    });
+  }, [messages]);
+
+
+  /* ==============================================================
+     CLOSE EMOJI PICKER WHEN CLICKING OUTSIDE
+  ============================================================== */
+
+  useEffect(() => {
+    const handleOutsideClick =
+      (event) => {
+        if (
+          emojiPickerRef.current &&
+          !emojiPickerRef.current.contains(
+            event.target
+          )
+        ) {
+          setShowEmojiPicker(false);
+        }
+      };
+
+    if (showEmojiPicker) {
+      document.addEventListener(
+        'mousedown',
+        handleOutsideClick
+      );
+    }
+
+    return () => {
+      document.removeEventListener(
+        'mousedown',
+        handleOutsideClick
+      );
+    };
+  }, [
+    showEmojiPicker,
+  ]);
+
+
+  /* ==============================================================
      SEND MESSAGE
   ============================================================== */
 
@@ -520,6 +687,10 @@ export function ConversationPage() {
         }
 
         setText('');
+
+        setShowEmojiPicker(
+          false
+        );
       } catch (err) {
         console.error(
           'Failed to send message:',
@@ -528,10 +699,50 @@ export function ConversationPage() {
 
         setError(
           err?.message ||
-            'Message could not be sent. Please try again.'
+          'Message could not be sent. Please try again.'
         );
       } finally {
         setSending(false);
+      }
+    };
+
+
+  /* ==============================================================
+     EMOJI
+  ============================================================== */
+
+  const handleEmojiClick =
+    (emojiData) => {
+      setText(
+        (currentText) =>
+          `${currentText}${emojiData.emoji}`
+      );
+    };
+
+
+  /* ==============================================================
+     KEYBOARD
+  ============================================================== */
+
+  const handleComposerKeyDown =
+    (event) => {
+      /*
+       * Enter = send
+       *
+       * Shift + Enter = new line
+       */
+      if (
+        event.key === 'Enter' &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+
+        if (
+          !sending &&
+          text.trim()
+        ) {
+          handleSend(event);
+        }
       }
     };
 
@@ -631,6 +842,7 @@ export function ConversationPage() {
 
   return (
     <div className="min-h-screen bg-bg-0 px-6 py-12 text-ink-0 md:px-10">
+
       <div className="mx-auto max-w-[1180px]">
 
         {/* =========================================================
@@ -656,7 +868,15 @@ export function ConversationPage() {
 
         <div className="mb-8 flex items-center gap-4">
 
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-black" style={{ background: 'linear-gradient(135deg, var(--mint), var(--mint-deep))', color: 'var(--bg-0)' }}>
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-black"
+            style={{
+              background:
+                'linear-gradient(135deg, var(--mint), var(--mint-deep))',
+              color:
+                'var(--bg-0)',
+            }}
+          >
             {initials}
           </div>
 
@@ -705,10 +925,13 @@ export function ConversationPage() {
             <div className="min-h-[480px] max-h-[600px] overflow-y-auto p-6">
 
               {messages.length === 0 ? (
+
                 <div className="flex min-h-[430px] items-center justify-center text-center text-sm text-ink-2">
                   No messages yet. Start the conversation!
                 </div>
+
               ) : (
+
                 <div className="space-y-4">
 
                   {messages.map(
@@ -722,6 +945,7 @@ export function ConversationPage() {
                           message
                         );
 
+
                       /*
                        * personId is the other
                        * participant.
@@ -733,9 +957,10 @@ export function ConversationPage() {
                         String(
                           senderId
                         ) !==
-                          String(
-                            personId
-                          );
+                        String(
+                          personId
+                        );
+
 
                       /*
                        * Prefer logged-in user ID
@@ -753,15 +978,54 @@ export function ConversationPage() {
                             )
                           : isMine;
 
+
                       const messageText =
                         getMessageText(
                           message
                         );
 
+
                       const time =
                         getMessageTime(
                           message
                         );
+
+
+                      const messageDate =
+                        getMessageDate(
+                          message
+                        );
+
+
+                      const currentDateKey =
+                        getDateKey(
+                          messageDate
+                        );
+
+
+                      const previousMessage =
+                        messages[
+                          index - 1
+                        ];
+
+
+                      const previousDate =
+                        getMessageDate(
+                          previousMessage
+                        );
+
+
+                      const previousDateKey =
+                        getDateKey(
+                          previousDate
+                        );
+
+
+                      const shouldShowDate =
+                        currentDateKey !== '' &&
+                        currentDateKey !==
+                          previousDateKey;
+
 
                       /*
                        * READ STATUS
@@ -781,111 +1045,141 @@ export function ConversationPage() {
                           message?.readAt
                         );
 
+
                       return (
                         <div
                           key={getMessageId(
                             message,
                             index
                           )}
-                          className={`flex w-full ${
-                            resolvedIsMine
-                              ? 'justify-end'
-                              : 'justify-start'
-                          }`}
                         >
 
-                          {/* ========================================
-                              MESSAGE BUBBLE
-                          ======================================== */}
+                          {/* =========================================
+                              DATE SEPARATOR
+                          ========================================= */}
+
+                          {shouldShowDate && (
+                            <div className="my-5 flex items-center justify-center">
+
+                              <div className="rounded-full border border-metal-1/40 bg-bg-2 px-4 py-1.5 font-technical text-[9px] font-semibold uppercase tracking-[0.2em] text-ink-2">
+                                {getDateLabel(
+                                  messageDate
+                                )}
+                              </div>
+
+                            </div>
+                          )}
+
+
+                          {/* =========================================
+                              MESSAGE ROW
+                          ========================================= */}
 
                           <div
-                            className={`
-                              max-w-[78%]
-                              rounded-2xl
-                              px-4
-                              py-3
-                              shadow-sm
-                              ${
-                                resolvedIsMine
-                                  ? `
-                                    rounded-br-md
-                                    bg-mint
-                                    text-bg-0
-                                  `
-                                  : `
-                                    rounded-bl-md
-                                    border
-                                    border-metal-1/40
-                                    bg-bg-2
-                                    text-ink-0
-                                  `
-                              }
-                            `}
+                            className={`flex w-full ${
+                              resolvedIsMine
+                                ? 'justify-end'
+                                : 'justify-start'
+                            }`}
                           >
 
-                            {/* MESSAGE */}
+                            {/* =====================================
+                                MESSAGE BUBBLE
+                            ===================================== */}
 
-                            <div className="break-words text-sm leading-6">
-                              {messageText}
-                            </div>
+                            <div
+                              className={`
+                                max-w-[78%]
+                                rounded-2xl
+                                px-4
+                                py-3
+                                shadow-sm
+                                ${
+                                  resolvedIsMine
+                                    ? `
+                                      rounded-br-md
+                                      bg-mint
+                                      text-bg-0
+                                    `
+                                    : `
+                                      rounded-bl-md
+                                      border
+                                      border-metal-1/40
+                                      bg-bg-2
+                                      text-ink-0
+                                    `
+                                }
+                              `}
+                            >
 
+                              {/* MESSAGE */}
 
-                            {/* TIME + TICKS */}
-
-                            {(
-                              time ||
-                              resolvedIsMine
-                            ) && (
-                              <div
-                                className={`
-                                  mt-1
-                                  flex
-                                  items-center
-                                  gap-1
-                                  text-[10px]
-                                  ${
-                                    resolvedIsMine
-                                      ? `
-                                        justify-end
-                                        text-bg-0/60
-                                      `
-                                      : `
-                                        justify-start
-                                        text-ink-2
-                                      `
-                                  }
-                                `}
-                              >
-
-                                {time && (
-                                  <span>
-                                    {time}
-                                  </span>
-                                )}
-
-                                {/* ==================================
-                                    READ RECEIPT
-                                ================================== */}
-
-                                {resolvedIsMine && (
-                                  <span
-                                    className={
-                                      isRead
-                                        ? 'font-bold text-blue-400'
-                                        : 'font-bold text-bg-0/60'
-                                    }
-                                    title={
-                                      isRead
-                                        ? 'Read'
-                                        : 'Sent'
-                                    }
-                                  >
-                                    ✓✓
-                                  </span>
-                                )}
-
+                              <div className="break-words whitespace-pre-wrap text-sm leading-6">
+                                {messageText}
                               </div>
-                            )}
+
+
+                              {/* TIME + TICKS */}
+
+                              {(
+                                time ||
+                                resolvedIsMine
+                              ) && (
+
+                                <div
+                                  className={`
+                                    mt-1
+                                    flex
+                                    items-center
+                                    gap-1
+                                    text-[10px]
+                                    ${
+                                      resolvedIsMine
+                                        ? `
+                                          justify-end
+                                          text-bg-0/60
+                                        `
+                                        : `
+                                          justify-start
+                                          text-ink-2
+                                        `
+                                    }
+                                  `}
+                                >
+
+                                  {time && (
+                                    <span>
+                                      {time}
+                                    </span>
+                                  )}
+
+
+                                  {/* ==================================
+                                      READ RECEIPT
+                                  ================================== */}
+
+                                  {resolvedIsMine && (
+                                    <span
+                                      className={
+                                        isRead
+                                          ? 'font-bold text-blue-400'
+                                          : 'font-bold text-bg-0/60'
+                                      }
+                                      title={
+                                        isRead
+                                          ? 'Read'
+                                          : 'Sent'
+                                      }
+                                    >
+                                      ✓✓
+                                    </span>
+                                  )}
+
+                                </div>
+
+                              )}
+
+                            </div>
 
                           </div>
 
@@ -894,7 +1188,14 @@ export function ConversationPage() {
                     }
                   )}
 
+                  {/* AUTO SCROLL TARGET */}
+
+                  <div
+                    ref={messagesEndRef}
+                  />
+
                 </div>
+
               )}
 
             </div>
@@ -908,35 +1209,99 @@ export function ConversationPage() {
               onSubmit={
                 handleSend
               }
-              className="flex gap-3 border-t border-metal-1/40 p-5"
+              className="relative border-t border-metal-1/40 p-4"
             >
 
-              <input
-                type="text"
-                value={text}
-                onChange={(event) =>
-                  setText(
-                    event.target.value
-                  )
-                }
-                placeholder="Write a message..."
-                disabled={sending}
-                className="min-w-0 flex-1 rounded-xl border border-metal-1/40 bg-bg-2 px-4 py-3 text-sm text-ink-0 outline-none placeholder:text-ink-3 focus:border-mint/60"
-              />
+              {/* ================================================
+                  EMOJI PICKER
+              ================================================ */}
 
-              <button
-                type="submit"
-                disabled={
-                  sending ||
-                  !text.trim()
-                }
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-mint text-xl text-bg-0 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Send message"
-              >
-                {sending
-                  ? '…'
-                  : '➤'}
-              </button>
+              {showEmojiPicker && (
+                <div
+                  ref={
+                    emojiPickerRef
+                  }
+                  className="absolute bottom-[76px] left-4 z-50"
+                >
+
+                  <EmojiPicker
+                    onEmojiClick={
+                      handleEmojiClick
+                    }
+                    theme="dark"
+                    width={320}
+                    height={400}
+                    lazyLoadEmojis
+                  />
+
+                </div>
+              )}
+
+
+              <div className="flex items-end gap-2">
+
+                {/* ==============================================
+                    EMOJI BUTTON
+                ============================================== */}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowEmojiPicker(
+                      (current) =>
+                        !current
+                    )
+                  }
+                  disabled={sending}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-metal-1/40 bg-bg-2 text-xl transition hover:bg-bg-3 disabled:opacity-40"
+                  aria-label="Open emoji picker"
+                  title="Emoji"
+                >
+                  😊
+                </button>
+
+
+                {/* ==============================================
+                    MESSAGE INPUT
+                ============================================== */}
+
+                <textarea
+                  value={text}
+                  onChange={(event) =>
+                    setText(
+                      event.target.value
+                    )
+                  }
+                  onKeyDown={
+                    handleComposerKeyDown
+                  }
+                  placeholder="Write a message..."
+                  disabled={sending}
+                  rows={1}
+                  className="max-h-32 min-h-12 min-w-0 flex-1 resize-none rounded-xl border border-metal-1/40 bg-bg-2 px-4 py-3 text-sm leading-6 text-ink-0 outline-none placeholder:text-ink-3 focus:border-mint/60"
+                />
+
+
+                {/* ==============================================
+                    SEND BUTTON
+                ============================================== */}
+
+                <button
+                  type="submit"
+                  disabled={
+                    sending ||
+                    !text.trim()
+                  }
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-mint text-xl text-bg-0 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Send message"
+                  title="Send"
+                >
+                  {sending
+                    ? '…'
+                    : '➤'}
+                </button>
+
+              </div>
 
             </form>
 
@@ -1005,12 +1370,16 @@ export function ConversationPage() {
               </div>
 
               <div className="mt-2 flex items-center gap-2 text-sm text-mint">
-                <span>✓</span>
+
+                <span>
+                  ✓
+                </span>
 
                 <span>
                   {conversation?.jugaad_status ||
                     'Accepted'}
                 </span>
+
               </div>
 
             </div>
@@ -1019,13 +1388,29 @@ export function ConversationPage() {
             {/* DEBUG INFO */}
 
             <div className="mt-7 hidden text-[10px] text-white/30">
-              conversation: {conversationId}
+
+              conversation:
+              {' '}
+              {conversationId}
+
               <br />
-              other user: {personId}
+
+              other user:
+              {' '}
+              {personId}
+
               <br />
-              gig: {jugaadId}
+
+              gig:
+              {' '}
+              {jugaadId}
+
               <br />
-              proposal: {proposalId}
+
+              proposal:
+              {' '}
+              {proposalId}
+
             </div>
 
           </aside>
@@ -1033,8 +1418,10 @@ export function ConversationPage() {
         </div>
 
       </div>
+
     </div>
   );
 }
+
 
 export default ConversationPage;

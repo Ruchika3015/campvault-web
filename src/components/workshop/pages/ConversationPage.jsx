@@ -382,6 +382,12 @@ export function ConversationPage() {
   ] = useState(null);
 
 
+  const [
+    openMessageMenuId,
+    setOpenMessageMenuId,
+  ] = useState(null);
+
+
   const messagesEndRef =
     useRef(null);
 
@@ -759,6 +765,7 @@ export function ConversationPage() {
 
   const handleReply = (message) => {
     setReplyToMessage(message);
+    setOpenMessageMenuId(null);
     setShowEmojiPicker(false);
   };
 
@@ -1155,38 +1162,132 @@ export function ConversationPage() {
 
                           <div
                             className={`flex w-full ${resolvedIsMine
-                                ? 'justify-end'
-                                : 'justify-start'
+                              ? 'justify-end'
+                              : 'justify-start'
                               }`}
                           >
 
                             {/* =====================================
-                                MESSAGE BUBBLE
-                            ===================================== */}
+    MESSAGE BUBBLE
+===================================== */}
 
                             <div
                               className={`
-                                max-w-[78%]
-                                rounded-2xl
-                                px-4
-                                py-3
-                                shadow-sm
-                                ${resolvedIsMine
+    group relative
+    max-w-[78%]
+    rounded-2xl
+    px-4
+    py-3
+    shadow-sm
+    ${resolvedIsMine
                                   ? `
-                                      rounded-br-md
-                                      bg-mint
-                                      text-bg-0
-                                    `
+            rounded-br-md
+            bg-mint
+            text-bg-0
+          `
                                   : `
-                                      rounded-bl-md
-                                      border
-                                      border-metal-1/40
-                                      bg-bg-2
-                                      text-ink-0
-                                    `
+            rounded-bl-md
+            border
+            border-metal-1/40
+            bg-bg-2
+            text-ink-0
+          `
                                 }
-                              `}
+  `}
                             >
+
+                              {/* MESSAGE ACTION BUTTON */}
+
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  const messageId =
+                                    String(
+                                      getMessageId(
+                                        message,
+                                        index
+                                      )
+                                    );
+
+                                  setOpenMessageMenuId(
+                                    (current) =>
+                                      current === messageId
+                                        ? null
+                                        : messageId
+                                  );
+                                }}
+                                className={`
+      absolute
+      -right-8
+      top-1
+      flex
+      h-7
+      w-7
+      items-center
+      justify-center
+      rounded-full
+      text-lg
+      leading-none
+      opacity-0
+      transition
+      group-hover:opacity-100
+      focus:opacity-100
+      ${resolvedIsMine
+                                    ? 'text-ink-3 hover:bg-bg-3 hover:text-ink-0'
+                                    : 'text-ink-3 hover:bg-bg-3 hover:text-ink-0'
+                                  }
+    `}
+                                aria-label="Message options"
+                                title="Message options"
+                              >
+                                ⋮
+                              </button>
+
+
+                              {/* MESSAGE MENU */}
+
+                              {openMessageMenuId ===
+                                String(
+                                  getMessageId(
+                                    message,
+                                    index
+                                  )
+                                ) && (
+                                  <div
+                                    className={`
+        absolute
+        top-8
+        z-50
+        w-32
+        overflow-hidden
+        rounded-xl
+        border
+        border-metal-1/40
+        bg-bg-1
+        shadow-xl
+        ${resolvedIsMine
+                                        ? 'right-0'
+                                        : 'left-0'
+                                      }
+      `}
+                                  >
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleReply(message)
+                                      }
+                                      disabled={sending}
+                                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-ink-1 transition hover:bg-bg-3 hover:text-ink-0 disabled:opacity-40"
+                                    >
+                                      <span>↩</span>
+                                      <span>Reply</span>
+                                    </button>
+
+                                  </div>
+                                )}
 
 
                               {/* REPLIED MESSAGE */}
@@ -1194,36 +1295,45 @@ export function ConversationPage() {
                               {repliedMessage && (
                                 <div
                                   className={`
-      mb-2 rounded-lg border-l-2 px-3 py-2
-      ${resolvedIsMine
+        mb-2
+        rounded-lg
+        border-l-2
+        px-3
+        py-2
+        ${resolvedIsMine
                                       ? 'border-bg-0/50 bg-bg-0/10'
                                       : 'border-mint/70 bg-bg-0/10'
                                     }
-    `}
+      `}
                                 >
+
                                   <div
                                     className={`
-        text-[10px] font-semibold
-        ${resolvedIsMine
+          text-[10px]
+          font-semibold
+          ${resolvedIsMine
                                         ? 'text-bg-0/70'
                                         : 'text-mint'
                                       }
-      `}
+        `}
                                   >
                                     {repliedSenderName}
                                   </div>
 
                                   <div
                                     className={`
-        mt-0.5 line-clamp-2 text-xs
-        ${resolvedIsMine
+          mt-0.5
+          line-clamp-2
+          text-xs
+          ${resolvedIsMine
                                         ? 'text-bg-0/70'
                                         : 'text-ink-2'
                                       }
-      `}
+        `}
                                   >
                                     {repliedText || 'Message'}
                                   </div>
+
                                 </div>
                               )}
 
@@ -1233,38 +1343,6 @@ export function ConversationPage() {
                               <div className="break-words whitespace-pre-wrap text-sm leading-6">
                                 {messageText}
                               </div>
-
-                              <div
-                                className={`
-    mt-2 flex
-    ${resolvedIsMine
-                                    ? 'justify-end'
-                                    : 'justify-start'
-                                  }
-  `}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleReply(message)
-                                  }
-                                  disabled={sending}
-                                  className={`
-      rounded-md px-2 py-1
-      text-[9px] font-semibold uppercase
-      tracking-[0.12em] transition
-      ${resolvedIsMine
-                                      ? 'text-bg-0/60 hover:bg-bg-0/10 hover:text-bg-0'
-                                      : 'text-ink-3 hover:bg-bg-3 hover:text-ink-0'
-                                    }
-      disabled:opacity-40
-    `}
-                                  title="Reply"
-                                >
-                                  ↩ Reply
-                                </button>
-                              </div>
-
 
 
                               {/* TIME + TICKS */}
@@ -1276,22 +1354,22 @@ export function ConversationPage() {
 
                                   <div
                                     className={`
-                                    mt-1
-                                    flex
-                                    items-center
-                                    gap-1
-                                    text-[10px]
-                                    ${resolvedIsMine
+        mt-1
+        flex
+        items-center
+        gap-1
+        text-[10px]
+        ${resolvedIsMine
                                         ? `
-                                          justify-end
-                                          text-bg-0/60
-                                        `
+                justify-end
+                text-bg-0/60
+              `
                                         : `
-                                          justify-start
-                                          text-ink-2
-                                        `
+                justify-start
+                text-ink-2
+              `
                                       }
-                                  `}
+      `}
                                   >
 
                                     {time && (
@@ -1301,9 +1379,7 @@ export function ConversationPage() {
                                     )}
 
 
-                                    {/* ==================================
-                                      READ RECEIPT
-                                  ================================== */}
+                                    {/* READ RECEIPT */}
 
                                     {resolvedIsMine && (
                                       <span
@@ -1327,6 +1403,9 @@ export function ConversationPage() {
                                 )}
 
                             </div>
+
+
+
 
                           </div>
 

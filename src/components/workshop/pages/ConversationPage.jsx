@@ -362,6 +362,9 @@ export function ConversationPage() {
   const emojiPickerRef =
     useRef(null);
 
+  const sendingRef =
+    useRef(false);
+
 
   /* ==============================================================
      LOAD CONVERSATION
@@ -487,11 +490,11 @@ export function ConversationPage() {
         );
 
         /*
-         * Refresh immediately after marking
-         * messages as read so the sender/receiver
-         * has the newest read_at values.
+         * Do not refresh immediately here.
+         * The normal 10-second polling handles
+         * the next message refresh and avoids
+         * unnecessary API requests.
          */
-        await refreshMessages();
       } catch (err) {
         console.error(
           'Failed to mark messages as read:',
@@ -499,6 +502,15 @@ export function ConversationPage() {
         );
       }
     };
+
+
+  /* ==============================================================
+     KEEP SENDING REF IN SYNC
+  ============================================================== */
+
+  useEffect(() => {
+    sendingRef.current = sending;
+  }, [sending]);
 
 
   /* ==============================================================
@@ -528,16 +540,19 @@ export function ConversationPage() {
     markMessagesAsRead();
 
     /*
-     * Poll every 2 seconds.
+     * Poll every 10 seconds.
      *
-     * New messages appear automatically.
+     * Do not run a background refresh while
+     * a message is actively being sent.
      */
     const intervalId =
       setInterval(
         async () => {
-          await refreshMessages();
+          if (!sendingRef.current) {
+            await refreshMessages();
+          }
         },
-        2000
+        10000
       );
 
     /*

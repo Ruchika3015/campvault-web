@@ -47,7 +47,7 @@ export async function apiRequest(
     options.body instanceof FormData;
 
 
-  const headers = {
+    const headers = {
     ...(token
       ? {
           Authorization:
@@ -62,7 +62,6 @@ export async function apiRequest(
             'application/json',
         }),
 
-    'x-bypass-rate-limit': 'true',
     ...(options.headers || {}),
   };
 
@@ -762,7 +761,7 @@ getPaymentOrderStatus: (orderId) =>
     ),
 
 
-  // ================================================================
+    // ================================================================
   // MESSAGES / CONVERSATIONS
   // Backend: /api/messages (inbox list) + /api/chat (send/receive)
   // ================================================================
@@ -773,17 +772,15 @@ getPaymentOrderStatus: (orderId) =>
       '/api/messages/inbox'
     ),
 
-
-  // GET /api/chat/messages/:conversationId — messages in a specific conversation
-  getConversationMessages: (
-    conversationId
-  ) =>
+  // GET /api/chat/messages/:conversationId
+  // Cache-busting prevents stale 304 responses while polling.
+  getConversationMessages: (conversationId) =>
     apiRequest(
-      `/api/chat/messages/${conversationId}`
+      `/api/chat/messages/${conversationId}?t=${Date.now()}`
     ),
 
-
-  // POST /api/chat/conversation/send — send a message inside a conversation
+  // POST /api/chat/conversation/:conversationId/message
+  // Send a message inside a conversation.
   sendMessage: (
     conversationId,
     text
@@ -796,8 +793,7 @@ getPaymentOrderStatus: (orderId) =>
       }
     ),
 
-
-  // PUT /api/messages/:receiverId/read — mark messages as read (uses old endpoint with receiverId)
+  // PUT /api/messages/:receiverId/read
   markConversationAsRead: (
     receiverId
   ) =>
@@ -809,8 +805,7 @@ getPaymentOrderStatus: (orderId) =>
       }
     ),
 
-
-  // Chat — create conversation + legacy getChatMessages alias
+  // Create conversation
   createConversation: (
     payload
   ) =>
@@ -822,12 +817,12 @@ getPaymentOrderStatus: (orderId) =>
       }
     ),
 
-
+  // Legacy chat-message alias
   getChatMessages: (
     conversationId
   ) =>
     apiRequest(
-      `/api/chat/messages/${conversationId}`
+      `/api/chat/messages/${conversationId}?t=${Date.now()}`
     ),
 
 
@@ -1098,15 +1093,6 @@ getPaymentOrderStatus: (orderId) =>
   deleteCertification: (certId) =>
     Promise.resolve({ success: true }),
 
-  // sendMessage is handled via Socket.IO in production
-  // This REST fallback is a stub
-  sendMessage: (
-    conversationId,
-    text
-  ) =>
-    Promise.resolve({
-      success: true,
-      message: 'Use Socket.IO for real-time messaging',
-    }),
+  
 
 };

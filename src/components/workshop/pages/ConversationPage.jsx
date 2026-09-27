@@ -150,6 +150,25 @@ function getMessageText(
 }
 
 
+function getReplyMessage(
+  message
+) {
+  const reply =
+    message?.replyTo ??
+    message?.reply_to ??
+    message?.reply;
+
+  if (
+    !reply ||
+    typeof reply !== 'object'
+  ) {
+    return null;
+  }
+
+  return reply;
+}
+
+
 function getSenderId(
   message
 ) {
@@ -355,6 +374,13 @@ export function ConversationPage() {
     showEmojiPicker,
     setShowEmojiPicker,
   ] = useState(false);
+
+
+  const [
+    replyToMessage,
+    setReplyToMessage,
+  ] = useState(null);
+
 
   const messagesEndRef =
     useRef(null);
@@ -645,7 +671,10 @@ export function ConversationPage() {
         const response =
           await api.sendMessage(
             conversationId,
-            trimmedText
+            trimmedText,
+            replyToMessage?._id ??
+            replyToMessage?.id ??
+            null
           );
 
         const returnedMessages =
@@ -703,6 +732,8 @@ export function ConversationPage() {
 
         setText('');
 
+        setReplyToMessage(null);
+
         setShowEmojiPicker(
           false
         );
@@ -720,6 +751,21 @@ export function ConversationPage() {
         setSending(false);
       }
     };
+
+
+  /* ==============================================================
+ REPLY TO MESSAGE
+============================================================== */
+
+  const handleReply = (message) => {
+    setReplyToMessage(message);
+    setShowEmojiPicker(false);
+  };
+
+  const cancelReply = () => {
+    setReplyToMessage(null);
+  };
+
 
 
   /* ==============================================================
@@ -984,13 +1030,13 @@ export function ConversationPage() {
 
                       const resolvedIsMine =
                         senderId !== null &&
-                        currentUserId !== null
+                          currentUserId !== null
                           ? String(
-                              senderId
-                            ) ===
-                            String(
-                              currentUserId
-                            )
+                            senderId
+                          ) ===
+                          String(
+                            currentUserId
+                          )
                           : isMine;
 
 
@@ -998,6 +1044,23 @@ export function ConversationPage() {
                         getMessageText(
                           message
                         );
+
+
+                      const repliedMessage =
+                        getReplyMessage(
+                          message
+                        );
+
+                      const repliedText =
+                        getMessageText(
+                          repliedMessage
+                        );
+
+                      const repliedSenderName =
+                        repliedMessage?.sender?.name ||
+                        repliedMessage?.sender?.fullName ||
+                        repliedMessage?.sender?.username ||
+                        'Message';
 
 
                       const time =
@@ -1020,7 +1083,7 @@ export function ConversationPage() {
 
                       const previousMessage =
                         messages[
-                          index - 1
+                        index - 1
                         ];
 
 
@@ -1039,7 +1102,7 @@ export function ConversationPage() {
                       const shouldShowDate =
                         currentDateKey !== '' &&
                         currentDateKey !==
-                          previousDateKey;
+                        previousDateKey;
 
 
                       /*
@@ -1091,11 +1154,10 @@ export function ConversationPage() {
                           ========================================= */}
 
                           <div
-                            className={`flex w-full ${
-                              resolvedIsMine
+                            className={`flex w-full ${resolvedIsMine
                                 ? 'justify-end'
                                 : 'justify-start'
-                            }`}
+                              }`}
                           >
 
                             {/* =====================================
@@ -1109,14 +1171,13 @@ export function ConversationPage() {
                                 px-4
                                 py-3
                                 shadow-sm
-                                ${
-                                  resolvedIsMine
-                                    ? `
+                                ${resolvedIsMine
+                                  ? `
                                       rounded-br-md
                                       bg-mint
                                       text-bg-0
                                     `
-                                    : `
+                                  : `
                                       rounded-bl-md
                                       border
                                       border-metal-1/40
@@ -1127,11 +1188,83 @@ export function ConversationPage() {
                               `}
                             >
 
+
+                              {/* REPLIED MESSAGE */}
+
+                              {repliedMessage && (
+                                <div
+                                  className={`
+      mb-2 rounded-lg border-l-2 px-3 py-2
+      ${resolvedIsMine
+                                      ? 'border-bg-0/50 bg-bg-0/10'
+                                      : 'border-mint/70 bg-bg-0/10'
+                                    }
+    `}
+                                >
+                                  <div
+                                    className={`
+        text-[10px] font-semibold
+        ${resolvedIsMine
+                                        ? 'text-bg-0/70'
+                                        : 'text-mint'
+                                      }
+      `}
+                                  >
+                                    {repliedSenderName}
+                                  </div>
+
+                                  <div
+                                    className={`
+        mt-0.5 line-clamp-2 text-xs
+        ${resolvedIsMine
+                                        ? 'text-bg-0/70'
+                                        : 'text-ink-2'
+                                      }
+      `}
+                                  >
+                                    {repliedText || 'Message'}
+                                  </div>
+                                </div>
+                              )}
+
+
                               {/* MESSAGE */}
 
                               <div className="break-words whitespace-pre-wrap text-sm leading-6">
                                 {messageText}
                               </div>
+
+                              <div
+                                className={`
+    mt-2 flex
+    ${resolvedIsMine
+                                    ? 'justify-end'
+                                    : 'justify-start'
+                                  }
+  `}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleReply(message)
+                                  }
+                                  disabled={sending}
+                                  className={`
+      rounded-md px-2 py-1
+      text-[9px] font-semibold uppercase
+      tracking-[0.12em] transition
+      ${resolvedIsMine
+                                      ? 'text-bg-0/60 hover:bg-bg-0/10 hover:text-bg-0'
+                                      : 'text-ink-3 hover:bg-bg-3 hover:text-ink-0'
+                                    }
+      disabled:opacity-40
+    `}
+                                  title="Reply"
+                                >
+                                  ↩ Reply
+                                </button>
+                              </div>
+
 
 
                               {/* TIME + TICKS */}
@@ -1141,15 +1274,14 @@ export function ConversationPage() {
                                 resolvedIsMine
                               ) && (
 
-                                <div
-                                  className={`
+                                  <div
+                                    className={`
                                     mt-1
                                     flex
                                     items-center
                                     gap-1
                                     text-[10px]
-                                    ${
-                                      resolvedIsMine
+                                    ${resolvedIsMine
                                         ? `
                                           justify-end
                                           text-bg-0/60
@@ -1158,41 +1290,41 @@ export function ConversationPage() {
                                           justify-start
                                           text-ink-2
                                         `
-                                    }
+                                      }
                                   `}
-                                >
+                                  >
 
-                                  {time && (
-                                    <span>
-                                      {time}
-                                    </span>
-                                  )}
+                                    {time && (
+                                      <span>
+                                        {time}
+                                      </span>
+                                    )}
 
 
-                                  {/* ==================================
+                                    {/* ==================================
                                       READ RECEIPT
                                   ================================== */}
 
-                                  {resolvedIsMine && (
-                                    <span
-                                      className={
-                                        isRead
-                                          ? 'font-bold text-blue-400'
-                                          : 'font-bold text-bg-0/60'
-                                      }
-                                      title={
-                                        isRead
-                                          ? 'Read'
-                                          : 'Sent'
-                                      }
-                                    >
-                                      ✓✓
-                                    </span>
-                                  )}
+                                    {resolvedIsMine && (
+                                      <span
+                                        className={
+                                          isRead
+                                            ? 'font-bold text-blue-400'
+                                            : 'font-bold text-bg-0/60'
+                                        }
+                                        title={
+                                          isRead
+                                            ? 'Read'
+                                            : 'Sent'
+                                        }
+                                      >
+                                        ✓✓
+                                      </span>
+                                    )}
 
-                                </div>
+                                  </div>
 
-                              )}
+                                )}
 
                             </div>
 
@@ -1226,6 +1358,44 @@ export function ConversationPage() {
               }
               className="relative border-t border-metal-1/40 p-4"
             >
+
+              {/* =================================================
+      REPLY PREVIEW
+  ================================================= */}
+
+              {replyToMessage && (
+                <div className="mb-3 flex items-center gap-3 rounded-xl border border-metal-1/40 bg-bg-2 px-3 py-2.5">
+
+                  <div className="min-w-0 flex-1 border-l-2 border-mint pl-3">
+
+                    <div className="font-technical text-[9px] font-semibold uppercase tracking-[0.15em] text-mint">
+                      Replying to
+                    </div>
+
+                    <div className="mt-1 truncate text-xs text-ink-2">
+                      {getMessageText(
+                        replyToMessage
+                      ) || 'Message'}
+                    </div>
+
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      cancelReply
+                    }
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg text-ink-2 transition hover:bg-bg-3 hover:text-ink-0"
+                    aria-label="Cancel reply"
+                    title="Cancel reply"
+                  >
+                    ×
+                  </button>
+
+                </div>
+              )}
+
+
 
               {/* ================================================
                   EMOJI PICKER

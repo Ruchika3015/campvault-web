@@ -782,16 +782,20 @@ getPaymentOrderStatus: (orderId) =>
   // POST /api/chat/conversation/:conversationId/message
   // Send a message inside a conversation.
   sendMessage: (
-    conversationId,
-    text
-  ) =>
-    apiRequest(
-      `/api/chat/conversation/${conversationId}/message`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ text }),
-      }
-    ),
+  conversationId,
+  text,
+  replyTo = null
+) =>
+  apiRequest(
+    `/api/chat/conversation/${conversationId}/message`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        text,
+        replyTo,
+      }),
+    }
+  ),
 
   // PUT /api/messages/:receiverId/read
   markConversationAsRead: (

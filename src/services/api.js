@@ -797,6 +797,22 @@ getPaymentOrderStatus: (orderId) =>
     }
   ),
 
+    // POST /api/chat/message/:messageId/reaction
+  // Add or remove a reaction on a message.
+  toggleReaction: (
+    messageId,
+    emoji
+  ) =>
+    apiRequest(
+      `/api/chat/message/${messageId}/reaction`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          emoji,
+        }),
+      }
+    ),
+    
   // PUT /api/messages/:receiverId/read
   markConversationAsRead: (
     receiverId

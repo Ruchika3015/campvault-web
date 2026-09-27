@@ -387,6 +387,10 @@ export function ConversationPage() {
     setOpenMessageMenuId,
   ] = useState(null);
 
+  const [
+  openReactionMessageId,
+  setOpenReactionMessageId,
+] = useState(null);
 
   const messagesEndRef =
     useRef(null);
@@ -773,7 +777,39 @@ export function ConversationPage() {
     setReplyToMessage(null);
   };
 
+const handleReaction = async (
+  message,
+  emoji
+) => {
+  const messageId =
+    message?._id ??
+    message?.id ??
+    message?.message_id;
 
+  if (!messageId) {
+    return;
+  }
+
+  try {
+    await api.toggleReaction(
+      messageId,
+      emoji
+    );
+
+    setOpenReactionMessageId(null);
+    await refreshMessages();
+  } catch (err) {
+    console.error(
+      'Failed to update reaction:',
+      err
+    );
+
+    setError(
+      err?.message ||
+        'Reaction could not be updated.'
+    );
+  }
+};
 
   /* ==============================================================
      EMOJI
@@ -1286,9 +1322,84 @@ export function ConversationPage() {
                                       <span>Reply</span>
                                     </button>
 
+<button
+  type="button"
+  onClick={() => {
+    const messageId = String(
+      getMessageId(
+        message,
+        index
+      )
+    );
+
+    setOpenReactionMessageId(
+      (current) =>
+        current === messageId
+          ? null
+          : messageId
+    );
+
+    setOpenMessageMenuId(null);
+  }}
+  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-ink-1 transition hover:bg-bg-3 hover:text-ink-0"
+>
+  <span>😊</span>
+  <span>React</span>
+</button>
                                   </div>
                                 )}
-
+{openReactionMessageId ===
+  String(
+    getMessageId(
+      message,
+      index
+    )
+  ) && (
+    <div
+      className={`
+        absolute
+        top-8
+        z-50
+        flex
+        gap-1
+        rounded-xl
+        border
+        border-metal-1/40
+        bg-bg-1
+        p-2
+        shadow-xl
+        ${
+          resolvedIsMine
+            ? 'right-0'
+            : 'left-0'
+        }
+      `}
+    >
+      {[
+        '❤️',
+        '👍',
+        '😂',
+        '😮',
+        '😢',
+        '🙏',
+      ].map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() =>
+            handleReaction(
+              message,
+              emoji
+            )
+          }
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition hover:bg-bg-3"
+          aria-label={`React ${emoji}`}
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  )}
 
                               {/* REPLIED MESSAGE */}
 

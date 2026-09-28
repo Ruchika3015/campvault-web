@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { LED } from '@/components/primitives/Details';
+import { api } from '@/services/api';
 
 import { useProposals } from '@/context/ProposalContext';
 
@@ -272,7 +273,11 @@ function getValidConversationId(
   const rawId =
     request?.conversation_id ??
     request?.conversationId ??
-    request?.conversation?.id;
+    request?.conversation?._id ??
+    request?.conversation?.id ??
+    request?.conversation?.conversation_id ??
+    request?.conversation?.conversationId ??
+    null;
 
 
   if (
@@ -293,6 +298,120 @@ function getValidConversationId(
 
   return value;
 
+}
+
+
+// ================================================================
+// GET GIG ID
+// ================================================================
+
+function getGigId(request = {}) {
+  return (
+    request?.gig?._id ??
+    request?.gig?.id ??
+    (typeof request?.gig === 'string' ? request.gig : null) ??
+    request?.jugaadId ??
+    request?.jugaad_id ??
+    request?.jugaad?._id ??
+    request?.jugaad?.id ??
+    null
+  );
+}
+
+
+// ================================================================
+// GET POSTER / RECEIVER ID
+// ================================================================
+
+function getPosterId(request = {}) {
+  const poster =
+    request?.gig?.postedBy ??
+    request?.poster ??
+    request?.owner ??
+    request?.creator ??
+    request?.jugaad?.poster ??
+    request?.jugaad?.owner ??
+    null;
+
+  return (
+    poster?._id ??
+    poster?.id ??
+    request?.poster_id ??
+    request?.posterId ??
+    request?.owner_id ??
+    request?.ownerId ??
+    request?.creator_id ??
+    request?.creatorId ??
+    request?.posted_by ??
+    request?.postedBy ??
+    null
+  );
+}
+
+
+function getConversationIdFromCandidate(candidate) {
+  const rawId =
+    candidate?._id ??
+    candidate?.id ??
+    candidate?.conversation_id ??
+    candidate?.conversationId ??
+    candidate?.conversation?._id ??
+    candidate?.conversation?.id ??
+    null;
+
+  if (rawId === null || rawId === undefined) {
+    return null;
+  }
+
+  const value = String(rawId).trim();
+
+  return value &&
+    value !== 'null' &&
+    value !== 'undefined'
+    ? value
+    : null;
+}
+
+
+function getCandidateGigId(candidate) {
+  return (
+    candidate?.gig?._id ??
+    candidate?.gig?.id ??
+    (typeof candidate?.gig === 'string' ? candidate.gig : null) ??
+    candidate?.jugaad?._id ??
+    candidate?.jugaad?.id ??
+    candidate?.jugaadId ??
+    candidate?.jugaad_id ??
+    candidate?.gig_id ??
+    candidate?.gigId ??
+    null
+  );
+}
+
+
+function getCandidateParticipantIds(candidate) {
+  const participants =
+    Array.isArray(candidate?.participants)
+      ? candidate.participants
+      : Array.isArray(candidate?.users)
+        ? candidate.users
+        : [];
+
+  return participants
+    .map((participant) =>
+      participant?._id ??
+      participant?.id ??
+      participant?.user_id ??
+      participant?.userId ??
+      participant
+    )
+    .filter(
+      (id) =>
+        id !== null &&
+        id !== undefined &&
+        String(id).trim() !== ''
+    )
+    .map((id) => String(id));
 }
 
 
@@ -603,6 +722,18 @@ function RequestRow({
 
 }) {
 
+  const navigate = useNavigate();
+
+  const [
+    openingMessage,
+    setOpeningMessage,
+  ] = useState(false);
+
+  const [
+    messageError,
+    setMessageError,
+  ] = useState('');
+
 
   // ==============================================================
   // POSTER
@@ -831,13 +962,138 @@ function RequestRow({
   // ==============================================================
   // CONVERSATION ID
   //
-  // Only show MESSAGE when proposal is accepted.
+  // Use the conversation already linked to this application when
+  // available. If the application response does not include it,
+  // look up the existing inbox conversation before creating one.
+  // The MESSAGE button is still shown for every accepted request.
   // ==============================================================
 
   const conversationId =
     getValidConversationId(
       request
     );
+
+
+  const handleOpenMessage =
+    async () => {
+
+      if (openingMessage) {
+        return;
+      }
+
+      try {
+        setOpeningMessage(true);
+        setMessageError('');
+
+        // 1. Use the conversation ID returned with the application.
+        if (conversationId) {
+          navigate(
+            `/dashboard/messages/${conversationId}`
+          );
+          return;
+        }
+
+        const gigId =
+          getGigId(request);
+
+        const receiverId =
+          getPosterId(request);
+
+        if (!gigId || !receiverId) {
+          throw new Error(
+            'The gig or poster information is missing, so the conversation cannot be opened.'
+          );
+        }
+
+        // 2. Reuse an existing conversation if the backend already
+        //    created one when the application was accepted.
+        const conversationsResponse =
+          await api.getConversations();
+
+        const conversations =
+          Array.isArray(
+            conversationsResponse
+          )
+            ? conversationsResponse
+            : conversationsResponse?.conversations ??
+              conversationsResponse?.data ??
+              [];
+
+        const existingConversation =
+          conversations.find(
+            (candidate) => {
+              const candidateGigId =
+                getCandidateGigId(
+                  candidate
+                );
+
+              const participantIds =
+                getCandidateParticipantIds(
+                  candidate
+                );
+
+              return (
+                String(candidateGigId) ===
+                  String(gigId) &&
+                participantIds.includes(
+                  String(receiverId)
+                ) &&
+                Boolean(
+                  getConversationIdFromCandidate(
+                    candidate
+                  )
+                )
+              );
+            }
+          );
+
+        let resolvedConversationId =
+          getConversationIdFromCandidate(
+            existingConversation
+          );
+
+        // 3. Only if no existing conversation is found, create one.
+        if (!resolvedConversationId) {
+          const createdResponse =
+            await api.createConversation({
+              receiverId,
+              gigId,
+            });
+
+          const createdConversation =
+            createdResponse?.conversation ??
+            createdResponse?.data ??
+            createdResponse;
+
+          resolvedConversationId =
+            getConversationIdFromCandidate(
+              createdConversation
+            );
+        }
+
+        if (!resolvedConversationId) {
+          throw new Error(
+            'Conversation ID was not returned by the server.'
+          );
+        }
+
+        navigate(
+          `/dashboard/messages/${resolvedConversationId}`
+        );
+      } catch (error) {
+        console.error(
+          'Failed to open conversation:',
+          error
+        );
+
+        setMessageError(
+          error?.message ||
+            'Unable to open this conversation.'
+        );
+      } finally {
+        setOpeningMessage(false);
+      }
+    };
 
 
   return (
@@ -1131,38 +1387,39 @@ function RequestRow({
               ONLY AFTER ACCEPTANCE
           ====================================================== */}
 
+          {isAccepted && (
+
+            <button
+
+              type="button"
+
+              onClick={handleOpenMessage}
+
+              disabled={openingMessage}
+
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs hover:bg-mint/25 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+
+            >
+
+              <MessageSquare
+                size={13}
+              />
+
+              {openingMessage
+                ? 'OPENING...'
+                : 'MESSAGE'}
+
+            </button>
+
+          )}
+
+
           {isAccepted &&
-            conversationId && (
+            messageError && (
 
-              <Link
+              <span className="basis-full font-mono text-[9px] text-coral">
 
-                to={`/dashboard/messages/${conversationId}`}
-
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs hover:bg-mint/25 transition-colors"
-
-              >
-
-                <MessageSquare
-                  size={13}
-                />
-
-                MESSAGE
-
-              </Link>
-
-            )}
-
-
-          {/* ======================================================
-              ACCEPTED BUT NO CONVERSATION
-          ====================================================== */}
-
-          {isAccepted &&
-            !conversationId && (
-
-              <span className="font-mono text-xs text-ink-3">
-
-                Conversation unavailable.
+                {messageError}
 
               </span>
 

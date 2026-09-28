@@ -327,6 +327,73 @@ function getMessageTime(
   }
 }
 
+function getReactionUserId(reaction) {
+  return (
+    reaction?.user?._id ??
+    reaction?.user?.id ??
+    (
+      typeof reaction?.user === 'string'
+        ? reaction.user
+        : null
+    ) ??
+    reaction?.user_id ??
+    reaction?.userId ??
+    null
+  );
+}
+
+function groupReactions(reactions) {
+  if (!Array.isArray(reactions)) {
+    return [];
+  }
+
+  const groups = new Map();
+
+  reactions.forEach((reaction) => {
+    const emoji = String(
+      reaction?.emoji || ''
+    ).trim();
+
+    if (!emoji) {
+      return;
+    }
+
+    if (!groups.has(emoji)) {
+      groups.set(emoji, {
+        emoji,
+        count: 0,
+        userIds: [],
+      });
+    }
+
+    const group = groups.get(emoji);
+
+    group.count += 1;
+
+    const userId =
+      getReactionUserId(reaction);
+
+    if (userId) {
+      group.userIds.push(
+        String(userId)
+      );
+    }
+  });
+
+  return Array.from(
+    groups.values()
+  );
+}
+
+const QUICK_REACTIONS = [
+  '❤️',
+  '👍',
+  '😂',
+  '😮',
+  '😢',
+  '🙏',
+];
+
 
 /* ================================================================
    CONVERSATION PAGE
@@ -388,9 +455,14 @@ export function ConversationPage() {
   ] = useState(null);
 
   const [
-  openReactionMessageId,
-  setOpenReactionMessageId,
-] = useState(null);
+    openReactionMessageId,
+    setOpenReactionMessageId,
+  ] = useState(null);
+
+  const [
+    openFullReactionPickerId,
+    setOpenFullReactionPickerId,
+  ] = useState(null);
 
   const messagesEndRef =
     useRef(null);
@@ -777,39 +849,40 @@ export function ConversationPage() {
     setReplyToMessage(null);
   };
 
-const handleReaction = async (
-  message,
-  emoji
-) => {
-  const messageId =
-    message?._id ??
-    message?.id ??
-    message?.message_id;
+  const handleReaction = async (
+    message,
+    emoji
+  ) => {
+    const messageId =
+      message?._id ??
+      message?.id ??
+      message?.message_id;
 
-  if (!messageId) {
-    return;
-  }
+    if (!messageId) {
+      return;
+    }
 
-  try {
-    await api.toggleReaction(
-      messageId,
-      emoji
-    );
+    try {
+      await api.toggleReaction(
+        messageId,
+        emoji
+      );
 
-    setOpenReactionMessageId(null);
-    await refreshMessages();
-  } catch (err) {
-    console.error(
-      'Failed to update reaction:',
-      err
-    );
+      setOpenReactionMessageId(null);
+      setOpenFullReactionPickerId(null);
+      await refreshMessages();
+    } catch (err) {
+      console.error(
+        'Failed to update reaction:',
+        err
+      );
 
-    setError(
-      err?.message ||
+      setError(
+        err?.message ||
         'Reaction could not be updated.'
-    );
-  }
-};
+      );
+    }
+  };
 
   /* ==============================================================
      EMOJI
@@ -1088,6 +1161,10 @@ const handleReaction = async (
                           message
                         );
 
+                      const reactionGroups =
+                        groupReactions(
+                          message?.reactions
+                        );
 
                       const repliedMessage =
                         getReplyMessage(
@@ -1322,45 +1399,46 @@ const handleReaction = async (
                                       <span>Reply</span>
                                     </button>
 
-<button
-  type="button"
-  onClick={() => {
-    const messageId = String(
-      getMessageId(
-        message,
-        index
-      )
-    );
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const messageId = String(
+                                          getMessageId(
+                                            message,
+                                            index
+                                          )
+                                        );
 
-    setOpenReactionMessageId(
-      (current) =>
-        current === messageId
-          ? null
-          : messageId
-    );
+                                        setOpenReactionMessageId(
+                                          (current) =>
+                                            current === messageId
+                                              ? null
+                                              : messageId
+                                        );
 
-    setOpenMessageMenuId(null);
-  }}
-  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-ink-1 transition hover:bg-bg-3 hover:text-ink-0"
->
-  <span>😊</span>
-  <span>React</span>
-</button>
+                                        setOpenMessageMenuId(null);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold text-ink-1 transition hover:bg-bg-3 hover:text-ink-0"
+                                    >
+                                      <span>😊</span>
+                                      <span>React</span>
+                                    </button>
                                   </div>
                                 )}
-{openReactionMessageId ===
-  String(
-    getMessageId(
-      message,
-      index
-    )
-  ) && (
-    <div
-      className={`
+                              {openReactionMessageId ===
+                                String(
+                                  getMessageId(
+                                    message,
+                                    index
+                                  )
+                                ) && (
+                                  <div
+                                    className={`
         absolute
         top-8
         z-50
         flex
+        items-center
         gap-1
         rounded-xl
         border
@@ -1368,41 +1446,103 @@ const handleReaction = async (
         bg-bg-1
         p-2
         shadow-xl
-        ${
-          resolvedIsMine
-            ? 'right-0'
-            : 'left-0'
-        }
+        ${resolvedIsMine
+                                        ? 'right-0'
+                                        : 'left-0'
+                                      }
       `}
-    >
-      {[
-        '❤️',
-        '👍',
-        '😂',
-        '😮',
-        '😢',
-        '🙏',
-      ].map((emoji) => (
-        <button
-          key={emoji}
-          type="button"
-          onClick={() =>
-            handleReaction(
-              message,
-              emoji
-            )
-          }
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition hover:bg-bg-3"
-          aria-label={`React ${emoji}`}
-        >
-          {emoji}
-        </button>
-      ))}
-    </div>
-  )}
+                                  >
+                                    {QUICK_REACTIONS.map(
+                                      (emoji) => (
+                                        <button
+                                          key={emoji}
+                                          type="button"
+                                          onClick={() =>
+                                            handleReaction(
+                                              message,
+                                              emoji
+                                            )
+                                          }
+                                          className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition hover:bg-bg-3"
+                                          aria-label={`React ${emoji}`}
+                                        >
+                                          {emoji}
+                                        </button>
+                                      )
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setOpenFullReactionPickerId(
+                                          (current) =>
+                                            current ===
+                                              String(
+                                                getMessageId(
+                                                  message,
+                                                  index
+                                                )
+                                              )
+                                              ? null
+                                              : String(
+                                                getMessageId(
+                                                  message,
+                                                  index
+                                                )
+                                              )
+                                        )
+                                      }
+                                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-metal-1/30 text-lg text-ink-1 transition hover:bg-bg-3"
+                                      aria-label="More reactions"
+                                      title="More reactions"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                )}
+
 
                               {/* REPLIED MESSAGE */}
-
+                              {openFullReactionPickerId ===
+                                String(
+                                  getMessageId(
+                                    message,
+                                    index
+                                  )
+                                ) && (
+                                  <div
+                                    className={`
+        absolute
+        top-[52px]
+        z-50
+        overflow-hidden
+        rounded-xl
+        border
+        border-metal-1/40
+        bg-bg-1
+        shadow-2xl
+        ${resolvedIsMine
+                                        ? 'right-0'
+                                        : 'left-0'
+                                      }
+      `}
+                                  >
+                                    <EmojiPicker
+                                      onEmojiClick={(
+                                        emojiData
+                                      ) =>
+                                        handleReaction(
+                                          message,
+                                          emojiData.emoji
+                                        )
+                                      }
+                                      theme="dark"
+                                      width={320}
+                                      height={400}
+                                      lazyLoadEmojis
+                                    />
+                                  </div>
+                                )}
                               {repliedMessage && (
                                 <div
                                   className={`
@@ -1512,7 +1652,78 @@ const handleReaction = async (
                                   </div>
 
                                 )}
+                              {reactionGroups.length > 0 && (
+                                <div
+                                  className={`
+      mt-2
+      flex
+      flex-wrap
+      gap-1
+      ${resolvedIsMine
+                                      ? 'justify-end'
+                                      : 'justify-start'
+                                    }
+    `}
+                                >
+                                  {reactionGroups.map(
+                                    (reaction) => {
+                                      const isActive =
+                                        currentUserId !== null &&
+                                        reaction.userIds.includes(
+                                          String(currentUserId)
+                                        );
 
+                                      return (
+                                        <button
+                                          key={reaction.emoji}
+                                          type="button"
+                                          onClick={() =>
+                                            handleReaction(
+                                              message,
+                                              reaction.emoji
+                                            )
+                                          }
+                                          className={`
+              flex
+              items-center
+              gap-1
+              rounded-full
+              border
+              px-2
+              py-0.5
+              text-xs
+              shadow-sm
+              transition
+              ${isActive
+                                              ? resolvedIsMine
+                                                ? 'border-bg-0/50 bg-bg-0/20'
+                                                : 'border-mint/60 bg-mint/10'
+                                              : 'border-metal-1/40 bg-bg-1/90 hover:bg-bg-3'
+                                            }
+            `}
+                                          aria-label={`React ${reaction.emoji}`}
+                                        >
+                                          <span>
+                                            {reaction.emoji}
+                                          </span>
+
+                                          {reaction.count > 1 && (
+                                            <span
+                                              className={
+                                                resolvedIsMine
+                                                  ? 'text-bg-0/80'
+                                                  : 'text-ink-2'
+                                              }
+                                            >
+                                              {reaction.count}
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              )}
                             </div>
 
 

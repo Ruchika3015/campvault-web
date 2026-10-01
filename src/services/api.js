@@ -1,6 +1,6 @@
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  'http://localhost:5001';
+  'http://localhost:5000';
 
 
 /**
@@ -519,6 +519,7 @@ addProject: async (payload) => {
     : [];
 
   const project = {
+    id: `project-${Date.now()}`,
     name: String(payload?.name || "").trim(),
     description: String(payload?.description || "").trim(),
     technologies: Array.isArray(payload?.technologies)
@@ -541,9 +542,7 @@ addProject: async (payload) => {
     projects: nextProjects,
   });
 
-  const savedProjects = Array.isArray(
-    updatedUser?.projects
-  )
+  const savedProjects = Array.isArray(updatedUser?.projects)
     ? updatedUser.projects
     : nextProjects;
 
@@ -556,7 +555,7 @@ addProject: async (payload) => {
       id:
         savedProject?.id ||
         savedProject?._id ||
-        `project-${Date.now()}`,
+        project.id,
     },
   };
 },
@@ -692,20 +691,20 @@ addCertification: async (payload) => {
       : [];
 
   const certification = {
-    title: String(
-      payload?.title || ""
-    ).trim(),
-    organization: String(
-      payload?.organization || ""
-    ).trim(),
-    date: String(
-      payload?.date || ""
-    ).trim(),
-    url: String(
-      payload?.url || ""
-    ).trim(),
-  };
-
+  id: `cert-${Date.now()}`,
+  title: String(
+    payload?.title || ""
+  ).trim(),
+  organization: String(
+    payload?.organization || ""
+  ).trim(),
+  date: String(
+    payload?.date || ""
+  ).trim(),
+  url: String(
+    payload?.url || ""
+  ).trim(),
+};
   if (!certification.title) {
     throw new Error(
       "Certification title is required."
@@ -740,8 +739,8 @@ addCertification: async (payload) => {
       ...savedCertification,
       id:
         savedCertification?.id ||
-        savedCertification?._id ||
-        `cert-${Date.now()}`,
+savedCertification?._id ||
+certification.id,
       url:
         savedCertification?.url ||
         "",

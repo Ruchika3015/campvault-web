@@ -494,12 +494,371 @@ export const api = {
     return { success: true };
   },
 
-  getProjects: async () => [],
-  addProject: async (p) => ({ data: { id: `project-${Date.now()}`, ...p } }),
-  deleteProject: async () => ({ success: true }),
-  getCertifications: async () => [],
-  addCertification: async (c) => ({ data: { id: `cert-${Date.now()}`, ...c } }),
-  deleteCertification: async () => ({ success: true }),
+  // ================================================================
+// PROJECTS — stored inside User profile
+// ================================================================
+
+getProjects: async () => {
+  const user = await api.getProfile();
+
+  const projects = Array.isArray(user?.projects)
+    ? user.projects
+    : [];
+
+  return projects.map((project) => ({
+    ...project,
+    id: project.id || project._id,
+  }));
+},
+
+addProject: async (payload) => {
+  const user = await api.getProfile();
+
+  const currentProjects = Array.isArray(user?.projects)
+    ? [...user.projects]
+    : [];
+
+  const project = {
+    name: String(payload?.name || "").trim(),
+    description: String(payload?.description || "").trim(),
+    technologies: Array.isArray(payload?.technologies)
+      ? payload.technologies
+      : [],
+    github: String(payload?.github || "").trim(),
+    link: String(payload?.link || "").trim(),
+  };
+
+  if (!project.name) {
+    throw new Error("Project name is required.");
+  }
+
+  const nextProjects = [
+    ...currentProjects,
+    project,
+  ];
+
+  const updatedUser = await api.updateProfile({
+    projects: nextProjects,
+  });
+
+  const savedProjects = Array.isArray(
+    updatedUser?.projects
+  )
+    ? updatedUser.projects
+    : nextProjects;
+
+  const savedProject =
+    savedProjects[savedProjects.length - 1];
+
+  return {
+    data: {
+      ...savedProject,
+      id:
+        savedProject?.id ||
+        savedProject?._id ||
+        `project-${Date.now()}`,
+    },
+  };
+},
+
+updateProject: async (projectId, payload) => {
+  const user = await api.getProfile();
+
+  const currentProjects = Array.isArray(user?.projects)
+    ? [...user.projects]
+    : [];
+
+  const updatedProjects = currentProjects.map(
+    (project) => {
+      const currentId = String(
+        project.id || project._id
+      );
+
+      if (currentId !== String(projectId)) {
+        return project;
+      }
+
+      return {
+        ...project,
+        name: String(
+          payload?.name || ""
+        ).trim(),
+        description: String(
+          payload?.description || ""
+        ).trim(),
+        technologies: Array.isArray(
+          payload?.technologies
+        )
+          ? payload.technologies
+          : [],
+        github: String(
+          payload?.github || ""
+        ).trim(),
+        link: String(
+          payload?.link || ""
+        ).trim(),
+      };
+    }
+  );
+
+  const updatedUser =
+    await api.updateProfile({
+      projects: updatedProjects,
+    });
+
+  const savedProjects =
+    Array.isArray(updatedUser?.projects)
+      ? updatedUser.projects
+      : updatedProjects;
+
+  const savedProject =
+    savedProjects.find(
+      (project) =>
+        String(
+          project.id || project._id
+        ) === String(projectId)
+    );
+
+  return {
+    data: {
+      ...(savedProject || {}),
+      id:
+        savedProject?.id ||
+        savedProject?._id ||
+        projectId,
+    },
+  };
+},
+
+deleteProject: async (projectId) => {
+  const user = await api.getProfile();
+
+  const currentProjects = Array.isArray(
+    user?.projects
+  )
+    ? user.projects
+    : [];
+
+  const updatedProjects =
+    currentProjects.filter(
+      (project) =>
+        String(
+          project.id || project._id
+        ) !== String(projectId)
+    );
+
+  await api.updateProfile({
+    projects: updatedProjects,
+  });
+
+  return {
+    success: true,
+  };
+},
+
+// ================================================================
+// CERTIFICATIONS — stored inside User profile
+// ================================================================
+
+getCertifications: async () => {
+  const user = await api.getProfile();
+
+  const certifications = Array.isArray(
+    user?.certifications
+  )
+    ? user.certifications
+    : [];
+
+  return certifications.map(
+    (certification) => ({
+      ...certification,
+      id:
+        certification.id ||
+        certification._id,
+      url:
+        certification.url ||
+        certification.credential_url ||
+        "",
+    })
+  );
+},
+
+addCertification: async (payload) => {
+  const user = await api.getProfile();
+
+  const currentCertifications =
+    Array.isArray(user?.certifications)
+      ? [...user.certifications]
+      : [];
+
+  const certification = {
+    title: String(
+      payload?.title || ""
+    ).trim(),
+    organization: String(
+      payload?.organization || ""
+    ).trim(),
+    date: String(
+      payload?.date || ""
+    ).trim(),
+    url: String(
+      payload?.url || ""
+    ).trim(),
+  };
+
+  if (!certification.title) {
+    throw new Error(
+      "Certification title is required."
+    );
+  }
+
+  const nextCertifications = [
+    ...currentCertifications,
+    certification,
+  ];
+
+  const updatedUser =
+    await api.updateProfile({
+      certifications:
+        nextCertifications,
+    });
+
+  const savedCertifications =
+    Array.isArray(
+      updatedUser?.certifications
+    )
+      ? updatedUser.certifications
+      : nextCertifications;
+
+  const savedCertification =
+    savedCertifications[
+      savedCertifications.length - 1
+    ];
+
+  return {
+    data: {
+      ...savedCertification,
+      id:
+        savedCertification?.id ||
+        savedCertification?._id ||
+        `cert-${Date.now()}`,
+      url:
+        savedCertification?.url ||
+        "",
+    },
+  };
+},
+
+updateCertification: async (
+  certificationId,
+  payload
+) => {
+  const user = await api.getProfile();
+
+  const currentCertifications =
+    Array.isArray(user?.certifications)
+      ? [...user.certifications]
+      : [];
+
+  const updatedCertifications =
+    currentCertifications.map(
+      (certification) => {
+        const currentId = String(
+          certification.id ||
+          certification._id
+        );
+
+        if (
+          currentId !==
+          String(certificationId)
+        ) {
+          return certification;
+        }
+
+        return {
+          ...certification,
+          title: String(
+            payload?.title || ""
+          ).trim(),
+          organization: String(
+            payload?.organization || ""
+          ).trim(),
+          date: String(
+            payload?.date || ""
+          ).trim(),
+          url: String(
+            payload?.url || ""
+          ).trim(),
+        };
+      }
+    );
+
+  const updatedUser =
+    await api.updateProfile({
+      certifications:
+        updatedCertifications,
+    });
+
+  const savedCertifications =
+    Array.isArray(
+      updatedUser?.certifications
+    )
+      ? updatedUser.certifications
+      : updatedCertifications;
+
+  const savedCertification =
+    savedCertifications.find(
+      (certification) =>
+        String(
+          certification.id ||
+          certification._id
+        ) === String(certificationId)
+    );
+
+  return {
+    data: {
+      ...(savedCertification || {}),
+      id:
+        savedCertification?.id ||
+        savedCertification?._id ||
+        certificationId,
+      url:
+        savedCertification?.url ||
+        "",
+    },
+  };
+},
+
+deleteCertification: async (
+  certificationId
+) => {
+  const user = await api.getProfile();
+
+  const currentCertifications =
+    Array.isArray(
+      user?.certifications
+    )
+      ? user.certifications
+      : [];
+
+  const updatedCertifications =
+    currentCertifications.filter(
+      (certification) =>
+        String(
+          certification.id ||
+          certification._id
+        ) !== String(certificationId)
+    );
+
+  await api.updateProfile({
+    certifications:
+      updatedCertifications,
+  });
+
+  return {
+    success: true,
+  };
+},
 
 
   // ================================================================

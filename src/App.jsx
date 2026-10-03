@@ -184,10 +184,13 @@ function App() {
               <Route path="/my-requests" element={<Navigate to="/dashboard/applications" replace />} />
 
               {/* Info Pages */}
-              <Route path="/about" element={<InfoPage kind="about" />} />
-              <Route path="/campus-program" element={<InfoPage kind="program" />} />
-              <Route path="/privacy" element={<InfoPage kind="privacy" />} />
-              <Route path="/terms" element={<InfoPage kind="terms" />} />
+             {/* Info Pages */}
+<Route path="/about" element={<InfoPage kind="about" />} />
+<Route path="/campus-program" element={<InfoPage kind="program" />} />
+<Route path="/privacy" element={<InfoPage kind="privacy" />} />
+<Route path="/terms" element={<InfoPage kind="terms" />} />
+<Route path="/refund-policy" element={<InfoPage kind="refund" />} />
+<Route path="/contact" element={<InfoPage kind="contact" />} />
             </Routes>
           </BrowserRouter>
         </EnvironmentProvider>

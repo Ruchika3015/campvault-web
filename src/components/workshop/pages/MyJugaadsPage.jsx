@@ -1669,6 +1669,12 @@ function ProposalDetailCard({
   ] = useState(false);
 
   const [
+  paymentConsent,
+  setPaymentConsent,
+] = useState(false);
+
+
+  const [
     conversationError,
     setConversationError,
   ] = useState('');
@@ -2020,8 +2026,44 @@ function ProposalDetailCard({
             </p>
           )}
 
+
+<div className="mt-3 pt-3 border-t border-metal-1/40">
+  <label className="flex items-start gap-2 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={paymentConsent}
+      onChange={(event) =>
+        setPaymentConsent(event.target.checked)
+      }
+      className="mt-0.5 accent-amber"
+    />
+
+    <span className="font-mono text-[10px] sm:text-xs text-ink-2 leading-relaxed">
+      I agree to the{' '}
+      <Link
+        to="/terms"
+        target="_blank"
+        className="text-amber hover:underline"
+      >
+        Terms & Conditions
+      </Link>{' '}
+      and{' '}
+      <Link
+        to="/refund-policy"
+        target="_blank"
+        className="text-amber hover:underline"
+      >
+        Refund & Cancellation Policy
+      </Link>
+      .
+    </span>
+  </label>
+</div>
+
+
           <button
-            type="button"
+  type="button"
+  disabled={!paymentConsent}
             onClick={async () => {
               try {
                 const profileResponse = await api.getProfile();
@@ -2148,11 +2190,9 @@ if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
                 );
               }
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-mint/15 text-mint font-technical text-xs font-semibold hover:bg-mint/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <HandCoins
-              size={14}
-            />
+            <HandCoins size={14} />
 
             PAY ₹
             {formattedProposedAmount}

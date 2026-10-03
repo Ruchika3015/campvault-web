@@ -72,7 +72,20 @@ const PAGE_CONTENT = {
     <div>
   For support and payment-related queries, email us at{' '}
   <a
-  href="mailto:CampusVault.co@gmail.com"
+  href="https://mail.google.com/mail/?view=cm&fs=1&to=CampusVault.co@gmail.com"
+  onClick={(event) => {
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    if (isAndroid) {
+      event.preventDefault();
+
+      window.location.href =
+        'intent://co?to=CampusVault.co@gmail.com' +
+        '#Intent;scheme=googlegmail;package=com.google.android.gm;end';
+    }
+  }}
+  target="_blank"
+  rel="noopener noreferrer"
   className="text-amber hover:underline"
 >
   CampusVault.co@gmail.com

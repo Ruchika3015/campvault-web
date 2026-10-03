@@ -72,13 +72,11 @@ const PAGE_CONTENT = {
     <div>
   For support and payment-related queries, email us at{' '}
   <a
-    href="https://mail.google.com/mail/?view=cm&fs=1&to=CampusVault.co@gmail.com"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="text-amber hover:underline"
-  >
-    CampusVault.co@gmail.com
-  </a>
+  href="mailto:CampusVault.co@gmail.com"
+  className="text-amber hover:underline"
+>
+  CampusVault.co@gmail.com
+</a>
   . Please include your registered email address and relevant gig or
   transaction details so that we can assist you efficiently.
 </div>,
